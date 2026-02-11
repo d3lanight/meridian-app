@@ -37,33 +37,6 @@ export default function DashboardPage() {
       {/* Dev-only scenario switcher */}
       <DevTools activeScenario={activeScenario} onScenarioChange={setScenario} />
 
-      {/* ── Status Bar ── */}
-      <div
-        className="flex justify-between items-center text-xs font-medium px-5 pt-3"
-        style={{ color: M.textMuted }}
-      >
-        <span>9:41</span>
-        <div className="flex gap-1 items-center">
-          <div
-            className="rounded-sm p-px"
-            style={{
-              width: '14px',
-              height: '10px',
-              border: `1px solid ${M.textMuted}`,
-            }}
-          >
-            <div
-              className="rounded-[1px]"
-              style={{
-                width: '70%',
-                height: '100%',
-                background: M.textMuted,
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-4" style={anim(0)}>
         <div className="flex items-center justify-between">
