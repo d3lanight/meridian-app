@@ -21,8 +21,8 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Meridian - Crypto Analyst",
-  description: "Market & portfolio intelligence for crypto traders",
+  title: "Meridian",
+  description: "Market & portfolio intelligence",
 };
 
 export default function RootLayout({

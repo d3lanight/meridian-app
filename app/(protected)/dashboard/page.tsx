@@ -73,7 +73,7 @@ export default function DashboardPage() {
               className="font-display text-lg font-semibold"
               style={{ letterSpacing: '-0.02em', color: M.text }}
             >
-              Crypto Analyst
+              Meridian
             </span>
           </div>
           <div
