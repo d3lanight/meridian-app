@@ -1,11 +1,12 @@
 // payload.config.ts
-// Version: 1.4.0 | 2026-02-15
+// Version: 1.5.0 | 2026-02-15
 // Changelog:
 //   1.0.0 — Story 21: Initial Payload install, Users collection inline
 //   1.1.0 — Story 22: Add KnowledgeEntries collection
 //   1.2.0 — Story 23: Add GlossaryEntries + Articles collections
 //   1.3.0 — Story 24: Add Media collection + S3 storage plugin (Supabase Storage)
 //   1.4.0 — Story 26: Add Epics collection (PM group)
+//   1.5.0 — Story 27: Add Stories collection (PM group)
 
 import path from 'path'
 import { buildConfig } from 'payload'
@@ -21,6 +22,8 @@ import { GlossaryEntries } from './collections/GlossaryEntries'
 import { Articles } from './collections/Articles'
 import { Media } from './collections/Media'
 import { Epics } from './collections/Epics'
+import { Stories } from './collections/Stories'
+import { Sprints } from './collections/Sprints'
 
 const Users: CollectionConfig = {
   slug: 'payload-users',
@@ -56,6 +59,8 @@ export default buildConfig({
     Articles,
     Media,
     Epics,
+    Stories,
+    Sprints,
   ],
 
   editor: lexicalEditor(),
