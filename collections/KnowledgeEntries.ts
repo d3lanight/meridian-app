@@ -7,7 +7,6 @@
 
 import type { CollectionConfig } from 'payload'
 import {
-  HeadingFeature,
   FixedToolbarFeature,
   InlineCodeFeature,
 } from '@payloadcms/richtext-lexical'
@@ -86,7 +85,6 @@ export const KnowledgeEntries: CollectionConfig = {
       editor: lexicalEditor({
         features: ({ defaultFeatures }) => [
           ...defaultFeatures,
-          HeadingFeature({ enabledHeadingSizes: ['h2', 'h3', 'h4'] }),
           FixedToolbarFeature(),
           InlineCodeFeature(),
         ],
@@ -201,6 +199,7 @@ export const KnowledgeEntries: CollectionConfig = {
         { label: 'Phase 2', value: 'phase-2' },
         { label: 'Phase 3', value: 'phase-3' },
         { label: 'Phase 4', value: 'phase-4' },
+        { label: 'Phase 5', value: 'phase-5' },
         { label: 'Cross-Phase', value: 'cross-phase' },
         { label: 'Company', value: 'company' },
       ],
@@ -234,6 +233,30 @@ export const KnowledgeEntries: CollectionConfig = {
         description: 'UUID of related signal from structure layer.',
         condition: (data) =>
           data?.category === 'concept' || data?.category === 'how-to',
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // 3.4 Migration Tracking Fields
+    // -------------------------------------------------------------------------
+    {
+      name: 'notion_id',
+      type: 'text',
+      unique: true,
+      index: true,
+      admin: {
+        position: 'sidebar',
+        description: 'Original Notion page ID (migration reference).',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'source',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        description: 'Content origin: notion-import or manual.',
+        readOnly: true,
       },
     },
   ],
