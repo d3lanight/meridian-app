@@ -78,12 +78,11 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
-      max: 3,
-      idleTimeoutMillis: 5000,    // Release idle connections after 5s
-      connectionTimeoutMillis: 10000, // Fail fast instead of hanging
+      max: 2,
     },
-    push: true,
+    push: false,                    // Schema managed via SQL migrations
     tablesFilter: ['payload_*'],
+    transactionOptions: false,      // Disable Drizzle transactions (required for transaction pooler)
   }),
 
   plugins: [
