@@ -75,6 +75,16 @@ export const Sprints: CollectionConfig = {
     // 4.1 Core Fields
     // -------------------------------------------------------------------------
     {
+      name: 'slug',
+      type: 'text',
+      unique: true,
+      index: true,
+      admin: {
+        position: 'sidebar',
+        description: 'URL-friendly identifier',
+      },
+    },
+    {
       name: 'name',
       type: 'text',
       required: true,
@@ -150,6 +160,13 @@ export const Sprints: CollectionConfig = {
       }),
       admin: {
         description: 'Sprint goal — what we aim to deliver',
+      },
+    },
+    {
+      name: 'content',
+      type: 'richText',
+      admin: {
+        description: 'Sprint overview, goals, and retrospective notes',
       },
     },
 
