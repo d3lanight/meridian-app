@@ -47,6 +47,9 @@ export const GlossaryEntries: CollectionConfig = {
       type: 'text',
       required: true,
       label: 'Term',
+      admin: {
+        description: 'Readable glossary term',
+      },
     },
     {
       name: 'slug',
@@ -55,7 +58,7 @@ export const GlossaryEntries: CollectionConfig = {
       unique: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier. Auto-generated from term if left empty.',
+        description: 'Unique identifier for URL routing. Auto-generated from term if left empty.',
       },
       hooks: {
         beforeValidate: [

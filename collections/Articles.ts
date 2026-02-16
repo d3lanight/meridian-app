@@ -46,6 +46,9 @@ export const Articles: CollectionConfig = {
       name: 'title',
       type: 'text',
       required: true,
+      admin: {
+        description: 'Readable article title',
+      },
     },
     {
       name: 'slug',
@@ -54,7 +57,7 @@ export const Articles: CollectionConfig = {
       unique: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier. Auto-generated from title if left empty.',
+        description: 'Unique identifier for URL routing',
       },
       hooks: {
         beforeValidate: [

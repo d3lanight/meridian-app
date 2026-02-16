@@ -75,21 +75,21 @@ export const Sprints: CollectionConfig = {
     // 4.1 Core Fields
     // -------------------------------------------------------------------------
     {
+      name: 'name',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Readable sprint name (e.g., "PM Migration & Dashboards")',
+      },
+    },
+    {
       name: 'slug',
       type: 'text',
       unique: true,
       index: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier',
-      },
-    },
-    {
-      name: 'name',
-      type: 'text',
-      required: true,
-      admin: {
-        description: 'Identifier (e.g., "ca-sprint7")',
+        description: 'Unique identifier (e.g., "ca-sprint8")',
       },
     },
     {
@@ -99,13 +99,6 @@ export const Sprints: CollectionConfig = {
       admin: {
         position: 'sidebar',
         description: 'Sequential sprint number',
-      },
-    },
-    {
-      name: 'sprintName',
-      type: 'text',
-      admin: {
-        description: 'Descriptive name (e.g., "PM Layer + Content Migration")',
       },
     },
     {

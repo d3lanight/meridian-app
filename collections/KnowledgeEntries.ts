@@ -47,6 +47,9 @@ export const KnowledgeEntries: CollectionConfig = {
       name: 'title',
       type: 'text',
       required: true,
+      admin: {
+        description: 'Readable entry title',
+      },
     },
     {
       name: 'slug',
@@ -55,12 +58,11 @@ export const KnowledgeEntries: CollectionConfig = {
       unique: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier. Auto-generated from title if left empty.',
+        description: 'Unique identifier for URL routing. Auto-generated from title if left empty.',
       },
       hooks: {
         beforeValidate: [
           ({ value, data }) => {
-            // Auto-generate slug from title if not provided
             if (!value && data?.title) {
               return data.title
                 .toLowerCase()

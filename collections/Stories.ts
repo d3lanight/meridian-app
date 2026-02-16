@@ -43,6 +43,14 @@ export const Stories: CollectionConfig = {
     // -------------------------------------------------------------------------
     // 3.1 Core Fields
     // -------------------------------------------------------------------------
+  {
+      name: 'name',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Readable story name (e.g., "Sprint Dashboard")',
+      },
+    },
     {
       name: 'slug',
       type: 'text',
@@ -50,14 +58,8 @@ export const Stories: CollectionConfig = {
       index: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier',
+        description: 'Unique identifier (e.g., "ca-story31-sprint-dashboard")',
       },
-    },
-    
-    {
-      name: 'name',
-      type: 'text',
-      required: true,
     },
     {
       name: 'status',

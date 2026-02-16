@@ -41,20 +41,22 @@ export const Epics: CollectionConfig = {
     // 3.1 Core Fields
     // -------------------------------------------------------------------------
     {
+      name: 'name',
+      type: 'text',
+      required: true,
+      admin: {
+        description: 'Readable epic name (e.g., "Payload Integration")',
+      },
+    },
+    {
       name: 'slug',
       type: 'text',
       unique: true,
       index: true,
       admin: {
         position: 'sidebar',
-        description: 'URL-friendly identifier',
+        description: 'Unique identifier (e.g., "ca-epic4-payload-integration")',
       },
-    },
-    
-    {
-      name: 'name',
-      type: 'text',
-      required: true,
     },
     {
       name: 'status',
