@@ -79,6 +79,8 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
       max: 3,
+      idleTimeoutMillis: 5000,    // Release idle connections after 5s
+      connectionTimeoutMillis: 10000, // Fail fast instead of hanging
     },
     push: true,
     tablesFilter: ['payload_*'],
