@@ -1,57 +1,55 @@
-// app/(payload)/admin/importMap.js
-// Manual importMap — Payload CLI cannot generate this on Node 24 (ESM incompatibility)
-// Updated: Story 24 — added S3ClientUploadHandler for storage-s3 plugin
-
-import { RscEntryLexicalCell } from '@payloadcms/richtext-lexical/rsc'
-import { RscEntryLexicalField } from '@payloadcms/richtext-lexical/rsc'
-import { BoldFeature } from '@payloadcms/richtext-lexical/client'
-import { ItalicFeature } from '@payloadcms/richtext-lexical/client'
-import { UnderlineFeature } from '@payloadcms/richtext-lexical/client'
-import { StrikethroughFeature } from '@payloadcms/richtext-lexical/client'
-import { SubscriptFeature } from '@payloadcms/richtext-lexical/client'
-import { SuperscriptFeature } from '@payloadcms/richtext-lexical/client'
-import { InlineCodeFeature } from '@payloadcms/richtext-lexical/client'
-import { ParagraphFeature } from '@payloadcms/richtext-lexical/client'
-import { HeadingFeature } from '@payloadcms/richtext-lexical/client'
-import { AlignFeature } from '@payloadcms/richtext-lexical/client'
-import { IndentFeature } from '@payloadcms/richtext-lexical/client'
-import { UnorderedListFeature } from '@payloadcms/richtext-lexical/client'
-import { OrderedListFeature } from '@payloadcms/richtext-lexical/client'
-import { ChecklistFeature } from '@payloadcms/richtext-lexical/client'
-import { LinkFeature } from '@payloadcms/richtext-lexical/client'
-import { RelationshipFeature } from '@payloadcms/richtext-lexical/client'
-import { BlockquoteFeature } from '@payloadcms/richtext-lexical/client'
-import { UploadFeature } from '@payloadcms/richtext-lexical/client'
-import { HorizontalRuleFeature } from '@payloadcms/richtext-lexical/client'
-import { InlineToolbarFeature } from '@payloadcms/richtext-lexical/client'
-import { FixedToolbarFeature } from '@payloadcms/richtext-lexical/client'
-import { CollectionCards } from '@payloadcms/ui/rsc'
-import { S3ClientUploadHandler } from '@payloadcms/storage-s3/client'
+import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
+import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
+import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
+import { InlineCodeFeatureClient as InlineCodeFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { UnderlineFeatureClient as UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { StrikethroughFeatureClient as StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { SubscriptFeatureClient as SubscriptFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { SuperscriptFeatureClient as SuperscriptFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { ParagraphFeatureClient as ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { AlignFeatureClient as AlignFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { IndentFeatureClient as IndentFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { UnorderedListFeatureClient as UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { OrderedListFeatureClient as OrderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { ChecklistFeatureClient as ChecklistFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { LinkFeatureClient as LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { RelationshipFeatureClient as RelationshipFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { BlockquoteFeatureClient as BlockquoteFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { UploadFeatureClient as UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { HorizontalRuleFeatureClient as HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { InlineToolbarFeatureClient as InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
+import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 export const importMap = {
-  "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell,
-  "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField,
-  "@payloadcms/richtext-lexical/client#BoldFeature": BoldFeature,
-  "@payloadcms/richtext-lexical/client#ItalicFeature": ItalicFeature,
-  "@payloadcms/richtext-lexical/client#UnderlineFeature": UnderlineFeature,
-  "@payloadcms/richtext-lexical/client#StrikethroughFeature": StrikethroughFeature,
-  "@payloadcms/richtext-lexical/client#SubscriptFeature": SubscriptFeature,
-  "@payloadcms/richtext-lexical/client#SuperscriptFeature": SuperscriptFeature,
-  "@payloadcms/richtext-lexical/client#InlineCodeFeature": InlineCodeFeature,
-  "@payloadcms/richtext-lexical/client#ParagraphFeature": ParagraphFeature,
-  "@payloadcms/richtext-lexical/client#HeadingFeature": HeadingFeature,
-  "@payloadcms/richtext-lexical/client#AlignFeature": AlignFeature,
-  "@payloadcms/richtext-lexical/client#IndentFeature": IndentFeature,
-  "@payloadcms/richtext-lexical/client#UnorderedListFeature": UnorderedListFeature,
-  "@payloadcms/richtext-lexical/client#OrderedListFeature": OrderedListFeature,
-  "@payloadcms/richtext-lexical/client#ChecklistFeature": ChecklistFeature,
-  "@payloadcms/richtext-lexical/client#LinkFeature": LinkFeature,
-  "@payloadcms/richtext-lexical/client#RelationshipFeature": RelationshipFeature,
-  "@payloadcms/richtext-lexical/client#BlockquoteFeature": BlockquoteFeature,
-  "@payloadcms/richtext-lexical/client#UploadFeature": UploadFeature,
-  "@payloadcms/richtext-lexical/client#HorizontalRuleFeature": HorizontalRuleFeature,
-  "@payloadcms/richtext-lexical/client#InlineToolbarFeature": InlineToolbarFeature,
-  "@payloadcms/richtext-lexical/client#FixedToolbarFeature": FixedToolbarFeature,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards,
-  "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler,
+  "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
+  "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
+  "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
+  "@payloadcms/richtext-lexical/client#InlineCodeFeatureClient": InlineCodeFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#HeadingFeatureClient": HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#BoldFeatureClient": BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#UnderlineFeatureClient": UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#StrikethroughFeatureClient": StrikethroughFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#SubscriptFeatureClient": SubscriptFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#SuperscriptFeatureClient": SuperscriptFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#ParagraphFeatureClient": ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#AlignFeatureClient": AlignFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#IndentFeatureClient": IndentFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#UnorderedListFeatureClient": UnorderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#OrderedListFeatureClient": OrderedListFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#ChecklistFeatureClient": ChecklistFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#LinkFeatureClient": LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#RelationshipFeatureClient": RelationshipFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#BlockquoteFeatureClient": BlockquoteFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#UploadFeatureClient": UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#HorizontalRuleFeatureClient": HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/richtext-lexical/client#InlineToolbarFeatureClient": InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/storage-s3/client#S3ClientUploadHandler": S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
+  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }
