@@ -44,6 +44,7 @@ const Users: CollectionConfig = {
 }
 
 export default buildConfig({
+  defaultDepth: 0,
   admin: {
     user: Users.slug,
     importMap: {
