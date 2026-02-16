@@ -31,9 +31,9 @@ type Story = {
 type Sprint = {
   id: string
   name: string
-  sprint_number: number | string
-  start_date: string
-  end_date: string
+  sprintNumber: number | string
+  startDate: string
+  endDate: string
 }
 
 type Epic = {
