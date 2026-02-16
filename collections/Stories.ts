@@ -1,8 +1,10 @@
 // collections/Stories.ts
 // Story: ca-story27-stories-collection
-// Version: 1.0.0 | 2026-02-15
+// Version: 1.1.0 | 2026-02-16
 // Purpose: Sprint-level stories for PM layer
 // Table: payload_stories (via slug prefix convention)
+// Change: Removed dependency1/dependency2 self-relations (tracked in notes instead)
+//         Added maxDepth: 1 to epic + sprint relations to prevent hydration loops
 
 import type { CollectionConfig } from 'payload'
 import {
@@ -106,7 +108,7 @@ export const Stories: CollectionConfig = {
         ],
       }),
       admin: {
-        description: 'Implementation notes, context, decisions',
+        description: 'Implementation notes, context, decisions, dependencies',
       },
     },
     {
@@ -133,6 +135,7 @@ export const Stories: CollectionConfig = {
       type: 'relationship',
       relationTo: 'payload-epics',
       required: true,
+      maxDepth: 1,
       admin: {
         description: 'Parent epic (required)',
       },
@@ -141,28 +144,9 @@ export const Stories: CollectionConfig = {
       name: 'sprint',
       type: 'relationship',
       relationTo: 'payload-sprints',
+      maxDepth: 1,
       admin: {
         description: 'Assigned sprint (null = backlog)',
-      },
-    },
-
-    // Self-referential dependencies
-    {
-      name: 'dependency1',
-      type: 'relationship',
-      relationTo: 'payload-stories',
-      label: 'Dependency 1',
-      admin: {
-        description: 'Story that must complete before this one',
-      },
-    },
-    {
-      name: 'dependency2',
-      type: 'relationship',
-      relationTo: 'payload-stories',
-      label: 'Dependency 2',
-      admin: {
-        description: 'Second dependency (if needed)',
       },
     },
 
