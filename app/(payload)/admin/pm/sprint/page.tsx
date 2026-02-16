@@ -43,7 +43,13 @@ function getStoryNumber(slug: string): string {
 }
 
 // Sort stories: in-progress → sprint-ready → needs-refinement
-const statusOrder = { 'in-progress': 0, 'sprint-ready': 1, 'needs-refinement': 2 }
+const statusOrder: Record<Story['status'], number> = { 
+  'in-progress': 0, 
+  'sprint-ready': 1, 
+  'needs-refinement': 2,
+  'done': 999,
+  'deferred': 999
+}
 function sortStories(stories: Story[]) {
   return stories.sort((a, b) => {
     const orderA = statusOrder[a.status] ?? 999
