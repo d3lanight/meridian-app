@@ -29,7 +29,7 @@ type Story = {
 type Sprint = {
   id: string
   name: string
-  sprintNumber: number | string
+  sprintNumber: number
   status: 'planned' | 'active' | 'completed'
   startDate: string
   endDate: string
