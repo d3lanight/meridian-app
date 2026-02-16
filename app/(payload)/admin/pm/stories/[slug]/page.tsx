@@ -213,7 +213,7 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
                 <span className="text-sm text-[#94A3B8]">{sprint.name}</span>
               </div>
               <span className="text-xs text-[#64748B]">
-                {new Date(sprint.start_date).toLocaleDateString()} - {new Date(sprint.end_date).toLocaleDateString()}
+                {new Date(sprint.startDate).toLocaleDateString()} - {new Date(sprint.endDate).toLocaleDateString()}
               </span>
             </div>
           </div>
