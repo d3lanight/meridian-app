@@ -150,6 +150,13 @@ export const Epics: CollectionConfig = {
       },
     },
     {
+      name: 'content',
+      type: 'richText',
+      admin: {
+        description: 'Full epic documentation — architecture, stories, progress log, decisions, lessons learned',
+      },
+    },
+    {
       name: 'successCriteria',
       type: 'richText',
       label: 'Success Criteria',
