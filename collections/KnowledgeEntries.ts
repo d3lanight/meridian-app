@@ -1,8 +1,9 @@
 // src/collections/KnowledgeEntries.ts
 // Story: ca-story22-knowledge-collection
-// Version: 1.0.0 | 2026-02-15
+// Version: 1.1.0 | 2026-02-16
 // Purpose: Unified knowledge collection replacing 5 Notion knowledge DBs
 //          (internal, phases, milestones, templates, public)
+//          templates split to standard and release notes in 1.1.0
 // Table: payload_knowledge_entries (via slug prefix convention)
 
 import type { CollectionConfig } from 'payload'
@@ -151,13 +152,15 @@ export const KnowledgeEntries: CollectionConfig = {
         // From ca-knowledge-milestones
         { label: 'Milestone', value: 'milestone' },
         // From ca-knowledge-templates
-        { label: 'Template', value: 'template' },
+        { label: 'Standard', value: 'standard' },
         // From ca-knowledge-public
         { label: 'Release Note', value: 'release-note' },
         { label: 'Help Article', value: 'help-article' },
         { label: 'FAQ', value: 'faq' },
         { label: 'Roadmap', value: 'roadmap' },
       ],
+      defaultValue: 'concept',
+      label: 'Category',
       admin: {
         position: 'sidebar',
       },

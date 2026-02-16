@@ -1,5 +1,5 @@
 // payload.config.ts
-// Version: 1.6.0 | 2026-02-15
+// Version: 1.7.0 | 2026-02-16
 // Changelog:
 //   1.0.0 — Story 21: Initial Payload install, Users collection inline
 //   1.1.0 — Story 22: Add KnowledgeEntries collection
@@ -8,6 +8,7 @@
 //   1.4.0 — Story 26: Add Epics collection (PM group)
 //   1.5.0 — Story 27: Add Stories collection (PM group)
 //   1.6.0 — Story 28: Full Sprints + SprintMetrics collections
+//   1.7.0 - Story 29: Add ProjectDocs collection
 
 import path from 'path'
 import { buildConfig } from 'payload'
@@ -26,6 +27,7 @@ import { Epics } from './collections/Epics'
 import { Stories } from './collections/Stories'
 import { Sprints } from './collections/Sprints'
 import { SprintMetrics } from './collections/SprintMetrics'
+import { ProjectDocs } from './collections/ProjectDocs'
 
 const Users: CollectionConfig = {
   slug: 'payload-users',
@@ -65,6 +67,7 @@ export default buildConfig({
     Stories,
     Sprints,
     SprintMetrics,
+    ProjectDocs,
   ],
 
   editor: lexicalEditor(),
