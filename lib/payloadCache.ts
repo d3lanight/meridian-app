@@ -8,7 +8,7 @@
 
 import { unstable_cache } from 'next/cache'
 import { getPayload } from 'payload'
-import type { Config } from 'payload'
+import type { SanitizedConfig } from 'payload'
 
 type QueryOptions = {
   collection: string
@@ -25,7 +25,7 @@ type QueryOptions = {
  * @param tags Cache tags for invalidation
  */
 export async function cachedFind(
-  config: Promise<Config>,
+  config: Promise<SanitizedConfig>,
   options: QueryOptions,
   revalidate: number = 60,
   tags: string[] = []
@@ -50,7 +50,7 @@ export async function cachedFind(
  * @param revalidate Cache duration in seconds (default: 60)
  */
 export async function cachedFindByID(
-  config: Promise<Config>,
+  config: Promise<SanitizedConfig>,
   collection: string,
   id: string,
   revalidate: number = 60
