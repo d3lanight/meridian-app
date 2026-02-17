@@ -14,9 +14,6 @@ import Link from 'next/link'
 
 const CACHE_TIME = 300 // 5 minutes
 
-// Next.js route segment config
-export const revalidate = CACHE_TIME
-export const dynamic = 'force-static'
 
 type Sprint = {
   id: string

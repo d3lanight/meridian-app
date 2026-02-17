@@ -18,9 +18,6 @@ import { MetricStrip } from '@/components/pm/MetricStrip'
 // Cache PM dashboard data for 5 minutes (revalidate every 300s)
 const CACHE_TIME = 300
 
-// Next.js route segment config
-export const revalidate = CACHE_TIME
-export const dynamic = 'force-static'
 
 type Epic = {
   id: string
