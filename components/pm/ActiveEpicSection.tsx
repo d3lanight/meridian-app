@@ -17,7 +17,7 @@ interface Story {
   id: string
   name: string
   slug: string
-  status: 'done' | 'in-progress' | 'sprint-ready' | 'needs-refinement'
+  status: 'done' | 'in-progress' | 'sprint-ready' | 'needs-refinement' | 'deferred'
 }
 
 interface ActiveEpicSectionProps {
@@ -85,6 +85,8 @@ export function ActiveEpicSection({ epicName, epicNumber, stories }: ActiveEpicS
                           ? 'bg-[#F5B74D]/10 text-[#F5B74D]'
                           : story.status === 'sprint-ready'
                           ? 'bg-[#60A5FA]/10 text-[#60A5FA]'
+                          : story.status === 'deferred'
+                          ? 'bg-[#F87171]/10 text-[#F87171]'
                           : 'bg-[#A78BFA]/10 text-[#A78BFA]'
                       }`}
                     >
