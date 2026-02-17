@@ -72,6 +72,7 @@ export const Stories: CollectionConfig = {
         { label: 'In Progress', value: 'in-progress' },
         { label: 'Done', value: 'done' },
         { label: 'Deferred', value: 'deferred' },
+        { label: 'Cancelled',value: 'cancelled'},
       ],
       admin: {
         position: 'sidebar',
