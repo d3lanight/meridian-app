@@ -1,19 +1,26 @@
 /**
  * Sprint Dashboard Page
- * Version: 1.0
+ * Version: 1.1 (with cache)
  * Story: ca-story31-sprint-dashboard
  * 
  * Main PM dashboard showing active sprint metrics and stories
+ * Performance: Cached queries with 5-minute revalidation
  */
 
-import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { cachedFind } from '@/lib/payloadCache'
 import { PMNav } from '@/components/pm/PMNav'
 import { MetricCard } from '@/components/pm/MetricCard'
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
 import { ProgressBar } from '@/components/pm/ProgressBar'
 import Link from 'next/link'
+
+const CACHE_TIME = 300 // 5 minutes
+
+// Next.js route segment config
+export const revalidate = CACHE_TIME
+export const dynamic = 'force-static'
 
 type Story = {
   id: string
@@ -59,15 +66,18 @@ function sortStories(stories: Story[]) {
 }
 
 export default async function SprintDashboardPage() {
-  const payload = await getPayload({ config: configPromise })
-
-  // Get active sprint
-  const sprintResult = await payload.find({
-    collection: 'payload-sprints',
-    where: { status: { equals: 'active' } },
-    depth: 0,
-    limit: 1,
-  })
+  // Get active sprint (cached)
+  const sprintResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-sprints',
+      where: { status: { equals: 'active' } },
+      depth: 0,
+      limit: 1,
+    },
+    CACHE_TIME,
+    ['sprint-dashboard']
+  )
 
   const activeSprint = sprintResult.docs[0] as Sprint | undefined
 
@@ -83,13 +93,18 @@ export default async function SprintDashboardPage() {
     )
   }
 
-  // Get stories for active sprint
-  const storiesResult = await payload.find({
-    collection: 'payload-stories',
-    where: { sprint: { equals: activeSprint.id } },
-    depth: 0,
-    limit: 100,
-  })
+  // Get stories for active sprint (cached)
+  const storiesResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-stories',
+      where: { sprint: { equals: activeSprint.id } },
+      depth: 0,
+      limit: 100,
+    },
+    CACHE_TIME,
+    ['sprint-dashboard']
+  )
 
   const allStories = storiesResult.docs as Story[]
 

@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
+  { label: 'PM Dashboard', href: '/admin/pm' },
   { label: 'Sprint Dashboard', href: '/admin/pm/sprint' },
   { label: 'Story Board', href: '/admin/pm/stories' },
   { label: 'Sprint Goals', href: '/admin/pm/goals' },

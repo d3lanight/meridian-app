@@ -1,19 +1,26 @@
 /**
  * Sprint Detail Page
- * Version: 1.0
+ * Version: 1.1 (with cache)
  * Story: ca-story31-sprint-dashboard
  * 
  * Full sprint view with goal, dates, and embedded story cards
+ * Performance: Cached queries with 5-minute revalidation
  */
 
-import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { cachedFind } from '@/lib/payloadCache'
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
 import { ProgressBar } from '@/components/pm/ProgressBar'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+
+const CACHE_TIME = 300 // 5 minutes
+
+// Next.js route segment config
+export const revalidate = CACHE_TIME
+export const dynamic = 'force-static'
 
 type Sprint = {
   id: string
@@ -91,26 +98,35 @@ function getStatusColor(status: string) {
 
 export default async function SprintDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const payload = await getPayload({ config: configPromise })
 
-  // Get sprint
-  const sprintResult = await payload.find({
-    collection: 'payload-sprints',
-    where: { slug: { equals: slug } },
-    depth: 0,
-    limit: 1,
-  })
+  // Get sprint (cached)
+  const sprintResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-sprints',
+      where: { slug: { equals: slug } },
+      depth: 0,
+      limit: 1,
+    },
+    CACHE_TIME,
+    ['sprint-goal-detail']
+  )
 
   const sprint = sprintResult.docs[0] as Sprint | undefined
   if (!sprint) notFound()
 
-  // Get stories for this sprint
-  const storiesResult = await payload.find({
-    collection: 'payload-stories',
-    where: { sprint: { equals: sprint.id } },
-    depth: 0,
-    limit: 100,
-  })
+  // Get stories for this sprint (cached)
+  const storiesResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-stories',
+      where: { sprint: { equals: sprint.id } },
+      depth: 0,
+      limit: 100,
+    },
+    CACHE_TIME,
+    ['sprint-goal-detail']
+  )
 
   const stories = storiesResult.docs as Story[]
   

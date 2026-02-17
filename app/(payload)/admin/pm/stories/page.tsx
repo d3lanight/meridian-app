@@ -1,17 +1,24 @@
 /**
  * Story Board Page
- * Version: 1.0
+ * Version: 1.1 (with cache)
  * Story: ca-story31-sprint-dashboard
  * 
  * Stories grouped by status with drill-down
+ * Performance: Cached queries with 5-minute revalidation
  */
 
-import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { cachedFind } from '@/lib/payloadCache'
 import { PMNav } from '@/components/pm/PMNav'
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
 import Link from 'next/link'
+
+const CACHE_TIME = 300 // 5 minutes
+
+// Next.js route segment config
+export const revalidate = CACHE_TIME
+export const dynamic = 'force-static'
 
 type Story = {
   id: string
@@ -56,25 +63,34 @@ function groupByStatus(stories: Story[]) {
 }
 
 export default async function StoryBoardPage() {
-  const payload = await getPayload({ config: configPromise })
-
-  // Get all stories
-  const storiesResult = await payload.find({
-    collection: 'payload-stories',
-    depth: 0,
-    limit: 200,
-    sort: '-updated_at',
-  })
+  // Get all stories (cached)
+  const storiesResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-stories',
+      depth: 0,
+      limit: 200,
+      sort: '-updated_at',
+    },
+    CACHE_TIME,
+    ['story-board']
+  )
 
   const stories = storiesResult.docs as Story[]
   const groupedStories = groupByStatus(stories)
 
-  // Get sprint names for display
-  const sprintsResult = await payload.find({
-    collection: 'payload-sprints',
-    depth: 0,
-    limit: 100,
-  })
+  // Get sprint names for display (cached)
+  const sprintsResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-sprints',
+      depth: 0,
+      limit: 100,
+    },
+    CACHE_TIME,
+    ['story-board']
+  )
+  
   const sprints = sprintsResult.docs as Sprint[]
   const sprintMap = new Map(sprints.map(s => [s.id, s]))
 

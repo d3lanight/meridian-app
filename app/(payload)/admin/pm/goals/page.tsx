@@ -1,15 +1,22 @@
 /**
  * Sprint Goals Page
- * Version: 1.0
+ * Version: 1.1 (with cache)
  * Story: ca-story31-sprint-dashboard
  * 
  * All sprints with goal content
+ * Performance: Cached queries with 5-minute revalidation
  */
 
-import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { cachedFind } from '@/lib/payloadCache'
 import { PMNav } from '@/components/pm/PMNav'
 import Link from 'next/link'
+
+const CACHE_TIME = 300 // 5 minutes
+
+// Next.js route segment config
+export const revalidate = CACHE_TIME
+export const dynamic = 'force-static'
 
 type Sprint = {
   id: string
@@ -48,15 +55,18 @@ function getStatusColor(status: string) {
 }
 
 export default async function SprintGoalsPage() {
-  const payload = await getPayload({ config: configPromise })
-
-  // Get all sprints, sorted by sprint number descending
-  const sprintsResult = await payload.find({
-    collection: 'payload-sprints',
-    depth: 0,
-    limit: 100,
-    sort: '-sprint_number',
-  })
+  // Get all sprints, sorted by sprint number descending (cached)
+  const sprintsResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-sprints',
+      depth: 0,
+      limit: 100,
+      sort: '-sprint_number',
+    },
+    CACHE_TIME,
+    ['sprint-goals']
+  )
 
   const sprints = sprintsResult.docs as Sprint[]
 

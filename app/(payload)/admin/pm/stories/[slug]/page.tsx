@@ -1,18 +1,25 @@
 /**
  * Story Detail Page
- * Version: 1.0
+ * Version: 1.1 (with cache)
  * Story: ca-story31-sprint-dashboard
  * 
  * Full story view with properties, AC, dependencies, notes
+ * Performance: Cached queries with 5-minute revalidation
  */
 
-import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { cachedFind, cachedFindByID } from '@/lib/payloadCache'
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
 import { CheckCircle2, Circle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+
+const CACHE_TIME = 300 // 5 minutes
+
+// Next.js route segment config
+export const revalidate = CACHE_TIME
+export const dynamic = 'force-static'
 
 type Story = {
   id: string
@@ -41,10 +48,6 @@ type Epic = {
   name: string
   slug: string
 }
-
-// Extract plain text from Lexical JSON
-// Replace the extractText function in app/(payload)/admin/pm/stories/[slug]/page.tsx
-// with this improved version:
 
 // Extract plain text from Lexical JSON - improved version
 function extractText(lexical: any): string {
@@ -106,47 +109,58 @@ function extractSection(text: string, sectionName: string): string {
 
 export default async function StoryDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const payload = await getPayload({ config: configPromise })
 
-  // Get story
-  const storyResult = await payload.find({
-    collection: 'payload-stories',
-    where: { slug: { equals: slug } },
-    depth: 0,
-    limit: 1,
-  })
+  // Get story (cached)
+  const storyResult = await cachedFind(
+    configPromise,
+    {
+      collection: 'payload-stories',
+      where: { slug: { equals: slug } },
+      depth: 0,
+      limit: 1,
+    },
+    CACHE_TIME,
+    ['story-detail']
+  )
 
   const story = storyResult.docs[0] as Story | undefined
   if (!story) notFound()
 
-  // Get related data
-  const [sprintResult, epicResult, allStoriesResult] = await Promise.all([
-    story.sprint ? payload.findByID({
-      collection: 'payload-sprints',
-      id: story.sprint,
-      depth: 0,
-    }) : null,
-    story.epic ? payload.findByID({
-      collection: 'payload-epics',
-      id: story.epic,
-      depth: 0,
-    }) : null,
-    payload.find({
-      collection: 'payload-stories',
-      depth: 0,
-      limit: 200,
-    }),
+  // Get related data (cached)
+  const [sprintData, epicData, allStoriesResult] = await Promise.all([
+    story.sprint ? cachedFindByID(
+      configPromise,
+      'payload-sprints',
+      story.sprint,
+      CACHE_TIME
+    ) : null,
+    story.epic ? cachedFindByID(
+      configPromise,
+      'payload-epics',
+      story.epic,
+      CACHE_TIME
+    ) : null,
+    cachedFind(
+      configPromise,
+      {
+        collection: 'payload-stories',
+        depth: 0,
+        limit: 200,
+      },
+      CACHE_TIME,
+      ['story-detail']
+    ),
   ])
 
-  const sprint = sprintResult as Sprint | null
-  const epic = epicResult as Epic | null
+  const sprint = sprintData as Sprint | null
+  const epic = epicData as Epic | null
   const allStories = allStoriesResult.docs as Story[]
 
   // Get dependency stories
   const dep1 = story.dependency_1 ? allStories.find(s => s.id === story.dependency_1) : null
   const dep2 = story.dependency_2 ? allStories.find(s => s.id === story.dependency_2) : null
 
-  // Extract content sections (simplified - assumes markdown-like structure)
+  // Extract content sections
   const contentText = extractText(story.content)
   
   // Simple AC extraction (looks for checkboxes in content)
