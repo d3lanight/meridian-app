@@ -54,7 +54,7 @@ export default async function StoryBoardPage() {
               </div>
               <div className="flex flex-col gap-2">
                 {group.items.map((s: any) => {
-                  const sEpic = typeof s.epic_id === 'object' ? s.epic_id : null
+                  const sEpic = typeof s.epic === 'object' ? s.epic : null
                   return (
                     <Link key={s.id} href={`/admin/pm/stories/${s.slug}`} className="flex items-center justify-between no-underline transition-colors" style={{ background: '#131B2E', borderRadius: 12, padding: '14px 18px', border: '1px solid rgba(148,163,184,0.08)', borderLeft: `3px solid ${cfg.color}` }}>
                       <div className="flex items-center gap-[14px]">

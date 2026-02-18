@@ -31,7 +31,7 @@ export default async function SprintGoalDetailPage({ params }: { params: Promise
 
   const storiesResult = await payload.find({
     collection: 'payload-stories',
-    where: { sprint_id: { equals: sprint.id } },
+    where: { sprint: { equals: sprint.id } },
     depth: 0,
     limit: 100,
     sort: 'id',

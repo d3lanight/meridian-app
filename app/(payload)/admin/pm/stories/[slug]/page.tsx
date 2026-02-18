@@ -37,8 +37,8 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
     )
   }
 
-  const epic = typeof story.epic_id === 'object' ? story.epic_id : null
-  const sprint = typeof story.sprint_id === 'object' ? story.sprint_id : null
+  const epic = typeof story.epic === 'object' ? story.epic : null
+  const sprint = typeof story.sprint === 'object' ? story.sprint : null
   const storyNumber = story.id
   const epicNumber = epic?.slug ? (epic.slug.match(/ca-epic(\d+)/)?.[1] || '?') : '?'
   const sections = splitContentSections(story.content)

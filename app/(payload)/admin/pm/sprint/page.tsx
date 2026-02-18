@@ -35,7 +35,7 @@ export default async function SprintDashboardPage() {
 
   const storiesResult = await payload.find({
     collection: 'payload-stories',
-    where: { sprint_id: { equals: sprint.id } },
+    where: { sprint: { equals: sprint.id } },
     depth: 1,
     limit: 100,
     sort: 'id',
@@ -47,7 +47,7 @@ export default async function SprintDashboardPage() {
   const pct = total ? Math.round((completed / total) * 100) : 0
   const activeStories = stories.filter((s: any) => s.status !== 'done' && s.status !== 'deferred' && s.status !== 'cancelled')
 
-  const epicIds = new Set(stories.map((s: any) => typeof s.epic_id === 'object' ? s.epic_id?.id : s.epic_id).filter(Boolean))
+  const epicIds = new Set(stories.map((s: any) => typeof s.epic === 'object' ? s.epic?.id : s.epic).filter(Boolean))
 
   const statusOrder = ['done', 'in-progress', 'sprint-ready', 'needs-refinement', 'deferred', 'cancelled'] as const
   const statusCounts = statusOrder.map(status => ({
@@ -148,7 +148,7 @@ export default async function SprintDashboardPage() {
                 return (order[a.status] ?? 9) - (order[b.status] ?? 9)
               })
               .map((s: any) => {
-                const sEpic = typeof s.epic_id === 'object' ? s.epic_id : null
+                const sEpic = typeof s.epic === 'object' ? s.epic : null
                 return (
                   <Link key={s.id} href={`/admin/pm/stories/${s.slug}`} className="block no-underline transition-colors" style={{ background: '#131B2E', borderRadius: 14, padding: '16px 18px', border: '1px solid rgba(148,163,184,0.08)' }}>
                     <div className="flex justify-between items-start mb-[10px]">
