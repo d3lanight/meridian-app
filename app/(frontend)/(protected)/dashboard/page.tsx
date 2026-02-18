@@ -4,7 +4,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronRight, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { ChevronRight, RefreshCw, Wifi, WifiOff, Activity } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { useMarketData } from '@/hooks/useMarketData'
 import MeridianMark from '@/components/brand/MeridianMark'
@@ -13,6 +13,7 @@ import PostureCard from '@/components/portfolio/PostureCard'
 import SignalCard from '@/components/signals/SignalCard'
 import MarketPulseCard from '@/components/market/MarketPulseCard'
 import DevTools from '@/components/dev/DevTools'
+import Link from 'next/link'
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
@@ -154,10 +155,50 @@ export default function DashboardPage() {
             <MarketPulseCard metrics={pulseMetrics} />
           </div>
 
+{/* Market Context link */}
+          <div style={anim(8)}>
+            <Link
+              href="/market"
+              className="flex items-center justify-between rounded-2xl px-4 py-3.5 no-underline"
+              style={{
+                background: M.surface,
+                border: `1px solid ${M.border}`,
+                marginTop: '8px',
+                cursor: 'pointer',
+                textDecoration: 'none',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center rounded-xl"
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    background: M.accentMuted,
+                  }}
+                >
+                  <Activity size={18} color={M.accent} />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span
+                    className="text-[13px] font-medium"
+                    style={{ color: M.text }}
+                  >
+                    Market Context
+                  </span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>
+                    Regime history, prices & volatility
+                  </span>
+                </div>
+              </div>
+              <ChevronRight size={18} color={M.textSubtle} />
+            </Link>
+          </div>
+
           {/* Last updated */}
           <div
             className="text-center text-[11px] py-2 pb-4"
-            style={{ color: M.textSubtle, ...anim(8) }}
+            style={{ color: M.textSubtle, ...anim(9) }}
           >
             Last analysis: {lastAnalysis}
           </div>

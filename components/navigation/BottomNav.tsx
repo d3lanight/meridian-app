@@ -4,14 +4,14 @@
 
 'use client';
 
-import { Home, Target, Bell, Settings } from 'lucide-react';
+import { Home, Target, Activity, Settings } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import type { NavTab } from '@/types';
 
 const tabs: { id: NavTab; icon: typeof Home; label: string }[] = [
   { id: 'home', icon: Home, label: 'Home' },
   { id: 'portfolio', icon: Target, label: 'Portfolio' },
-  { id: 'signals', icon: Bell, label: 'Signals' },
+  { id: 'market', icon: Activity, label: 'Market' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 

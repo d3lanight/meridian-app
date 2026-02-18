@@ -9,7 +9,7 @@ import type { NavTab } from '@/types';
 
 function getTabFromPath(pathname: string): NavTab {
   if (pathname.startsWith('/portfolio')) return 'portfolio';
-  if (pathname.startsWith('/signals')) return 'signals';
+  if (pathname.startsWith('/market')) return 'market';
   if (pathname.startsWith('/settings')) return 'settings';
   return 'home';
 }
@@ -26,7 +26,7 @@ export default function ProtectedLayout({
     const routes: Record<NavTab, string> = {
       home: '/dashboard',
       portfolio: '/portfolio',
-      signals: '/dashboard',
+      market: '/market',
       settings: '/settings/config',
     };
     window.location.href = routes[tab];
