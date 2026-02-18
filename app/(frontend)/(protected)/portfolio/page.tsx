@@ -73,11 +73,26 @@ export default function PortfolioPage() {
   const allHoldings: DisplayHolding[] =
     data && !isEmpty
       ? [
-          ...data.holdings_json.map((h) => ({
-            ...h,
-            category: (h.asset === 'BTC' ? 'BTC' : h.asset === 'ETH' ? 'ETH' : 'ALT') as 'BTC' | 'ETH' | 'ALT',
-            weight: h.value_usd / data.total_value_usd_all,
-          })),
+          ...(data.btc_weight_all > 0
+            ? [{
+                asset: 'BTC',
+                quantity: data.holdings_json.find((h) => h.asset === 'BTC')?.quantity ?? 0,
+                usd_price: data.btc_value_usd / (data.holdings_json.find((h) => h.asset === 'BTC')?.quantity || 1),
+                value_usd: data.btc_value_usd,
+                category: 'BTC' as const,
+                weight: data.btc_weight_all,
+              }]
+            : []),
+          ...(data.eth_weight_all > 0
+            ? [{
+                asset: 'ETH',
+                quantity: data.holdings_json.find((h) => h.asset === 'ETH')?.quantity ?? 0,
+                usd_price: data.eth_value_usd / (data.holdings_json.find((h) => h.asset === 'ETH')?.quantity || 1),
+                value_usd: data.eth_value_usd,
+                category: 'ETH' as const,
+                weight: data.eth_weight_all,
+              }]
+            : []),
           ...data.alt_breakdown.map((a) => ({
             asset: a.asset, quantity: a.quantity, usd_price: a.usd_price,
             value_usd: a.value_usd, category: 'ALT' as const,
@@ -85,7 +100,6 @@ export default function PortfolioPage() {
           })),
         ].sort((a, b) => b.value_usd - a.value_usd)
       : [];
-
   const anim = (i: number): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
     transform: mounted ? 'translateY(0)' : 'translateY(12px)',
