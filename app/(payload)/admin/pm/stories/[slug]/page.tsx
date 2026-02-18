@@ -1,10 +1,14 @@
 /**
  * Story Detail Page
- * Version: 1.1 (with cache)
- * Story: ca-story31-sprint-dashboard
- * 
- * Full story view with properties, AC, dependencies, notes
- * Performance: Cached queries with 5-minute revalidation
+ * Version: 1.2 (locked sections + AC field)
+ * Story: curator-initiated structural fix
+ *
+ * Changelog:
+ * v1.2 — Locked 8-section content parser (Pre-work + Post-work groups),
+ *         AC reads from acceptanceCriteria field (not content checkboxes),
+ *         Story type updated with acceptanceCriteria field.
+ * v1.1 — Cached queries, full story view.
+ * v1.0 — Initial story detail (ca-story31-sprint-dashboard).
  */
 
 import configPromise from '@payload-config'
@@ -28,6 +32,7 @@ type Story = {
   epic?: string
   sprint?: string
   content?: any
+  acceptanceCriteria?: any  // Lexical rich text (v1.2)
   dependency_1?: string
   dependency_2?: string
 }
@@ -104,6 +109,70 @@ function extractSection(text: string, sectionName: string): string {
   return sectionLines.join('\n').trim()
 }
 
+// ─── Section Definitions (v1.2 locked) ───────────────────────────────────────
+
+const PRE_WORK_SECTIONS = ['Problem', 'Approach', 'Dependencies'] as const
+const POST_WORK_SECTIONS = [
+  'Outcome',
+  'What Was Delivered',
+  'Files Changed',
+  'What Was Skipped',
+  'Quality Pass',
+] as const
+
+// ─── AC Parser (v1.2) — reads acceptanceCriteria field ───────────────────────
+
+type ACItem = { checked: boolean; text: string }
+
+function parseAcceptanceCriteria(acField: any): ACItem[] {
+  if (!acField) return []
+  const text = extractText(acField)
+  const matches = text.match(/- \[([ x])\] (.+)/g) || []
+  return matches.map(m => ({
+    checked: m[3] === 'x',
+    text: m.replace(/- \[[ x]\] /, '').trim(),
+  }))
+}
+
+// ─── Section Group Renderer ───────────────────────────────────────────────────
+
+function SectionGroup({
+  label,
+  sections,
+  contentText,
+}: {
+  label: string
+  sections: readonly string[]
+  contentText: string
+}) {
+  const rendered = sections
+    .map(name => ({ name, body: extractSection(contentText, name) }))
+    .filter(s => s.body !== '')
+
+  if (rendered.length === 0) return null
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+          {label}
+        </span>
+        <div className="flex-1 h-px bg-[#1E293B]" />
+      </div>
+      {rendered.map(s => (
+        <div key={s.name}>
+          <h2 className="text-sm font-semibold text-[#94A3B8] uppercase tracking-wide mb-3">
+            {s.name}
+          </h2>
+          <div className="text-[#F1F5F9] leading-relaxed whitespace-pre-wrap">
+            {s.body}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default async function StoryDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
 
@@ -157,17 +226,16 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
   const dep1 = story.dependency_1 ? allStories.find(s => s.id === story.dependency_1) : null
   const dep2 = story.dependency_2 ? allStories.find(s => s.id === story.dependency_2) : null
 
-  // Extract content sections
+  // Extract content text for section parsing
   const contentText = extractText(story.content)
-  
-  // Simple AC extraction (looks for checkboxes in content)
-  const acMatches = contentText.match(/- \[([ x])\] (.+)/g) || []
-  const acceptanceCriteria = acMatches.map(line => {
-    const checked = line.includes('[x]')
-    const text = line.replace(/- \[([ x])\] /, '')
-    return { checked, text }
-  })
+
+  // v1.2: AC from dedicated field
+  const acceptanceCriteria = parseAcceptanceCriteria(story.acceptanceCriteria)
   const acProgress = acceptanceCriteria.filter(ac => ac.checked).length
+
+  // Section visibility
+  const hasPreWork = PRE_WORK_SECTIONS.some(s => extractSection(contentText, s) !== '')
+  const hasPostWork = POST_WORK_SECTIONS.some(s => extractSection(contentText, s) !== '')
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-[#F1F5F9] p-8">
@@ -285,44 +353,25 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
           </div>
         )}
 
-       {/* Content */}
-        <div className="space-y-6">
-          {/* Problem Section */}
-          {contentText.includes('## Problem') && (
-            <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-6">
-              <h2 className="text-sm font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">
-                Problem
-              </h2>
-              <div className="text-[#F1F5F9] leading-relaxed">
-                {extractSection(contentText, 'Problem')}
-              </div>
-            </div>
-          )}
+        {/* Content Sections — Pre-work + Post-work groups */}
+        {(hasPreWork || hasPostWork) && (
+          <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-6 space-y-8">
+            <SectionGroup
+              label="Pre-work"
+              sections={PRE_WORK_SECTIONS}
+              contentText={contentText}
+            />
+            {hasPreWork && hasPostWork && (
+              <div className="h-px bg-[#1E293B]" />
+            )}
+            <SectionGroup
+              label="Post-work"
+              sections={POST_WORK_SECTIONS}
+              contentText={contentText}
+            />
+          </div>
+        )}
 
-          {/* Solution Section */}
-          {contentText.includes('## Solution') && (
-            <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-6">
-              <h2 className="text-sm font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">
-                Solution
-              </h2>
-              <div className="text-[#F1F5F9] leading-relaxed">
-                {extractSection(contentText, 'Solution')}
-              </div>
-            </div>
-          )}
-
-          {/* Technical Approach Section */}
-          {contentText.includes('## Technical Approach') && (
-            <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-6">
-              <h2 className="text-sm font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">
-                Technical Approach
-              </h2>
-              <div className="text-[#F1F5F9] leading-relaxed whitespace-pre-wrap">
-                {extractSection(contentText, 'Technical Approach')}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
