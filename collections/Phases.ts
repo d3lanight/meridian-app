@@ -90,7 +90,7 @@ export const Phases: CollectionConfig = {
         ],
       }),
       admin: {
-        description: 'Phase: strategic objective. Stage: what this stage delivers.',
+        description: 'For stages only — requirements and doc references. Phase narrative lives in knowledge entries.',
       },
     },
     {
