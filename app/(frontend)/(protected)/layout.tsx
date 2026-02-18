@@ -1,19 +1,36 @@
 // ━━━ Protected Layout ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
-// Wraps protected pages with bottom nav. Auth gate added in story14.
-
+// v0.4.0 · ca-story39 · 2026-02-18
+// Route-aware tab state: reads pathname to set active tab
 'use client';
 
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/navigation/BottomNav';
 import type { NavTab } from '@/types';
+
+function getTabFromPath(pathname: string): NavTab {
+  if (pathname.startsWith('/portfolio')) return 'portfolio';
+  if (pathname.startsWith('/signals')) return 'signals';
+  if (pathname.startsWith('/settings')) return 'settings';
+  return 'home';
+}
 
 export default function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState<NavTab>('home');
+  const pathname = usePathname();
+  const activeTab = getTabFromPath(pathname);
+
+  const handleTabChange = (tab: NavTab) => {
+    const routes: Record<NavTab, string> = {
+      home: '/dashboard',
+      portfolio: '/portfolio',
+      signals: '/dashboard',
+      settings: '/settings/config',
+    };
+    window.location.href = routes[tab];
+  };
 
   return (
     <div
@@ -24,8 +41,7 @@ export default function ProtectedLayout({
       }}
     >
       {children}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );
 }
-
