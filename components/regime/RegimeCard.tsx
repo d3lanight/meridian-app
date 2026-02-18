@@ -1,6 +1,9 @@
 // ━━━ Regime Card (Hero) ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
+// v0.4.1 · ca-story38 · 2026-02-17
 // Top card showing current market regime with confidence arc
+// Changelog (from v0.3.1):
+//  - Removed redundant "{trend} (7d)" from subtitle (already in metrics row)
+//  - Persistence now shows real computed days from regime_persistence_days()
 
 import { M } from '@/lib/meridian';
 import type { RegimeData } from '@/types';
@@ -53,16 +56,12 @@ export default function RegimeCard({ data }: RegimeCardProps) {
             >
               {data.current}
             </div>
-            <div className="flex items-center gap-3 text-xs" style={{ color: M.textMuted }}>
-              <span className="flex items-center gap-1">
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: M.positive }}
-                />
-                {data.persistence} days
-              </span>
-              <span style={{ color: M.textSubtle }}>·</span>
-              <span>{data.trend} (7d)</span>
+            <div className="flex items-center gap-1 text-xs" style={{ color: M.textMuted }}>
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: M.positive }}
+              />
+              <span>{data.persistence} days</span>
             </div>
           </div>
 
@@ -106,4 +105,3 @@ export default function RegimeCard({ data }: RegimeCardProps) {
     </div>
   );
 }
-

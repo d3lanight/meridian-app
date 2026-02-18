@@ -1,18 +1,25 @@
 // ━━━ Allocation Bar ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
+// v0.4.1 · ca-story38 · 2026-02-17
 // Single horizontal bar showing current vs target allocation
+// Changelog (from v0.4.0):
+//  - 0% bars skip fill render (no false accent signal)
+//  - 0% percentage text uses textSubtle instead of accent
 
-import { M } from '@/lib/meridian';
-import type { Allocation } from '@/types';
+import { M } from '@/lib/meridian'
 
 interface AllocationBarProps {
-  allocation: Allocation;
+  allocation: {
+    asset: string
+    current: number
+    target: number
+  }
 }
 
 export default function AllocationBar({ allocation }: AllocationBarProps) {
-  const { asset, current, target } = allocation;
-  const diff = current - target;
-  const hasDiff = Math.abs(diff) > 2;
+  const { asset, current, target } = allocation
+  const diff = current - target
+  const hasDiff = Math.abs(diff) > 2
+  const isEmpty = current === 0 && target === 0
 
   return (
     <div className="flex items-center gap-2.5">
@@ -27,19 +34,21 @@ export default function AllocationBar({ allocation }: AllocationBarProps) {
         className="relative flex-1 h-1.5 rounded-full overflow-hidden"
         style={{ background: M.surfaceLight }}
       >
-        {/* Filled bar */}
-        <div
-          className="h-full rounded-full transition-[width] duration-[800ms] ease-out"
-          style={{
-            width: `${current}%`,
-            background: hasDiff
-              ? `linear-gradient(90deg, ${M.accent}88, ${M.accent})`
-              : `linear-gradient(90deg, ${M.positive}66, ${M.positive})`,
-          }}
-        />
+        {/* Filled bar — skip when empty */}
+        {!isEmpty && (
+          <div
+            className="h-full rounded-full transition-[width] duration-[800ms] ease-out"
+            style={{
+              width: `${current}%`,
+              background: hasDiff
+                ? `linear-gradient(90deg, ${M.accent}88, ${M.accent})`
+                : `linear-gradient(90deg, ${M.positive}66, ${M.positive})`,
+            }}
+          />
+        )}
 
-        {/* Target marker (only shown when misaligned) */}
-        {hasDiff && (
+        {/* Target marker — only when misaligned and has data */}
+        {hasDiff && !isEmpty && (
           <div
             className="absolute rounded-sm"
             style={{
@@ -54,13 +63,13 @@ export default function AllocationBar({ allocation }: AllocationBarProps) {
         )}
       </div>
 
+      {/* Percentage — muted when empty */}
       <span
         className="w-8 text-[11px] font-mono font-medium text-right"
-        style={{ color: hasDiff ? M.accent : M.textMuted }}
+        style={{ color: isEmpty ? M.textSubtle : hasDiff ? M.accent : M.textMuted }}
       >
         {current}%
       </span>
     </div>
-  );
+  )
 }
-

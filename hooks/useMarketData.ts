@@ -1,6 +1,10 @@
 // ━━━ Market Data Hook ━━━
-// v0.4.0 · ca-story18 · 2026-02-14
-// Fetches live data from /api/market, falls back to demo data.
+// v0.4.1 · ca-story38 · 2026-02-17
+// Fetches live data from /api/market, falls back to demo only on error.
+// Changelog (from v0.4.0):
+//  - Removed demo signal fallback when live signals array is empty
+//  - Removed demo regime fallback when live regime is null (use local fallback)
+//  - Empty signals = intentional "no active signals" state, not missing data
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
@@ -33,6 +37,16 @@ interface UseMarketDataReturn {
   error: string | null
   isLive: boolean
   refresh: () => void
+}
+
+// Neutral regime when API returns null (no regime data at all)
+const fallbackRegime: RegimeData = {
+  current: 'No Data',
+  confidence: 0,
+  persistence: 0,
+  trend: '—',
+  volume: '—',
+  volatility: '—',
 }
 
 export function useMarketData(): UseMarketDataReturn {
@@ -72,17 +86,16 @@ export function useMarketData(): UseMarketDataReturn {
   // Build scenario from live data or demo fallback
   const scenario: Scenario = useMemo(() => {
     if (activeScenario === 'live' && liveData) {
-      const fallback = scenarios[defaultScenario]
       return {
         id: 'bull' as ScenarioId, // closest match for type compat
         label: '🟢 Live Data',
-        regime: liveData.regime ?? fallback.regime,
+        regime: liveData.regime ?? fallbackRegime,  // FIX: local fallback, not demo
         portfolio: liveData.portfolio,
-        signals: liveData.signals.length > 0 ? liveData.signals : fallback.signals,
+        signals: liveData.signals,                   // FIX: pass through — empty = no signals
         metrics: liveData.metrics,
       }
     }
-    // Demo scenario
+    // Demo scenario (error fallback or dev tools)
     const id = activeScenario === 'live' ? defaultScenario : activeScenario
     return scenarios[id]
   }, [activeScenario, liveData])

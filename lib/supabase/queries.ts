@@ -1,8 +1,15 @@
 // ============================================================
 // Supabase Queries — fetch + map to UI types
-// Story: ca-story18-connect-ui-supabase
-// Version: 1.0 · 2026-02-14
+// Story: ca-story38-daily-overview-real-data
+// Version: 2.0 · 2026-02-17
 // ============================================================
+// Changelog (from v1.0):
+//  1. mapRegime: multiply r_1d/r_7d/vol_7d by 100 (decimal → percent)
+//  2. mapExposure: use regime_status instead of missing misalignment_label
+//  3. mapExposure: derive misalignment from weight deltas + regime targets
+//  4. mapExposure: regime-aware target weights (not hardcoded bull targets)
+//  5. emptyExposure: zero targets (nothing to compare against)
+//  6. computeMetrics: multiply r7d/vol by 100 so proxies scale correctly
 
 import type { RegimeData, PortfolioData, Signal, MarketMetrics } from '@/types'
 
@@ -17,14 +24,14 @@ const REGIME_LABELS: Record<string, string> = {
 }
 
 export function mapRegime(row: any): RegimeData {
-  const r1d = row.r_1d ?? 0
-  const r7d = row.r_7d ?? 0
-  const vol = row.vol_7d ?? 0
+  const r1d = (row.r_1d ?? 0) * 100   // FIX #1: decimal → percent
+  const r7d = (row.r_7d ?? 0) * 100   // FIX #1: decimal → percent
+  const vol = (row.vol_7d ?? 0) * 100  // FIX #1: decimal → percent
 
   return {
     current: REGIME_LABELS[row.regime] ?? row.regime ?? 'Unknown',
     confidence: Math.round((row.confidence ?? 0) * 100),
-    persistence: row.eth_days_confirmed ?? 0,
+    persistence: row._persistence_days ?? row.eth_days_confirmed ?? 0,
     trend: `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
     volume: r1d > 3 ? 'High' : r1d > -3 ? 'Medium' : 'Low',
     volatility: `${vol.toFixed(0)}%`,
@@ -33,11 +40,14 @@ export function mapRegime(row: any): RegimeData {
 
 // ━━━ PORTFOLIO ━━━
 
-const POSTURE_MAP: Record<string, string> = {
-  aligned: 'Aligned',
-  watch: 'Watch',
-  misaligned: 'Misaligned',
+// FIX #4: regime-aware target weights (percentage points)
+const REGIME_TARGETS: Record<string, { btc: number; eth: number; alts: number; stable: number }> = {
+  bull:       { btc: 50, eth: 25, alts: 15, stable: 10 },
+  bear:       { btc: 30, eth: 15, alts: 10, stable: 45 },
+  range:      { btc: 40, eth: 20, alts: 15, stable: 25 },
+  volatility: { btc: 35, eth: 15, alts: 10, stable: 40 },
 }
+const DEFAULT_TARGETS = { btc: 40, eth: 20, alts: 15, stable: 25 }
 
 export function mapExposure(row: any): PortfolioData {
   const btcW = Math.round((row.btc_weight_all ?? 0) * 100)
@@ -45,28 +55,49 @@ export function mapExposure(row: any): PortfolioData {
   const altW = Math.round((row.alt_weight_all ?? 0) * 100)
   const stableW = Math.max(0, 100 - btcW - ethW - altW)
 
+  // FIX #4: pick targets based on current regime
+  const targets = REGIME_TARGETS[row.regime] ?? DEFAULT_TARGETS
+
+  // FIX #3: derive misalignment from average absolute delta
+  const deltas = [
+    Math.abs(btcW - targets.btc),
+    Math.abs(ethW - targets.eth),
+    Math.abs(altW - targets.alts),
+    Math.abs(stableW - targets.stable),
+  ]
+  const misalignment = Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length)
+
+  // FIX #2: use regime_status (not missing misalignment_label)
+  const postureFromStatus: Record<string, string> = {
+    ok: 'Aligned',
+    watch: 'Watch',
+    misaligned: 'Misaligned',
+  }
+  const posture = postureFromStatus[row.regime_status]
+    ?? (misalignment > 20 ? 'Misaligned' : misalignment > 10 ? 'Watch' : 'Aligned')
+
   return {
-    posture: POSTURE_MAP[row.misalignment_label] ?? 'Unknown',
-    misalignment: Math.round(row.misalignment_score ?? 0),
+    posture,
+    misalignment,
     allocations: [
-      { asset: 'BTC', current: btcW, target: 50 },
-      { asset: 'ETH', current: ethW, target: 25 },
-      { asset: 'ALTS', current: altW, target: 15 },
-      { asset: 'STABLE', current: stableW, target: 10 },
+      { asset: 'BTC', current: btcW, target: targets.btc },
+      { asset: 'ETH', current: ethW, target: targets.eth },
+      { asset: 'ALTS', current: altW, target: targets.alts },
+      { asset: 'STABLE', current: stableW, target: targets.stable },
     ],
   }
 }
 
-// Fallback when no exposure data exists yet
+// FIX #5: zero targets when no data (nothing to compare against)
 export function emptyExposure(): PortfolioData {
   return {
     posture: 'No Data',
     misalignment: 0,
     allocations: [
-      { asset: 'BTC', current: 0, target: 50 },
-      { asset: 'ETH', current: 0, target: 25 },
-      { asset: 'ALTS', current: 0, target: 15 },
-      { asset: 'STABLE', current: 0, target: 10 },
+      { asset: 'BTC', current: 0, target: 0 },
+      { asset: 'ETH', current: 0, target: 0 },
+      { asset: 'ALTS', current: 0, target: 0 },
+      { asset: 'STABLE', current: 0, target: 0 },
     ],
   }
 }
@@ -104,13 +135,13 @@ export function mapSignals(rows: any[]): Signal[] {
 
 export function computeMetrics(regime: any, prices: any): MarketMetrics {
   const confidence = Math.round((regime?.confidence ?? 0.5) * 100)
-  const r7d = regime?.r_7d ?? 0
-  const vol = regime?.vol_7d ?? 0
+  const r7d = (regime?.r_7d ?? 0) * 100  // FIX #6: decimal → percent
+  const vol = (regime?.vol_7d ?? 0) * 100 // FIX #6: decimal → percent
 
   // Proxy fear & greed from confidence + trend
   const fearGreed = Math.min(100, Math.max(0, Math.round(50 + r7d * 2 + (confidence - 50) * 0.3)))
 
-  // BTC dominance — from exposure if available, else estimate
+  // BTC dominance — estimate from regime prices
   const btcDom = regime?.price_now && regime?.eth_price_now
     ? Math.round(regime.price_now / (regime.price_now + regime.eth_price_now * 10) * 100 * 10) / 10
     : 54.0

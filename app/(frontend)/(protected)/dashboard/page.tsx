@@ -122,28 +122,30 @@ export default function DashboardPage() {
               >
                 ACTIVE SIGNALS
               </span>
-              <button
-                className="text-[11px] font-medium flex items-center gap-0.5 bg-transparent border-none cursor-pointer"
-                style={{ color: M.accent }}
-              >
-                View all <ChevronRight size={14} />
-              </button>
+                {scenario.signals.length > 0 && (
+                  <button className="text-[11px]..." style={{ color: M.accent }}>
+                    View all <ChevronRight size={14} />
+                  </button>
+                )}
             </div>
             <div className="flex flex-col gap-2">
-              {scenario.signals.length === 0 ? (
-                <div
-                  className="text-center text-[12px] py-6 rounded-2xl"
-                  style={{ color: M.textMuted, background: M.surfaceLight }}
-                >
-                  No active signals
-                </div>
-              ) : (
-                scenario.signals.map((signal, i) => (
-                  <div key={signal.id} style={anim(4 + i)}>
-                    <SignalCard signal={signal} />
+                  {scenario.signals.length === 0 ? (
+                    <div
+                      className="text-center py-6 rounded-2xl"
+                      style={{ background: M.surfaceLight }}
+                    >
+                      <div className="text-[12px] font-medium mb-1" style={{ color: M.textSecondary }}>
+                      No active signals
+                      </div>
+                      <div className="text-[11px]" style={{ color: M.textMuted }}>
+                  Market conditions unchanged
                   </div>
-                ))
-              )}
+                    </div>
+                    ) : (
+                  scenario.signals.map((signal, i) => (
+                  <SignalCard key={signal.id} signal={signal} />
+                  ))
+                )}
             </div>
           </div>
 

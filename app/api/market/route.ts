@@ -1,8 +1,11 @@
 // ============================================================
 // Market Dashboard API — single endpoint for all dashboard data
-// Story: ca-story18-connect-ui-supabase
-// Version: 1.0 · 2026-02-14
+// Story: ca-story38-daily-overview-real-data
+// Version: 1.1 · 2026-02-17
 // ============================================================
+// Changelog (from v1.0):
+//  - Added regime_persistence_days() RPC call for accurate day count
+//  - Injects persistence into regime row before mapRegime
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -24,15 +27,21 @@ export async function GET() {
   }
 
   // Parallel fetch all data
-  const [regimeRes, exposureRes, signalsRes] = await Promise.all([
+  const [regimeRes, exposureRes, signalsRes, persistenceRes] = await Promise.all([
     supabase.from('latest_regime').select('*').single(),
     supabase.from('latest_exposure').select('*').eq('user_id', user.id).single(),
     supabase.from('active_signals').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(5),
+    supabase.rpc('regime_persistence_days'),
   ])
 
-  // Map regime (always present or fallback)
-  const regime = regimeRes.data ? mapRegime(regimeRes.data) : null
+  // Inject persistence into regime row before mapping
   const regimeRaw = regimeRes.data
+  if (regimeRaw) {
+    regimeRaw._persistence_days = persistenceRes.data ?? 0
+  }
+
+  // Map regime (always present or fallback)
+  const regime = regimeRaw ? mapRegime(regimeRaw) : null
 
   // Map exposure (may not exist for new users)
   const portfolio = exposureRes.data ? mapExposure(exposureRes.data) : emptyExposure()
