@@ -1,6 +1,6 @@
 // collections/Stories.ts
 // Story: ca-story27-stories-collection
-// Version: 1.1.0 | 2026-02-16
+// Version: 1.3.0 | 2026-02-18
 // Purpose: Sprint-level stories for PM layer
 // Table: payload_stories (via slug prefix convention)
 // Change: Field descriptions aligned to locked story standard (Curator audit)
@@ -104,6 +104,42 @@ export const Stories: CollectionConfig = {
       ],
       admin: {
         position: 'sidebar',
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // 3.1b Phase Tagging
+    // -------------------------------------------------------------------------
+    {
+      name: 'phase',
+      type: 'select',
+      options: [
+        { label: 'Phase 1', value: '1' },
+        { label: 'Phase 2', value: '2' },
+        { label: 'Phase 3', value: '3' },
+        { label: 'Phase 4', value: '4' },
+        { label: 'Phase 5', value: '5' },
+      ],
+      admin: {
+        position: 'sidebar',
+        description: 'Which phase this story belongs to.',
+      },
+    },
+    {
+      name: 'phase_stage',
+      type: 'select',
+      options: [
+        { label: '1.1', value: '1.1' },
+        { label: '1.2', value: '1.2' },
+        { label: '1.3', value: '1.3' },
+        { label: '2.1', value: '2.1' },
+        { label: '2.2', value: '2.2' },
+        { label: '2.3', value: '2.3' },
+        { label: '2.4', value: '2.4' },
+      ],
+      admin: {
+        position: 'sidebar',
+        description: 'Stage within the phase. Format: X.Y.',
       },
     },
 

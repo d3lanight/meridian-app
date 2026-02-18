@@ -28,6 +28,7 @@ import { Stories } from './collections/Stories'
 import { Sprints } from './collections/Sprints'
 import { SprintMetrics } from './collections/SprintMetrics'
 import { ProjectDocs } from './collections/ProjectDocs'
+import { Phases } from './collections/Phases'
 
 const Users: CollectionConfig = {
   slug: 'payload-users',
@@ -68,6 +69,7 @@ export default buildConfig({
     Sprints,
     SprintMetrics,
     ProjectDocs,
+    Phases,
   ],
 
   editor: lexicalEditor(),
