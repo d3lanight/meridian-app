@@ -3,8 +3,7 @@
 // Version: 1.1.0 | 2026-02-16
 // Purpose: Sprint-level stories for PM layer
 // Table: payload_stories (via slug prefix convention)
-// Change: Removed dependency1/dependency2 self-relations (tracked in notes instead)
-//         Added maxDepth: 1 to epic + sprint relations to prevent hydration loops
+// Change: Field descriptions aligned to locked story standard (Curator audit)
 
 import type { CollectionConfig } from 'payload'
 import {
@@ -122,14 +121,14 @@ export const Stories: CollectionConfig = {
         ],
       }),
       admin: {
-        description: 'Implementation notes, context, decisions, dependencies',
+        description: 'Internal scratch — not rendered on dashboards. Trim to 1-2 lines at closure.',
       },
     },
     {
       name: 'content',
       type: 'richText',
       admin: {
-        description: 'Story details, context, and implementation notes',
+        description: 'Permanent story record — rendered on PM Dashboard. Locked sections: Problem, Approach, Dependencies, Outcome, What Was Delivered, Files Changed, What Was Skipped, Quality Pass.',
       },
     },
     {
@@ -144,7 +143,7 @@ export const Stories: CollectionConfig = {
         ],
       }),
       admin: {
-        description: 'What must be true for this story to be Done',
+        description: 'Definition of Done checklist — rendered on PM Dashboard. Use: - [x] criterion',
       },
     },
 
