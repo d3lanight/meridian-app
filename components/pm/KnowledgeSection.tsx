@@ -1,16 +1,18 @@
 /**
  * KnowledgeSection Component
- * Version: 1.0
- * Story: ca-story29-pm-dashboard
- * 
- * Filterable knowledge documents with category pills
+ * Version: 2.0
+ * Story: ca-story41-pm-dashboard-coherence
+ *
+ * Filterable knowledge docs with colored category pills and 2-col grid.
+ * Matches pm-dashboard-b-v2.jsx lines 548–665.
  */
 
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, ExternalLink } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { ChevronDown, FileText } from 'lucide-react'
 import Link from 'next/link'
+import { SectionLabel } from '@/components/pm/SectionLabel'
 
 interface KnowledgeDoc {
   id: string
@@ -23,112 +25,172 @@ interface KnowledgeSectionProps {
   documents: KnowledgeDoc[]
 }
 
-const categoryColors: Record<string, string> = {
-  workflow: 'bg-[#60A5FA]/10 text-[#60A5FA]',
-  database: 'bg-[#34D399]/10 text-[#34D399]',
-  diagram: 'bg-[#F5B74D]/10 text-[#F5B74D]',
-  config: 'bg-[#A78BFA]/10 text-[#A78BFA]',
-  default: 'bg-[#94A3B8]/10 text-[#94A3B8]',
+const categoryConfig: Record<string, { color: string; label: string }> = {
+  'phase-overview': { color: '#A78BFA', label: 'Phase Overview' },
+  standard: { color: '#60A5FA', label: 'Standard' },
+  reference: { color: '#94A3B8', label: 'Reference' },
+  'how-to': { color: '#34D399', label: 'How-To' },
+  concept: { color: '#F472B6', label: 'Concept' },
+  milestone: { color: '#F5B74D', label: 'Milestone' },
+  'release-note': { color: '#34D399', label: 'Release Note' },
+}
+
+function getCategoryColor(cat: string): string {
+  return categoryConfig[cat]?.color || '#94A3B8'
+}
+
+function getCategoryLabel(cat: string): string {
+  return categoryConfig[cat]?.label || cat.replace(/-/g, ' ')
 }
 
 export function KnowledgeSection({ documents }: KnowledgeSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
 
-  // Get unique categories
-  const categories = Array.from(new Set(documents.map(d => d.category))).sort()
+  // Build category counts from live data
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    documents.forEach((doc) => {
+      counts[doc.category] = (counts[doc.category] || 0) + 1
+    })
+    return counts
+  }, [documents])
 
-  // Filter docs
-  const filteredDocs = selectedCategory
-    ? documents.filter(d => d.category === selectedCategory)
+  const filteredDocs = activeCategory
+    ? documents.filter((d) => d.category === activeCategory)
     : documents
 
-  // Group by category for display
-  const groupedDocs = filteredDocs.reduce((acc, doc) => {
-    if (!acc[doc.category]) acc[doc.category] = []
-    acc[doc.category].push(doc)
-    return acc
-  }, {} as Record<string, KnowledgeDoc[]>)
-
   return (
-    <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg overflow-hidden">
-      {/* Header */}
-      <button
+    <div className="px-[28px] py-[20px]">
+      {/* Header — NOT inside a card */}
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#0B1120]/30 transition-colors"
+        className="flex items-center justify-between cursor-pointer py-[4px]"
+        style={{ marginBottom: isExpanded ? 14 : 0 }}
       >
-        <div className="flex items-center gap-3">
-          {isExpanded ? (
-            <ChevronDown className="w-5 h-5 text-[#94A3B8]" />
-          ) : (
-            <ChevronRight className="w-5 h-5 text-[#94A3B8]" />
-          )}
-          <span className="text-sm font-semibold text-[#F1F5F9]">Knowledge Documents</span>
+        <div className="flex items-center gap-[10px]">
+          <SectionLabel color="#60A5FA">Phase Knowledge</SectionLabel>
+          <span className="font-mono text-[10px] text-[#64748B]">
+            {documents.length} entries
+          </span>
         </div>
-        <span className="text-xs text-[#64748B]">{documents.length} docs</span>
-      </button>
+        <ChevronDown
+          size={16}
+          className="text-[#64748B] transition-transform duration-200"
+          style={{
+            transform: isExpanded ? 'rotate(0)' : 'rotate(-90deg)',
+          }}
+        />
+      </div>
 
-      {/* Content */}
       {isExpanded && (
-        <div className="px-6 pb-4 space-y-4">
-          {/* Category Filters */}
-          <div className="flex flex-wrap gap-2">
+        <div>
+          {/* Category filter pills */}
+          <div className="flex gap-[6px] mb-[14px] flex-wrap">
+            {/* All pill */}
             <button
-              onClick={() => setSelectedCategory(null)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                selectedCategory === null
-                  ? 'bg-[#F5B74D] text-[#0B1120] font-medium'
-                  : 'bg-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B]/70'
-              }`}
+              onClick={() => setActiveCategory(null)}
+              className="flex items-center gap-[4px] text-[10px] font-semibold tracking-[0.02em] rounded-[20px] px-[10px] py-[4px] cursor-pointer transition-colors border"
+              style={{
+                color: activeCategory === null ? '#0B1120' : '#64748B',
+                background:
+                  activeCategory === null ? '#F5B74D' : '#131B2E',
+                borderColor:
+                  activeCategory === null
+                    ? '#F5B74D'
+                    : 'rgba(148,163,184,0.08)',
+              }}
             >
               All
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`text-xs px-3 py-1.5 rounded-full transition-colors capitalize ${
-                  selectedCategory === cat
-                    ? 'bg-[#F5B74D] text-[#0B1120] font-medium'
-                    : 'bg-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B]/70'
-                }`}
+              <span
+                className="font-mono text-[9px]"
+                style={{
+                  color: activeCategory === null ? '#0B1120' : '#475569',
+                  opacity: activeCategory === null ? 0.7 : 1,
+                }}
               >
-                {cat}
-              </button>
-            ))}
+                {documents.length}
+              </span>
+            </button>
+
+            {Object.entries(categoryCounts).map(([cat, count]) => {
+              const isActive = activeCategory === cat
+              const catColor = getCategoryColor(cat)
+              return (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    setActiveCategory(isActive ? null : cat)
+                  }
+                  className="flex items-center gap-[4px] text-[10px] font-semibold tracking-[0.02em] rounded-[20px] px-[10px] py-[4px] cursor-pointer transition-colors border"
+                  style={{
+                    color: isActive ? '#0B1120' : catColor,
+                    background: isActive ? catColor : '#131B2E',
+                    borderColor: isActive
+                      ? catColor
+                      : 'rgba(148,163,184,0.08)',
+                  }}
+                >
+                  {/* Dot indicator when inactive */}
+                  {!isActive && (
+                    <span
+                      className="w-[5px] h-[5px] rounded-full"
+                      style={{ background: catColor }}
+                    />
+                  )}
+                  {getCategoryLabel(cat)}
+                  <span
+                    className="font-mono text-[9px]"
+                    style={{
+                      color: isActive ? '#0B1120' : '#475569',
+                      opacity: isActive ? 0.7 : 1,
+                    }}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
-          {/* Document Grid */}
-          <div className="space-y-4">
-            {Object.entries(groupedDocs).map(([category, docs]) => (
-              <div key={category}>
-                <div className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  {category}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {docs.map((doc) => (
-                    <Link
-                      key={doc.id}
-                      href={`/admin/collections/knowledge-entries/${doc.id}`}
-                      className="block"
-                    >
-                      <div className="flex items-center gap-2 p-3 rounded-lg bg-[#0B1120] hover:bg-[#0B1120]/70 transition-colors group">
-                        <FileText className="w-4 h-4 text-[#94A3B8] flex-shrink-0" />
-                        <span className="text-sm text-[#F1F5F9] flex-1 truncate">
-                          {doc.title}
-                        </span>
-                        <ExternalLink className="w-3 h-3 text-[#64748B] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          {/* Docs grid */}
+          <div className="grid grid-cols-2 gap-[8px]">
+            {filteredDocs.map((doc) => {
+              const color = getCategoryColor(doc.category)
+              return (
+                <Link
+                  key={doc.id}
+                  href={`/admin/collections/knowledge-entries/${doc.id}`}
+                  className="block"
+                >
+                  <div
+                    className="bg-[#131B2E] rounded-[10px] py-[12px] px-[14px] border border-[rgba(148,163,184,0.08)] flex items-start gap-[10px] cursor-pointer transition-colors hover:border-[rgba(245,183,77,0.15)]"
+                  >
+                    <FileText
+                      size={14}
+                      style={{ color }}
+                      className="shrink-0 mt-[1px]"
+                    />
+                    <div>
+                      <div className="text-[12px] font-semibold text-[#F1F5F9] leading-[1.3]">
+                        {doc.title}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+                      <div
+                        className="text-[9px] font-semibold uppercase tracking-[0.06em] mt-[4px]"
+                        style={{ color }}
+                      >
+                        {getCategoryLabel(doc.category)}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
 
           {filteredDocs.length === 0 && (
-            <div className="text-center py-8 text-sm text-[#64748B]">
-              No documents in this category
+            <div className="text-center py-[24px] text-[12px] text-[#475569]">
+              No entries in this category
             </div>
           )}
         </div>

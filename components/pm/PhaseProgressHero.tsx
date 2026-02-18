@@ -1,111 +1,138 @@
 /**
  * PhaseProgressHero Component
- * Version: 1.0
- * Story: ca-story29-pm-dashboard
- * 
- * Phase progress with segmented bar and release card
+ * Version: 2.0
+ * Story: ca-story41-pm-dashboard-coherence
+ *
+ * Phase progress with gradient hero, segmented bar, release card.
+ * Reads from payload_phases — no hardcoded stages.
+ * Matches pm-dashboard-b-v2.jsx lines 289–381.
  */
 
 'use client'
 
+import { Rocket } from 'lucide-react'
+
 interface PhaseStage {
   id: number
   name: string
+  stageNumber: number
   status: 'done' | 'in-progress' | 'not-started'
 }
 
 interface PhaseProgressHeroProps {
-  currentPhase: string
-  releaseVersion: string
+  phaseName: string
+  phaseNumber: number
+  activeStage?: { name: string; stageNumber: number }
   stages: PhaseStage[]
-  upcomingPhases: string[]
+  stagesDone: number
+  phasePct: number
+  releaseVersion: string
+}
+
+const statusColor: Record<string, string> = {
+  done: '#34D399',
+  'in-progress': '#F5B74D',
+  'not-started': '#1A2540',
+}
+
+const labelColor: Record<string, string> = {
+  done: '#34D399',
+  'in-progress': '#F5B74D',
+  'not-started': '#475569',
 }
 
 export function PhaseProgressHero({
-  currentPhase,
-  releaseVersion,
+  phaseName,
+  phaseNumber,
+  activeStage,
   stages,
-  upcomingPhases,
+  stagesDone,
+  phasePct,
+  releaseVersion,
 }: PhaseProgressHeroProps) {
-  const doneCount = stages.filter(s => s.status === 'done').length
-  const totalCount = stages.length
-  const progressPercent = Math.round((doneCount / totalCount) * 100)
-
   return (
-    <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-6">
-      <div className="flex items-start justify-between gap-6 mb-6">
-        {/* Title */}
+    <div
+      className="pt-[28px] px-[28px]"
+      style={{
+        background: 'linear-gradient(180deg, #16203A 0%, #0B1120 100%)',
+      }}
+    >
+      {/* Top row: title left, release card right */}
+      <div className="flex items-start justify-between mb-[20px]">
+        {/* Title block */}
         <div>
-          <h2 className="text-2xl font-bold text-[#F1F5F9] mb-1">
-            Product Management
-          </h2>
-          <p className="text-sm text-[#94A3B8]">
-            Phase {currentPhase} • {progressPercent}% complete
-          </p>
+          <div className="flex items-center gap-[8px] mb-[8px]">
+            <Rocket size={15} className="text-[#F5B74D]" />
+            <span className="font-mono text-[10px] text-[#F5B74D] font-semibold uppercase tracking-[0.12em]">
+              Phase {phaseNumber}
+            </span>
+          </div>
+          <h1 className="font-display text-[28px] font-bold text-[#F1F5F9] tracking-[-0.02em] m-0 mb-[4px]">
+            {phaseName}
+          </h1>
+          {activeStage && (
+            <p className="text-[12px] text-[#64748B] m-0">
+              Stage {activeStage.stageNumber} — {activeStage.name}
+            </p>
+          )}
         </div>
 
-        {/* Release Card */}
-        <div className="bg-[#0B1120] border border-[#1E293B] rounded-lg px-4 py-3 min-w-[140px]">
-          <div className="text-xs text-[#64748B] mb-1">Current Release</div>
-          <div className="text-lg font-bold text-[#F1F5F9]">{releaseVersion}</div>
+        {/* Release version card */}
+        <div className="bg-[#131B2E] rounded-[14px] py-[14px] px-[18px] border border-[rgba(245,183,77,0.10)] text-center min-w-[120px] shrink-0">
+          <div className="text-[9px] tracking-[0.1em] text-[#64748B] uppercase font-semibold mb-[6px]">
+            Current Release
+          </div>
+          <div className="font-display text-[28px] font-bold text-[#F5B74D] tracking-[-0.03em] leading-none">
+            {releaseVersion}
+          </div>
+          <div className="text-[10px] text-[#475569] mt-[6px] border-t border-[rgba(148,163,184,0.08)] pt-[6px]">
+            Next:{' '}
+            <span className="text-[#A78BFA] font-semibold">v0.5</span>
+          </div>
         </div>
       </div>
 
-      {/* Segmented Progress Bar */}
-      <div className="mb-4">
-        <div className="flex gap-1 mb-3">
+      {/* Compact Phase Progress Bar */}
+      <div className="bg-[#131B2E] rounded-[14px] py-[16px] px-[20px] border border-[rgba(148,163,184,0.08)]">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-[10px]">
+          <span className="text-[11px] font-semibold text-[#94A3B8]">
+            Phase Progress
+          </span>
+          <div className="flex items-center gap-[8px]">
+            <span className="font-mono text-[13px] font-bold text-[#F5B74D]">
+              {phasePct}%
+            </span>
+            <span className="font-mono text-[11px] text-[#64748B]">
+              {stagesDone}/{stages.length} stages
+            </span>
+          </div>
+        </div>
+
+        {/* Segmented bar */}
+        <div className="flex gap-[3px] mb-[10px]">
           {stages.map((stage) => (
             <div
               key={stage.id}
-              className="flex-1 h-2 rounded-full overflow-hidden"
-              style={{
-                background:
-                  stage.status === 'done'
-                    ? '#34D399'
-                    : stage.status === 'in-progress'
-                    ? '#F5B74D'
-                    : '#1E293B',
-              }}
+              className="flex-1 h-[8px] rounded-[4px] transition-colors duration-400"
+              style={{ background: statusColor[stage.status] }}
             />
           ))}
         </div>
 
-        {/* Stage Labels */}
-        <div className="grid grid-cols-6 gap-2">
+        {/* Stage labels */}
+        <div className="flex gap-[3px]">
           {stages.map((stage) => (
-            <div key={stage.id} className="text-center">
-              <div
-                className={`text-xs font-medium ${
-                  stage.status === 'done'
-                    ? 'text-[#34D399]'
-                    : stage.status === 'in-progress'
-                    ? 'text-[#F5B74D]'
-                    : 'text-[#64748B]'
-                }`}
-              >
-                {stage.name}
-              </div>
+            <div
+              key={stage.id}
+              className="flex-1 text-center text-[9px] font-semibold tracking-[0.02em] leading-tight"
+              style={{ color: labelColor[stage.status] }}
+            >
+              {stage.name}
             </div>
           ))}
         </div>
       </div>
-
-      {/* Upcoming Phases */}
-      {upcomingPhases.length > 0 && (
-        <div className="pt-4 border-t border-[#1E293B]">
-          <div className="text-xs text-[#64748B] mb-2">Up Next</div>
-          <div className="flex gap-2">
-            {upcomingPhases.map((phase, i) => (
-              <span
-                key={i}
-                className="text-xs px-2 py-1 rounded bg-[#1E293B] text-[#94A3B8]"
-              >
-                {phase}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -9,7 +9,7 @@
 
 import configPromise from '@payload-config'
 import { cachedFind } from '@/lib/payloadCache'
-import { PMNav } from '@/components/pm/PMNav'
+
 import { MetricCard } from '@/components/pm/MetricCard'
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
@@ -84,7 +84,7 @@ export default async function SprintDashboardPage() {
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Sprint Dashboard</h1>
           <p className="text-[#94A3B8] mb-8">No active sprint found</p>
-          <PMNav />
+
         </div>
       </div>
     )
@@ -145,7 +145,7 @@ export default async function SprintDashboardPage() {
         </div>
 
         {/* Navigation */}
-        <PMNav />
+
 
         {/* Metrics Hero */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

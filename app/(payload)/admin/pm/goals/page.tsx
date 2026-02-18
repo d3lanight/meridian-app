@@ -9,7 +9,7 @@
 
 import configPromise from '@payload-config'
 import { cachedFind } from '@/lib/payloadCache'
-import { PMNav } from '@/components/pm/PMNav'
+
 import Link from 'next/link'
 
 const CACHE_TIME = 300 // 5 minutes
@@ -77,7 +77,7 @@ export default async function SprintGoalsPage() {
         </div>
 
         {/* Navigation */}
-        <PMNav />
+
 
         {/* Sprint List */}
         <div className="space-y-4">

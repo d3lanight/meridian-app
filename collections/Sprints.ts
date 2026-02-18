@@ -1,8 +1,9 @@
 // collections/Sprints.ts
 // Story: ca-story28-sprints-metrics
-// Version: 1.0.0 | 2026-02-15
+// Version: 1.1.0 | 2026-02-17
 // Purpose: Sprint tracking for PM layer with computed story counts
 // Table: payload_sprints (via slug prefix convention)
+// Added phase select values
 
 import type { CollectionConfig } from 'payload'
 import {

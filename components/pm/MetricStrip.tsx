@@ -1,40 +1,57 @@
 /**
  * MetricStrip Component
- * Version: 1.0
- * Story: ca-story29-pm-dashboard
- * 
- * Compact 4-cell metric strip
+ * Version: 2.0
+ * Story: ca-story41-pm-dashboard-coherence
+ *
+ * Compact 4-cell continuous strip with gap-1 divider pattern.
+ * Matches pm-dashboard-b-v2.jsx lines 383–406.
  */
 
 'use client'
 
 interface Metric {
   label: string
-  value: string | number
-  color: 'accent' | 'positive' | 'blue' | 'purple'
+  value: string
+  sub?: string
+  color: 'positive' | 'accent' | 'blue' | 'purple'
 }
 
 interface MetricStripProps {
   metrics: Metric[]
 }
 
-const colorConfig = {
-  accent: 'border-l-[#F5B74D]',
-  positive: 'border-l-[#34D399]',
-  blue: 'border-l-[#60A5FA]',
-  purple: 'border-l-[#A78BFA]',
+const colorMap: Record<string, string> = {
+  positive: '#34D399',
+  accent: '#F5B74D',
+  blue: '#60A5FA',
+  purple: '#A78BFA',
 }
 
 export function MetricStrip({ metrics }: MetricStripProps) {
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {metrics.map((metric, i) => (
+    <div
+      className="flex gap-[1px] mx-[28px] my-[20px] rounded-[14px] overflow-hidden"
+      style={{ background: 'rgba(148,163,184,0.08)' }}
+    >
+      {metrics.map((metric) => (
         <div
-          key={i}
-          className={`bg-[#131B2E] border border-[#1E293B] border-l-2 ${colorConfig[metric.color]} rounded-lg p-4`}
+          key={metric.label}
+          className="flex-1 bg-[#131B2E] py-[14px] px-[16px] text-center"
         >
-          <div className="text-xs text-[#64748B] mb-1">{metric.label}</div>
-          <div className="text-2xl font-bold text-[#F1F5F9]">{metric.value}</div>
+          <div className="text-[9px] uppercase tracking-[0.08em] text-[#64748B] font-semibold mb-[6px]">
+            {metric.label}
+          </div>
+          <div
+            className="font-mono text-[20px] font-bold"
+            style={{ color: colorMap[metric.color] }}
+          >
+            {metric.value}
+          </div>
+          {metric.sub && (
+            <div className="text-[10px] text-[#475569] mt-[2px]">
+              {metric.sub}
+            </div>
+          )}
         </div>
       ))}
     </div>

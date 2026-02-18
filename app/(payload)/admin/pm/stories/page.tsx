@@ -9,7 +9,7 @@
 
 import configPromise from '@payload-config'
 import { cachedFind } from '@/lib/payloadCache'
-import { PMNav } from '@/components/pm/PMNav'
+
 import { StatusBadge } from '@/components/pm/StatusBadge'
 import { ComplexityDots } from '@/components/pm/ComplexityDots'
 import Link from 'next/link'
@@ -101,7 +101,7 @@ export default async function StoryBoardPage() {
         </div>
 
         {/* Navigation */}
-        <PMNav />
+
 
         {/* Story Groups */}
         <div className="space-y-8">
