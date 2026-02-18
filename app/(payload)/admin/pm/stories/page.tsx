@@ -1,163 +1,78 @@
-/**
- * Story Board Page
- * Version: 1.1 (with cache)
- * Story: ca-story31-sprint-dashboard
- * 
- * Stories grouped by status with drill-down
- * Performance: Cached queries with 5-minute revalidation
- */
-
-import configPromise from '@payload-config'
-import { cachedFind } from '@/lib/payloadCache'
-
-import { StatusBadge } from '@/components/pm/StatusBadge'
-import { ComplexityDots } from '@/components/pm/ComplexityDots'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import Link from 'next/link'
+import { SectionLabel } from '@/components/pm/SectionLabel'
+import { StatusBadge, statusConfig } from '@/components/pm/StatusBadge'
+import { ComplexityDots } from '@/components/pm/ComplexityDots'
 
-const CACHE_TIME = 300 // 5 minutes
-
-
-type Story = {
-  id: string
-  name: string
-  slug: string
-  status: 'done' | 'in-progress' | 'sprint-ready' | 'needs-refinement' | 'deferred'
-  complexity: 'low' | 'medium' | 'high'
-  effort: number
-  epic?: string
-  sprint?: string
+function effortLabel(e: string) {
+  return e?.replace(/-/g, ' ').replace('plus', '+') || '—'
 }
 
-type Sprint = {
-  id: string
-  name: string
-  sprintNumber: number | string
-}
-
-// Extract story number from slug
-function getStoryNumber(slug: string): string {
-  const match = slug.match(/ca-story(\d+)/)
-  return match ? `#${match[1]}` : ''
-}
-
-// Group stories by status
-function groupByStatus(stories: Story[]) {
-  const groups = {
-    'in-progress': [] as Story[],
-    'sprint-ready': [] as Story[],
-    'needs-refinement': [] as Story[],
-    'done': [] as Story[],
-    'deferred': [] as Story[],
-  }
-
-  stories.forEach(story => {
-    if (groups[story.status]) {
-      groups[story.status].push(story)
-    }
-  })
-
-  return groups
-}
+const statusOrder = ['in-progress', 'sprint-ready', 'needs-refinement', 'done', 'deferred', 'cancelled']
 
 export default async function StoryBoardPage() {
-  // Get all stories (cached)
-  const storiesResult = await cachedFind(
-    configPromise,
-    {
-      collection: 'payload-stories',
-      depth: 0,
-      limit: 200,
-      sort: '-updated_at',
-    },
-    CACHE_TIME,
-    ['story-board']
-  )
+  const payload = await getPayload({ config })
 
-  const stories = storiesResult.docs as Story[]
-  const groupedStories = groupByStatus(stories)
+  const result = await payload.find({
+    collection: 'payload-stories',
+    depth: 1,
+    limit: 200,
+    sort: '-id',
+  })
+  const stories = result.docs
 
-  // Get sprint names for display (cached)
-  const sprintsResult = await cachedFind(
-    configPromise,
-    {
-      collection: 'payload-sprints',
-      depth: 0,
-      limit: 100,
-    },
-    CACHE_TIME,
-    ['story-board']
-  )
-  
-  const sprints = sprintsResult.docs as Sprint[]
-  const sprintMap = new Map(sprints.map(s => [s.id, s]))
+  const groups = statusOrder
+    .map(status => ({
+      status,
+      items: stories.filter((s: any) => s.status === status),
+    }))
+    .filter(g => g.items.length > 0)
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-[#F1F5F9] p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
+    <div className="pb-10">
+      <div className="flex justify-between items-start" style={{ padding: '28px 28px 20px' }}>
         <div>
-          <h1 className="text-3xl font-bold mb-2">Story Board</h1>
-          <p className="text-[#94A3B8]">All stories grouped by status</p>
+          <h1 className="font-display font-bold text-[#F1F5F9]" style={{ fontSize: 24, letterSpacing: '-0.02em', margin: 0 }}>
+            Story Board
+          </h1>
         </div>
+        <span className="font-mono text-xs text-[#64748B]">{stories.length} stories</span>
+      </div>
 
-        {/* Navigation */}
+      <div className="flex flex-col gap-6" style={{ padding: '0 28px 32px' }}>
+        {groups.map(group => {
+          const cfg = statusConfig[group.status]
+          if (!cfg) return null
 
-
-        {/* Story Groups */}
-        <div className="space-y-8">
-          {Object.entries(groupedStories).map(([status, statusStories]) => {
-            if (statusStories.length === 0) return null
-
-            return (
-              <div key={status}>
-                <div className="flex items-center gap-3 mb-4">
-                  <StatusBadge status={status as any} />
-                  <span className="text-[#64748B] text-sm">
-                    {statusStories.length} {statusStories.length === 1 ? 'story' : 'stories'}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {statusStories.map((story) => {
-                    const sprint = story.sprint ? sprintMap.get(story.sprint) : null
-
-                    return (
-                      <Link
-                        key={story.id}
-                        href={`/admin/pm/stories/${story.slug}`}
-                        className="block"
-                      >
-                        <div className="bg-[#131B2E] border border-[#1E293B] rounded-lg p-5 hover:border-[#F5B74D]/30 transition-all cursor-pointer">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="text-sm font-mono text-[#64748B]">
-                                  {getStoryNumber(story.slug)}
-                                </span>
-                                {sprint && (
-                                  <span className="text-xs text-[#64748B]">
-                                    S{sprint.sprintNumber || '?'}
-                                  </span>
-                                )}
-                              </div>
-                              <h3 className="text-[#F1F5F9] font-medium">{story.name}</h3>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <ComplexityDots level={story.complexity} showLabel={false} />
-                              <span className="text-sm text-[#94A3B8] font-mono">
-                                {story.effort}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
+          return (
+            <div key={group.status}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="rounded-sm" style={{ width: 3, height: 16, background: cfg.color }} />
+                <span className="font-body text-xs font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
+                <span className="font-mono text-[11px] text-[#64748B]">{group.items.length}</span>
               </div>
-            )
-          })}
-        </div>
+              <div className="flex flex-col gap-2">
+                {group.items.map((s: any) => {
+                  const sEpic = typeof s.epic_id === 'object' ? s.epic_id : null
+                  return (
+                    <Link key={s.id} href={`/admin/pm/stories/${s.slug}`} className="flex items-center justify-between no-underline transition-colors" style={{ background: '#131B2E', borderRadius: 12, padding: '14px 18px', border: '1px solid rgba(148,163,184,0.08)', borderLeft: `3px solid ${cfg.color}` }}>
+                      <div className="flex items-center gap-[14px]">
+                        <span className="font-mono text-[11px] text-[#64748B] min-w-[28px]">#{s.id}</span>
+                        <span className="font-body text-sm font-semibold text-[#F1F5F9]">{s.name}</span>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-[14px]">
+                        <ComplexityDots level={s.complexity} />
+                        <span className="font-body text-[11px] text-[#64748B] min-w-[100px]">{sEpic?.name || '—'}</span>
+                        <span className="font-mono text-[11px] text-[#475569]">{effortLabel(s.effort)}</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -1,23 +1,14 @@
-/**
- * PMNav Component
- * Version: 2.0
- * Story: ca-story41-pm-dashboard-coherence
- *
- * Sticky top nav with icons, backdrop blur, accent underline.
- * Matches pm-dashboard-b-v2.jsx lines 772–799.
- */
-
 'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, Flag, Target } from 'lucide-react'
+import { LayoutDashboard, Layers, KanbanSquare, GitBranch } from 'lucide-react'
 
-const tabs = [
-  { label: 'PM Dashboard', href: '/admin/pm', icon: LayoutDashboard },
-  { label: 'Sprint Dashboard', href: '/admin/pm/sprint', icon: KanbanSquare },
-  { label: 'Story Board', href: '/admin/pm/stories', icon: Flag },
-  { label: 'Sprint Goals', href: '/admin/pm/goals', icon: Target },
+const navItems = [
+  { label: 'Dashboard', href: '/admin/pm',         icon: LayoutDashboard },
+  { label: 'Sprint',    href: '/admin/pm/sprint',   icon: Layers },
+  { label: 'Stories',   href: '/admin/pm/stories',  icon: KanbanSquare },
+  { label: 'Roadmap',   href: '/admin/pm/roadmap',  icon: GitBranch },
 ]
 
 export function PMNav() {
@@ -25,31 +16,41 @@ export function PMNav() {
 
   return (
     <nav
-      className="sticky top-0 z-20 border-b border-[rgba(148,163,184,0.08)] px-[28px] flex items-center h-[48px]"
+      className="sticky top-0 z-20 flex items-center border-b"
       style={{
         background: 'rgba(11,17,32,0.95)',
         backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        borderColor: 'rgba(148,163,184,0.08)',
+        height: 48,
+        paddingLeft: 28, paddingRight: 28,
       }}
     >
-      {tabs.map((tab) => {
-        const isActive = tab.href === '/admin/pm'
-          ? pathname === '/admin/pm'
-          : pathname?.startsWith(tab.href)
-        const Icon = tab.icon
+      {navItems.map(item => {
+        const isActive =
+          item.href === '/admin/pm'
+            ? pathname === '/admin/pm'
+            : pathname?.startsWith(item.href)
+        const Icon = item.icon
 
         return (
           <Link
-            key={tab.href}
-            href={tab.href}
-            className={`flex items-center gap-[7px] px-[16px] h-full text-[13px] font-body border-b-2 -mb-px transition-colors ${
-              isActive
-                ? 'border-[#F5B74D] text-[#F5B74D] font-semibold'
-                : 'border-transparent text-[#64748B] font-medium hover:text-[#94A3B8]'
-            }`}
+            key={item.href}
+            href={item.href}
+            className="flex items-center no-underline transition-colors"
+            style={{
+              gap: 7,
+              padding: '0 16px',
+              height: '100%',
+              borderBottom: `2px solid ${isActive ? '#F5B74D' : 'transparent'}`,
+              color: isActive ? '#F5B74D' : '#64748B',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              fontFamily: "'DM Sans', sans-serif",
+              marginBottom: -1,
+            }}
           >
             <Icon size={15} />
-            {tab.label}
+            {item.label}
           </Link>
         )
       })}
