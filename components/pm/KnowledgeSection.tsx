@@ -160,7 +160,7 @@ export function KnowledgeSection({ documents }: KnowledgeSectionProps) {
               return (
                 <Link
                   key={doc.id}
-                  href={`/admin/collections/knowledge-entries/${doc.id}`}
+                  href={`/admin/pm/knowledge/${doc.id}`}
                   className="block"
                 >
                   <div

@@ -11,6 +11,7 @@
 'use client'
 
 import { Rocket } from 'lucide-react'
+import Link from 'next/link'
 
 interface PhaseStage {
   id: number
@@ -21,6 +22,7 @@ interface PhaseStage {
 
 interface PhaseProgressHeroProps {
   phaseName: string
+  phaseId?: number
   phaseNumber: number
   activeStage?: { name: string; stageNumber: number }
   stages: PhaseStage[]
@@ -43,6 +45,7 @@ const labelColor: Record<string, string> = {
 
 export function PhaseProgressHero({
   phaseName,
+  phaseId,
   phaseNumber,
   activeStage,
   stages,
@@ -68,7 +71,7 @@ export function PhaseProgressHero({
             </span>
           </div>
           <h1 className="font-display text-[28px] font-bold text-[#F1F5F9] tracking-[-0.02em] m-0 mb-[4px]">
-            {phaseName}
+            {phaseId ? <Link href={`/admin/pm/phases/${phaseId}`} className="no-underline" style={{ color: "inherit" }}>{phaseName}</Link> : phaseName}
           </h1>
           {activeStage && (
             <p className="text-[12px] text-[#64748B] m-0">

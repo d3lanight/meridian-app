@@ -55,12 +55,18 @@ export default async function SprintDashboardPage() {
     count: stories.filter((s: any) => s.status === status).length,
   })).filter(s => s.count > 0)
 
+
+
+
+
+
   const phaseResult = await payload.find({
     collection: 'payload-phases',
-    where: { status: { equals: 'active' }, stage_number: { exists: true } },
-    limit: 1,
+    where: { status: { equals: 'active' } },
+    depth: 0,
+    limit: 20,
   })
-  const activeStage = phaseResult.docs[0]
+  const activeStage = phaseResult.docs.find((p: any) => p.stage_number != null)
 
   return (
     <div className="pb-10">

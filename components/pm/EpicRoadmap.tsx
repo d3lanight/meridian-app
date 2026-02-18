@@ -76,7 +76,7 @@ export function EpicRoadmap({ epics }: EpicRoadmapProps) {
               return (
                 <Link
                   key={epic.id}
-                  href={`/admin/collections/epics/${epic.id}`}
+                  href={`/admin/pm/epics/${epic.id}`}
                   className="block"
                   style={{
                     flex: isOrphanRow ? 'none' : '1 1 0',

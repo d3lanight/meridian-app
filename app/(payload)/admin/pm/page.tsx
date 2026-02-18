@@ -233,6 +233,7 @@ export default async function PMDashboardPage() {
       <PhaseProgressHero
         phaseName={activePhase?.name || 'Interface, UX & Delivery'}
         phaseNumber={2}
+        phaseId={activePhase?.id}
         activeStage={phaseStages.find((s) => s.status === 'in-progress')}
         stages={phaseStages}
         stagesDone={stagesDone}

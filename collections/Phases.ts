@@ -3,7 +3,7 @@
 // Purpose: Phase and stage tracking for PM layer
 // Table: payload_phases (parent-child pattern)
 // Phase row: phase_number set, stage_number null
-// Stage row: phase_number matches parent, stage_number set, parent_phase relation
+// Stage row: phase_number matches parent, stage_number set, parent_phase_id relation
 
 import type { CollectionConfig } from 'payload'
 import {
