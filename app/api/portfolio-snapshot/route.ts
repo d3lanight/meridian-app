@@ -1,7 +1,13 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v1.0.1 · ca-story39 · 2026-02-18
+// v1.1.0 · ca-story47 · 2026-02-20
+// Changelog (from v1.0.1):
+//  - Enriches holdings with cost_basis (from portfolio_holdings)
+//  - Enriches holdings with category (from asset_mapping)
+//  - New enriched_holdings array in response
+
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import type { EnrichedHolding } from '@/types';
 
 interface ExposureRow {
   btc_weight_all: number | null;
@@ -25,6 +31,7 @@ const EMPTY = {
   btc_value_usd: 0, eth_value_usd: 0, alt_value_usd: 0,
   alt_count: 0, alt_unpriced: '[]', alt_breakdown: [],
   total_value_usd_all: 0, holdings_count: 0, holdings_json: [],
+  enriched_holdings: [],
   timestamp: null,
 };
 
@@ -40,19 +47,48 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error: expError } = await supabase
-      .from('latest_exposure')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('timestamp', { ascending: false })
-      .limit(1)
-      .single();
+    // Parallel fetch: exposure snapshot + enriched holdings
+    const [expResult, holdingsResult] = await Promise.all([
+      supabase
+        .from('latest_exposure')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single(),
+      supabase
+        .from('portfolio_holdings')
+        .select('asset, quantity, cost_basis')
+        .eq('user_id', user.id)
+        .order('asset', { ascending: true }),
+    ]);
 
-    if (expError || !data) {
+    if (expResult.error || !expResult.data) {
       return NextResponse.json(EMPTY);
     }
 
-    const exposure = data as unknown as ExposureRow;
+    const exposure = expResult.data as unknown as ExposureRow;
+
+    // Build category lookup from asset_mapping
+    const { data: mappings } = await supabase
+      .from('asset_mapping')
+      .select('symbol, category')
+      .eq('active', true);
+
+    const categoryMap: Record<string, string> = {};
+    if (mappings) {
+      for (const m of mappings) {
+        categoryMap[m.symbol] = m.category;
+      }
+    }
+
+    // Build enriched holdings array
+    const enrichedHoldings: EnrichedHolding[] = (holdingsResult.data ?? []).map((h: any) => ({
+      asset: h.asset,
+      quantity: Number(h.quantity) || 0,
+      cost_basis: h.cost_basis != null ? Number(h.cost_basis) : null,
+      category: (categoryMap[h.asset] as EnrichedHolding['category']) ?? null,
+    }));
 
     let altBreakdown = exposure.alt_breakdown;
     if (typeof altBreakdown === 'string') {
@@ -77,6 +113,7 @@ export async function GET() {
       total_value_usd_all: Number(exposure.total_value_usd_all) || 0,
       holdings_count: exposure.holdings_count ?? 0,
       holdings_json: holdingsJson ?? [],
+      enriched_holdings: enrichedHoldings,
       timestamp: exposure.timestamp,
     });
   } catch (err) {

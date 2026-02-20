@@ -1,15 +1,17 @@
 // ============================================================
 // Portfolio Holdings API — PUT (update) + DELETE (remove)
-// Story: ca-story17-portfolio-management-api
-// Version: 1.0 · 2026-02-14
+// Story: ca-story47-holdings-data-model
+// Version: 1.1 · 2026-02-20
 // ============================================================
+// Changelog (from v1.0):
+//  - PUT accepts optional cost_basis (nullable numeric)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-// PUT /api/portfolio/:id — update quantity
+// PUT /api/portfolio/:id — update quantity and/or cost_basis
 export async function PUT(request: NextRequest, context: RouteContext) {
   const supabase = await createClient()
   const { id } = await context.params
@@ -20,28 +22,33 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   }
 
   // Parse body
-  let body: { quantity?: number; name?: string }
+  let body: { quantity?: number; name?: string; cost_basis?: number | null }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { quantity, name } = body
+  const { quantity, name, cost_basis } = body
 
   // At least one field to update
-  if (quantity === undefined && name === undefined) {
-    return NextResponse.json({ error: 'Provide quantity and/or name to update' }, { status: 400 })
+  if (quantity === undefined && name === undefined && cost_basis === undefined) {
+    return NextResponse.json({ error: 'Provide quantity, name, and/or cost_basis to update' }, { status: 400 })
   }
 
   if (quantity !== undefined && (typeof quantity !== 'number' || quantity <= 0)) {
     return NextResponse.json({ error: 'quantity must be a positive number' }, { status: 400 })
   }
 
+  if (cost_basis !== undefined && cost_basis !== null && (typeof cost_basis !== 'number' || cost_basis < 0)) {
+    return NextResponse.json({ error: 'cost_basis must be a non-negative number or null' }, { status: 400 })
+  }
+
   // Build update payload
   const updates: Record<string, any> = { updated_at: new Date().toISOString() }
   if (quantity !== undefined) updates.quantity = quantity
   if (name !== undefined) updates.name = name
+  if (cost_basis !== undefined) updates.cost_basis = cost_basis
 
   // RLS ensures user can only update their own holdings
   const { data, error } = await supabase

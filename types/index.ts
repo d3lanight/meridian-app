@@ -1,5 +1,8 @@
 // ━━━ Crypto Analyst · Meridian Types ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
+// v0.4.0 · ca-story47 · 2026-02-20
+// Changelog (from v0.3.1):
+//  - Added EnrichedHolding (cost_basis + category from DB)
+//  - Added enriched_holdings to PortfolioExposure
 
 export interface RegimeData {
   current: string;
@@ -49,8 +52,8 @@ export interface MarketMetrics {
 
 export type NavTab = 'home' | 'portfolio' | 'market' | 'settings';
 
+// ━━━ Portfolio Snapshot (ca-story39, updated ca-story47) ━━━
 
-// ━━━ Portfolio Snapshot (ca-story39) ━━━
 export interface AltHolding {
   asset: string;
   quantity: number;
@@ -64,6 +67,13 @@ export interface CoreHolding {
   quantity: number;
   usd_price: number;
   value_usd: number;
+}
+
+export interface EnrichedHolding {
+  asset: string;
+  quantity: number;
+  cost_basis: number | null;
+  category: 'core' | 'alt' | 'stable' | null;
 }
 
 export interface PortfolioExposure {
@@ -80,6 +90,7 @@ export interface PortfolioExposure {
   total_value_usd_all: number;
   holdings_count: number;
   holdings_json: CoreHolding[];
+  enriched_holdings: EnrichedHolding[];
   timestamp: string | null;
 }
 

@@ -1,8 +1,11 @@
 // ============================================================
 // Portfolio Holdings API — GET (list) + POST (upsert)
-// Story: ca-story17-portfolio-management-api
-// Version: 1.0 · 2026-02-14
+// Story: ca-story47-holdings-data-model
+// Version: 1.1 · 2026-02-20
 // ============================================================
+// Changelog (from v1.0):
+//  - GET now returns cost_basis field
+//  - POST accepts optional cost_basis (nullable numeric)
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -29,7 +32,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('portfolio_holdings')
-    .select('id, asset, name, quantity, timestamp, created_at, updated_at')
+    .select('id, asset, name, quantity, cost_basis, timestamp, created_at, updated_at')
     .eq('user_id', user.id)
     .order('asset', { ascending: true })
 
@@ -50,14 +53,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Parse body
-  let body: { asset?: string; quantity?: number; name?: string }
+  let body: { asset?: string; quantity?: number; name?: string; cost_basis?: number | null }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { asset, quantity, name } = body
+  const { asset, quantity, name, cost_basis } = body
 
   // Validate required fields
   if (!asset || typeof asset !== 'string') {
@@ -65,6 +68,11 @@ export async function POST(request: NextRequest) {
   }
   if (quantity === undefined || typeof quantity !== 'number' || quantity <= 0) {
     return NextResponse.json({ error: 'quantity must be a positive number' }, { status: 400 })
+  }
+
+  // Validate cost_basis if provided
+  if (cost_basis !== undefined && cost_basis !== null && (typeof cost_basis !== 'number' || cost_basis < 0)) {
+    return NextResponse.json({ error: 'cost_basis must be a non-negative number or null' }, { status: 400 })
   }
 
   const symbol = asset.toUpperCase().trim()
@@ -78,19 +86,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Build upsert payload
+  const payload: Record<string, any> = {
+    user_id: user.id,
+    asset: symbol,
+    name: name || symbol,
+    quantity,
+    timestamp: new Date().toISOString(),
+  }
+
+  // Only include cost_basis if explicitly provided (preserve existing on upsert)
+  if (cost_basis !== undefined) {
+    payload.cost_basis = cost_basis
+  }
+
   // Upsert — ON CONFLICT (user_id, asset) update quantity
   const { data, error } = await supabase
     .from('portfolio_holdings')
-    .upsert(
-      {
-        user_id: user.id,
-        asset: symbol,
-        name: name || symbol,
-        quantity,
-        timestamp: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,asset' }
-    )
+    .upsert(payload, { onConflict: 'user_id,asset' })
     .select()
     .single()
 
