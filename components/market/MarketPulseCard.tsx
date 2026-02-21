@@ -1,6 +1,6 @@
 // ━━━ Market Pulse Card ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
-// 2×2 grid of market health metrics
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: glassmorphic, 24px radius, warm sub-cards
 
 import { M } from '@/lib/meridian';
 
@@ -18,10 +18,13 @@ interface MarketPulseCardProps {
 export default function MarketPulseCard({ metrics }: MarketPulseCardProps) {
   return (
     <div
-      className="rounded-2xl p-5 mb-3"
+      className="rounded-3xl p-5 mb-3"
       style={{
         background: M.surface,
-        border: `1px solid ${M.borderSubtle}`,
+        backdropFilter: M.surfaceBlur,
+        WebkitBackdropFilter: M.surfaceBlur,
+        border: `1px solid ${M.border}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
       }}
     >
       <div
@@ -35,17 +38,17 @@ export default function MarketPulseCard({ metrics }: MarketPulseCardProps) {
         {metrics.map((m) => (
           <div
             key={m.label}
-            className="rounded-xl p-3.5"
-            style={{ background: M.surfaceLight }}
+            className="rounded-2xl p-3.5"
+            style={{ background: 'rgba(255,255,255,0.4)' }}
           >
             <div
               className="text-[10px] font-medium mb-1.5"
-              style={{ color: M.textSubtle, letterSpacing: '0.03em' }}
+              style={{ color: M.textMuted, letterSpacing: '0.03em' }}
             >
               {m.label}
             </div>
             <div
-              className="font-display text-xl font-semibold leading-tight"
+              className="font-display text-xl font-medium leading-tight"
               style={{ color: m.color, letterSpacing: '-0.02em' }}
             >
               {m.value}
@@ -61,4 +64,3 @@ export default function MarketPulseCard({ metrics }: MarketPulseCardProps) {
     </div>
   );
 }
-

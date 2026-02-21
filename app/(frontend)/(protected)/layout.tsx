@@ -1,6 +1,6 @@
 // ━━━ Protected Layout ━━━
-// v0.4.0 · ca-story39 · 2026-02-18
-// Route-aware tab state: reads pathname to set active tab
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: warm cream gradient, glassmorphic nav
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -36,8 +36,7 @@ export default function ProtectedLayout({
     <div
       className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden"
       style={{
-        background:
-          'linear-gradient(180deg, #0B1120 0%, #0D1526 50%, #0B1120 100%)',
+        background: 'linear-gradient(135deg, #F5F1ED, #E8DED6)',
       }}
     >
       {children}

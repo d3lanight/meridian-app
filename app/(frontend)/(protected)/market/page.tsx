@@ -1,7 +1,6 @@
-// app/(frontend)/(protected)/market/page.tsx
-// v1.0.0 — Story 40: Market Context Screen
-// Client component — fetches /api/market-context, renders 4 sections
-
+// ━━━ Market Context Screen ━━━
+// v1.1.0 · ca-story66 · 2026-02-21
+// Meridian v2: warm theme, glassmorphic cards, shared M tokens
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,40 +13,9 @@ import {
   Clock,
   Shield,
   BookOpen,
-  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
-
-// ——— MERIDIAN DESIGN TOKENS ———
-const M = {
-  bg: '#0B1120',
-  bgGrad: 'linear-gradient(180deg, #0B1120 0%, #0D1526 50%, #0B1120 100%)',
-  surface: '#131B2E',
-  surfaceHover: '#172036',
-  surfaceLight: '#1A2540',
-  surfaceElevated: '#16203A',
-  border: 'rgba(245, 183, 77, 0.10)',
-  borderSubtle: 'rgba(148, 163, 184, 0.08)',
-  accent: '#F5B74D',
-  accentDim: '#C4923E',
-  accentGlow: 'rgba(245, 183, 77, 0.06)',
-  accentMuted: 'rgba(245, 183, 77, 0.12)',
-  positive: '#34D399',
-  positiveDim: 'rgba(52, 211, 153, 0.12)',
-  negative: '#F87171',
-  negativeDim: 'rgba(248, 113, 113, 0.12)',
-  neutral: '#94A3B8',
-  neutralDim: 'rgba(148, 163, 184, 0.10)',
-  blue: '#60A5FA',
-  blueDim: 'rgba(96, 165, 250, 0.12)',
-  text: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
-  textSubtle: '#475569',
-  display: "'Outfit', sans-serif",
-  body: "'DM Sans', sans-serif",
-  mono: "'DM Mono', monospace",
-};
+import { M } from '@/lib/meridian';
 
 // ——— TYPES ———
 interface RegimeRow {
@@ -112,7 +80,7 @@ function regimeDimColor(regime: string): string {
   switch (regime.toLowerCase()) {
     case 'bull': return M.positiveDim;
     case 'bear': return M.negativeDim;
-    case 'range': return M.accentMuted;
+    case 'range': return M.accentDim;
     default: return M.neutralDim;
   }
 }
@@ -171,6 +139,18 @@ function Sparkline({
   );
 }
 
+// ——— CARD HELPER ———
+const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
+  background: M.surface,
+  backdropFilter: M.surfaceBlur,
+  WebkitBackdropFilter: M.surfaceBlur,
+  borderRadius: '24px',
+  padding: '20px',
+  border: `1px solid ${M.border}`,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+  ...extra,
+});
+
 // ——— SKELETON ———
 function Skeleton() {
   return (
@@ -179,8 +159,8 @@ function Skeleton() {
         <div
           key={i}
           style={{
-            background: M.surface,
-            borderRadius: '16px',
+            background: M.surfaceLight,
+            borderRadius: '24px',
             height: i === 1 ? '180px' : '120px',
             animation: 'pulse 1.5s ease-in-out infinite',
           }}
@@ -204,7 +184,7 @@ function EmptyState() {
         textAlign: 'center',
       }}
     >
-      <BarChart3 size={48} color={M.textSubtle} style={{ marginBottom: '12px' }} />
+      <BarChart3 size={48} color={M.textMuted} style={{ marginBottom: '12px' }} />
       <p style={{ fontSize: '14px', color: M.textSecondary, margin: 0 }}>
         No market data available
       </p>
@@ -250,27 +230,15 @@ export default function MarketContextPage() {
     transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
   });
 
-  // Derived data
   const current = data?.regimes?.[0] ?? null;
   const persistence = data ? computePersistence(data.regimes) : 0;
-
-  // Sparkline data: oldest→newest (reverse the DESC order)
-  const btcSparkData = data?.prices
-    ? [...data.prices].reverse().map((p) => p.btc_usd)
-    : [];
-  const ethSparkData = data?.prices
-    ? [...data.prices].reverse().map((p) => p.eth_usd)
-    : [];
-
-  // 7d change direction
+  const btcSparkData = data?.prices ? [...data.prices].reverse().map((p) => p.btc_usd) : [];
+  const ethSparkData = data?.prices ? [...data.prices].reverse().map((p) => p.eth_usd) : [];
   const btcUp = current ? current.r_7d >= 0 : true;
   const ethUp = current ? current.eth_r_7d >= 0 : true;
-
-  // Volatility
   const btcVol = current ? volLevel(current.vol_7d) : null;
   const ethVol = current ? volLevel(current.eth_vol_7d) : null;
 
-  // Narrative
   const narrative = current
     ? `The market has been in a ${regimeLabel(current.regime)} regime for ${persistence} day${persistence !== 1 ? 's' : ''}. BTC is ${btcUp ? 'up' : 'down'} ${formatPct(current.r_7d)} over the past week at ${formatUsd(current.price_now)}. Volatility is ${btcVol?.label.toLowerCase()} at ${(current.vol_7d * 100).toFixed(2)}%.`
     : '';
@@ -279,9 +247,8 @@ export default function MarketContextPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: M.bg,
         color: M.text,
-        fontFamily: M.body,
+        fontFamily: "'DM Sans', sans-serif",
         maxWidth: '428px',
         margin: '0 auto',
       }}
@@ -292,8 +259,9 @@ export default function MarketContextPage() {
           position: 'sticky',
           top: 0,
           zIndex: 10,
-          background: 'rgba(11, 17, 32, 0.95)',
+          background: 'rgba(245,241,237,0.95)',
           backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
@@ -308,9 +276,10 @@ export default function MarketContextPage() {
             justifyContent: 'center',
             width: '36px',
             height: '36px',
-            borderRadius: '10px',
+            borderRadius: '12px',
             background: M.surface,
-            border: 'none',
+            backdropFilter: M.surfaceBlur,
+            border: `1px solid ${M.border}`,
             cursor: 'pointer',
             textDecoration: 'none',
           }}
@@ -319,10 +288,11 @@ export default function MarketContextPage() {
         </Link>
         <h1
           style={{
-            fontFamily: M.display,
+            fontFamily: "'Outfit', sans-serif",
             fontSize: '20px',
-            fontWeight: 600,
+            fontWeight: 500,
             margin: 0,
+            color: M.text,
           }}
         >
           Market Context
@@ -340,15 +310,7 @@ export default function MarketContextPage() {
             {/* ——— A) REGIME TIMELINE ——— */}
             <section style={animDelay(0)}>
               {/* Current regime hero */}
-              <div
-                style={{
-                  background: M.surface,
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: `1px solid ${M.border}`,
-                  marginBottom: '12px',
-                }}
-              >
+              <div style={{ ...card({ border: `1px solid ${M.borderPositive}` }), marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <Shield size={18} color={M.accent} />
@@ -358,18 +320,17 @@ export default function MarketContextPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Clock size={13} color={M.textMuted} />
-                    <span style={{ fontFamily: M.mono, fontSize: '12px', color: M.textMuted }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px', color: M.textMuted }}>
                       {persistence}d
                     </span>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                  {/* Large regime badge */}
                   <div
                     style={{
                       background: regimeDimColor(current!.regime),
-                      borderRadius: '12px',
+                      borderRadius: '16px',
                       padding: '10px 20px',
                       display: 'flex',
                       alignItems: 'center',
@@ -386,21 +347,20 @@ export default function MarketContextPage() {
                     />
                     <span
                       style={{
-                        fontFamily: M.display,
+                        fontFamily: "'Outfit', sans-serif",
                         fontSize: '22px',
-                        fontWeight: 600,
+                        fontWeight: 500,
                         color: regimeColor(current!.regime),
                       }}
                     >
                       {regimeLabel(current!.regime)}
                     </span>
                   </div>
-                  {/* Confidence */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span style={{ fontSize: '10px', color: M.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 600 }}>
                       Confidence
                     </span>
-                    <span style={{ fontFamily: M.mono, fontSize: '18px', fontWeight: 600, color: M.text }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '18px', fontWeight: 600, color: M.text }}>
                       {Math.round(current!.confidence * 100)}%
                     </span>
                   </div>
@@ -412,14 +372,7 @@ export default function MarketContextPage() {
               </div>
 
               {/* Timeline */}
-              <div
-                style={{
-                  background: M.surface,
-                  borderRadius: '16px',
-                  padding: '16px 20px',
-                  border: `1px solid ${M.borderSubtle}`,
-                }}
-              >
+              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                   <Clock size={14} color={M.textMuted} />
                   <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
@@ -439,30 +392,27 @@ export default function MarketContextPage() {
                         borderBottom: i < data.regimes.length - 1 ? `1px solid ${M.borderSubtle}` : 'none',
                       }}
                     >
-                      {/* Timeline dot + line */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px', flexShrink: 0 }}>
                         <div
                           style={{
                             width: i === 0 ? '10px' : '8px',
                             height: i === 0 ? '10px' : '8px',
                             borderRadius: '50%',
-                            background: i === 0 ? regimeColor(r.regime) : M.textSubtle,
+                            background: i === 0 ? regimeColor(r.regime) : M.textMuted,
                             border: i === 0 ? `2px solid ${regimeColor(r.regime)}` : 'none',
                             boxShadow: i === 0 ? `0 0 8px ${regimeColor(r.regime)}40` : 'none',
                           }}
                         />
                       </div>
 
-                      {/* Date */}
-                      <span style={{ fontFamily: M.mono, fontSize: '11px', color: M.textMuted, width: '48px', flexShrink: 0 }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: M.textMuted, width: '48px', flexShrink: 0 }}>
                         {formatDate(r.timestamp)}
                       </span>
 
-                      {/* Regime badge */}
                       <div
                         style={{
                           background: regimeDimColor(r.regime),
-                          borderRadius: '6px',
+                          borderRadius: '8px',
                           padding: '2px 8px',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -482,15 +432,13 @@ export default function MarketContextPage() {
                         </span>
                       </div>
 
-                      {/* Regime changed marker */}
                       {r.regime_changed && (
                         <span style={{ fontSize: '9px', color: M.negative, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
                           SHIFT
                         </span>
                       )}
 
-                      {/* Price */}
-                      <span style={{ fontFamily: M.mono, fontSize: '12px', color: M.textSecondary, marginLeft: 'auto' }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px', color: M.textSecondary, marginLeft: 'auto' }}>
                         {formatUsd(r.price_now)}
                       </span>
                     </div>
@@ -501,14 +449,7 @@ export default function MarketContextPage() {
 
             {/* ——— B) PRICE TREND ——— */}
             <section style={animDelay(1)}>
-              <div
-                style={{
-                  background: M.surface,
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: `1px solid ${M.borderSubtle}`,
-                }}
-              >
+              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <Activity size={14} color={M.textMuted} />
                   <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
@@ -521,12 +462,12 @@ export default function MarketContextPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: M.textSecondary }}>Bitcoin</span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontFamily: M.mono, fontSize: '20px', fontWeight: 600, color: M.text }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '20px', fontWeight: 600, color: M.text }}>
                         {formatUsd(current!.price_now)}
                       </span>
                       <span
                         style={{
-                          fontFamily: M.mono,
+                          fontFamily: "'DM Mono', monospace",
                           fontSize: '13px',
                           fontWeight: 500,
                           color: btcUp ? M.positive : M.negative,
@@ -551,12 +492,12 @@ export default function MarketContextPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: M.textSecondary }}>Ethereum</span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontFamily: M.mono, fontSize: '20px', fontWeight: 600, color: M.text }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '20px', fontWeight: 600, color: M.text }}>
                         {formatUsd(current!.eth_price_now)}
                       </span>
                       <span
                         style={{
-                          fontFamily: M.mono,
+                          fontFamily: "'DM Mono', monospace",
                           fontSize: '13px',
                           fontWeight: 500,
                           color: ethUp ? M.positive : M.negative,
@@ -578,14 +519,7 @@ export default function MarketContextPage() {
 
             {/* ——— C) VOLATILITY CONTEXT ——— */}
             <section style={animDelay(2)}>
-              <div
-                style={{
-                  background: M.surface,
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: `1px solid ${M.borderSubtle}`,
-                }}
-              >
+              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <BarChart3 size={14} color={M.textMuted} />
                   <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
@@ -598,8 +532,8 @@ export default function MarketContextPage() {
                   <div
                     style={{
                       flex: 1,
-                      background: M.surfaceLight,
-                      borderRadius: '12px',
+                      background: M.surfaceHover,
+                      borderRadius: '16px',
                       padding: '16px',
                       display: 'flex',
                       flexDirection: 'column',
@@ -607,7 +541,7 @@ export default function MarketContextPage() {
                     }}
                   >
                     <span style={{ fontSize: '11px', color: M.textMuted, fontWeight: 500 }}>BTC 7d Vol</span>
-                    <span style={{ fontFamily: M.mono, fontSize: '22px', fontWeight: 600, color: M.text }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '22px', fontWeight: 600, color: M.text }}>
                       {(current!.vol_7d * 100).toFixed(2)}%
                     </span>
                     <div
@@ -630,8 +564,8 @@ export default function MarketContextPage() {
                   <div
                     style={{
                       flex: 1,
-                      background: M.surfaceLight,
-                      borderRadius: '12px',
+                      background: M.surfaceHover,
+                      borderRadius: '16px',
                       padding: '16px',
                       display: 'flex',
                       flexDirection: 'column',
@@ -639,7 +573,7 @@ export default function MarketContextPage() {
                     }}
                   >
                     <span style={{ fontSize: '11px', color: M.textMuted, fontWeight: 500 }}>ETH 7d Vol</span>
-                    <span style={{ fontFamily: M.mono, fontSize: '22px', fontWeight: 600, color: M.text }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '22px', fontWeight: 600, color: M.text }}>
                       {(current!.eth_vol_7d * 100).toFixed(2)}%
                     </span>
                     <div
@@ -662,8 +596,8 @@ export default function MarketContextPage() {
                 {/* Educational explainer */}
                 <div
                   style={{
-                    background: M.surfaceLight,
-                    borderRadius: '10px',
+                    background: 'rgba(244,162,97,0.05)',
+                    borderRadius: '12px',
                     padding: '12px 14px',
                     display: 'flex',
                     gap: '10px',
@@ -682,10 +616,7 @@ export default function MarketContextPage() {
             <section style={animDelay(3)}>
               <div
                 style={{
-                  background: M.surface,
-                  borderRadius: '16px',
-                  padding: '20px',
-                  border: `1px solid ${M.border}`,
+                  ...card({ border: `1px solid ${M.borderAccent}` }),
                   borderLeft: `3px solid ${M.accent}`,
                 }}
               >
@@ -706,7 +637,7 @@ export default function MarketContextPage() {
 
             {/* ——— GENERATED TIMESTAMP ——— */}
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <span style={{ fontSize: '10px', color: M.textSubtle, fontFamily: M.mono }}>
+              <span style={{ fontSize: '10px', color: M.textSubtle, fontFamily: "'DM Mono', monospace" }}>
                 Updated {new Date(data.generated_at).toLocaleString()}
               </span>
             </div>

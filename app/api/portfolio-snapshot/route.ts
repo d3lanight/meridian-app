@@ -1,9 +1,8 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v1.1.0 · ca-story47 · 2026-02-20
-// Changelog (from v1.0.1):
-//  - Enriches holdings with cost_basis (from portfolio_holdings)
-//  - Enriches holdings with category (from asset_mapping)
-//  - New enriched_holdings array in response
+// v1.2.0 · ca-story48 · 2026-02-21
+// Changelog:
+//  v1.1.0 — Enriched holdings with cost_basis + category
+//  v1.2.0 — Enriched holdings include include_in_exposure flag
 
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
@@ -58,7 +57,7 @@ export async function GET() {
         .single(),
       supabase
         .from('portfolio_holdings')
-        .select('asset, quantity, cost_basis')
+        .select('asset, quantity, cost_basis, include_in_exposure')
         .eq('user_id', user.id)
         .order('asset', { ascending: true }),
     ]);
@@ -88,6 +87,7 @@ export async function GET() {
       quantity: Number(h.quantity) || 0,
       cost_basis: h.cost_basis != null ? Number(h.cost_basis) : null,
       category: (categoryMap[h.asset] as EnrichedHolding['category']) ?? null,
+      include_in_exposure: h.include_in_exposure ?? true,
     }));
 
     let altBreakdown = exposure.alt_breakdown;

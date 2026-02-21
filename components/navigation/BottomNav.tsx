@@ -1,7 +1,6 @@
 // ━━━ Bottom Navigation ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
-// 4-tab nav with amber active state, radial glow, gradient fade
-
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: glassmorphic nav, warm accent, teal-free active state
 'use client';
 
 import { Home, Target, Activity, Settings } from 'lucide-react';
@@ -25,25 +24,15 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     <nav
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[428px]"
       style={{
-        background:
-          'linear-gradient(180deg, rgba(13,21,38,0.0) 0%, rgba(13,21,38,0.85) 20%, rgba(13,21,38,0.98) 100%)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        padding: '14px 20px 26px',
+        background: 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: `1px solid ${M.borderSubtle}`,
+        padding: '10px 16px 18px',
       }}
       aria-label="Main navigation"
     >
-      {/* Separator line */}
-      <div
-        className="absolute left-5 right-5"
-        style={{
-          top: '14px',
-          height: '1px',
-          background: `linear-gradient(90deg, transparent, ${M.border}, transparent)`,
-        }}
-      />
-
-      <div className="flex justify-around items-center pt-1">
+      <div className="flex justify-around items-center">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -56,28 +45,33 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               aria-current={isActive ? 'page' : undefined}
               aria-label={tab.label}
             >
-              {/* Active radial glow */}
+              {/* Active top accent bar */}
               {isActive && (
                 <div
-                  className="absolute top-[-2px] left-1/2 -translate-x-1/2 w-9 h-9 rounded-full pointer-events-none"
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
                   style={{
-                    background:
-                      'radial-gradient(circle, rgba(245, 183, 77, 0.12), transparent 70%)',
+                    top: '-10px',
+                    width: '32px',
+                    height: '2px',
+                    borderRadius: '2px',
+                    background: 'linear-gradient(90deg, #F4A261, #E76F51)',
                   }}
                 />
               )}
 
               {/* Icon pill */}
               <div
-                className="w-9 h-7 rounded-[10px] flex items-center justify-center transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+                className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
                 style={{
-                  background: isActive ? 'rgba(245, 183, 77, 0.10)' : 'transparent',
+                  background: isActive
+                    ? 'linear-gradient(135deg, rgba(244,162,97,0.15), rgba(231,111,81,0.15))'
+                    : 'transparent',
                 }}
               >
                 <Icon
-                  size={19}
-                  color={isActive ? '#F5B74D' : '#4A5568'}
-                  strokeWidth={isActive ? 2 : 1.5}
+                  size={20}
+                  color={isActive ? '#E76F51' : M.textMuted}
+                  strokeWidth={isActive ? 2.5 : 2}
                   className="transition-all duration-[250ms] ease-out"
                 />
               </div>
@@ -86,9 +80,9 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               <span
                 className="text-[10px] transition-all duration-[250ms] ease-out"
                 style={{
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#F5B74D' : '#4A5568',
-                  letterSpacing: '0.02em',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? M.text : M.textMuted,
+                  opacity: isActive ? 1 : 0.8,
                 }}
               >
                 {tab.label}
@@ -100,4 +94,3 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     </nav>
   );
 }
-

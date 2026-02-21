@@ -1,8 +1,8 @@
 // ━━━ Crypto Analyst · Meridian Types ━━━
-// v0.4.0 · ca-story47 · 2026-02-20
-// Changelog (from v0.3.1):
-//  - Added EnrichedHolding (cost_basis + category from DB)
-//  - Added enriched_holdings to PortfolioExposure
+// v0.5.0 · ca-story48 · 2026-02-21
+// Changelog:
+//  v0.4.0 — Added EnrichedHolding, enriched_holdings on PortfolioExposure
+//  v0.5.0 — Added include_in_exposure to EnrichedHolding, Holding type for CRUD
 
 export interface RegimeData {
   current: string;
@@ -52,7 +52,7 @@ export interface MarketMetrics {
 
 export type NavTab = 'home' | 'portfolio' | 'market' | 'settings';
 
-// ━━━ Portfolio Snapshot (ca-story39, updated ca-story47) ━━━
+// ━━━ Portfolio Snapshot (ca-story39, updated ca-story47, ca-story48) ━━━
 
 export interface AltHolding {
   asset: string;
@@ -74,6 +74,7 @@ export interface EnrichedHolding {
   quantity: number;
   cost_basis: number | null;
   category: 'core' | 'alt' | 'stable' | null;
+  include_in_exposure: boolean;
 }
 
 export interface PortfolioExposure {
@@ -101,4 +102,25 @@ export interface DisplayHolding {
   value_usd: number;
   category: 'BTC' | 'ETH' | 'ALT';
   weight: number;
+}
+
+// ━━━ Portfolio CRUD (ca-story48) ━━━
+
+export interface Holding {
+  id: string;
+  asset: string;
+  quantity: number;
+  cost_basis: number | null;
+  include_in_exposure: boolean;
+  timestamp: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetMapping {
+  id: string;
+  symbol: string;
+  coingecko_id: string | null;
+  category: 'core' | 'alt' | 'stable' | null;
+  active: boolean;
 }

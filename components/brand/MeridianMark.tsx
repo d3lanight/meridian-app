@@ -1,5 +1,6 @@
 // ━━━ Meridian Logo Mark ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: warm accent color default
 
 import { M } from '@/lib/meridian';
 
@@ -33,4 +34,3 @@ export default function MeridianMark({
     </svg>
   );
 }
-

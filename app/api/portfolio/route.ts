@@ -1,12 +1,11 @@
 // ============================================================
 // Portfolio Holdings API — GET (list) + POST (upsert)
-// Story: ca-story47-holdings-data-model
-// Version: 1.1 · 2026-02-20
+// Story: ca-story48-portfolio-crud-ui
+// Version: 1.2 · 2026-02-21
 // ============================================================
-// Changelog (from v1.0):
-//  - GET now returns cost_basis field
-//  - POST accepts optional cost_basis (nullable numeric)
-
+// Changelog:
+//  v1.1 — GET returns cost_basis, POST accepts cost_basis
+//  v1.2 — GET returns include_in_exposure, POST accepts include_in_exposure
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -24,7 +23,6 @@ async function validateAsset(supabase: any, symbol: string): Promise<boolean> {
 // GET /api/portfolio — list user's holdings
 export async function GET() {
   const supabase = await createClient()
-
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,7 +30,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('portfolio_holdings')
-    .select('id, asset, name, quantity, cost_basis, timestamp, created_at, updated_at')
+    .select('id, asset, quantity, cost_basis, include_in_exposure, timestamp, created_at, updated_at')
     .eq('user_id', user.id)
     .order('asset', { ascending: true })
 
@@ -46,21 +44,26 @@ export async function GET() {
 // POST /api/portfolio — add or update holding (upsert on user_id + asset)
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // Parse body
-  let body: { asset?: string; quantity?: number; name?: string; cost_basis?: number | null }
+  let body: {
+    asset?: string
+    quantity?: number
+    
+    cost_basis?: number | null
+    include_in_exposure?: boolean
+  }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { asset, quantity, name, cost_basis } = body
+  const { asset, quantity, cost_basis, include_in_exposure } = body
 
   // Validate required fields
   if (!asset || typeof asset !== 'string') {
@@ -73,6 +76,11 @@ export async function POST(request: NextRequest) {
   // Validate cost_basis if provided
   if (cost_basis !== undefined && cost_basis !== null && (typeof cost_basis !== 'number' || cost_basis < 0)) {
     return NextResponse.json({ error: 'cost_basis must be a non-negative number or null' }, { status: 400 })
+  }
+
+  // Validate include_in_exposure if provided
+  if (include_in_exposure !== undefined && typeof include_in_exposure !== 'boolean') {
+    return NextResponse.json({ error: 'include_in_exposure must be a boolean' }, { status: 400 })
   }
 
   const symbol = asset.toUpperCase().trim()
@@ -90,14 +98,16 @@ export async function POST(request: NextRequest) {
   const payload: Record<string, any> = {
     user_id: user.id,
     asset: symbol,
-    name: name || symbol,
     quantity,
     timestamp: new Date().toISOString(),
   }
 
-  // Only include cost_basis if explicitly provided (preserve existing on upsert)
+  // Only include optional fields if explicitly provided
   if (cost_basis !== undefined) {
     payload.cost_basis = cost_basis
+  }
+  if (include_in_exposure !== undefined) {
+    payload.include_in_exposure = include_in_exposure
   }
 
   // Upsert — ON CONFLICT (user_id, asset) update quantity

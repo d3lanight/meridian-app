@@ -1,9 +1,6 @@
 // ━━━ Allocation Bar ━━━
-// v0.4.1 · ca-story38 · 2026-02-17
-// Single horizontal bar showing current vs target allocation
-// Changelog (from v0.4.0):
-//  - 0% bars skip fill render (no false accent signal)
-//  - 0% percentage text uses textSubtle instead of accent
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: warm track color, accent/teal fills
 
 import { M } from '@/lib/meridian'
 
@@ -31,23 +28,21 @@ export default function AllocationBar({ allocation }: AllocationBarProps) {
       </span>
 
       <div
-        className="relative flex-1 h-1.5 rounded-full overflow-hidden"
+        className="relative flex-1 h-2 rounded-full overflow-hidden"
         style={{ background: M.surfaceLight }}
       >
-        {/* Filled bar — skip when empty */}
         {!isEmpty && (
           <div
             className="h-full rounded-full transition-[width] duration-[800ms] ease-out"
             style={{
               width: `${current}%`,
               background: hasDiff
-                ? `linear-gradient(90deg, ${M.accent}88, ${M.accent})`
-                : `linear-gradient(90deg, ${M.positive}66, ${M.positive})`,
+                ? 'linear-gradient(90deg, #F4A261, #E76F51)'
+                : `linear-gradient(90deg, ${M.positive}, rgba(42,157,143,0.8))`,
             }}
           />
         )}
 
-        {/* Target marker — only when misaligned and has data */}
         {hasDiff && !isEmpty && (
           <div
             className="absolute rounded-sm"
@@ -55,7 +50,7 @@ export default function AllocationBar({ allocation }: AllocationBarProps) {
               top: '-1px',
               left: `${target}%`,
               width: '2px',
-              height: '8px',
+              height: '10px',
               background: M.textMuted,
               transform: 'translateX(-1px)',
             }}
@@ -63,10 +58,9 @@ export default function AllocationBar({ allocation }: AllocationBarProps) {
         )}
       </div>
 
-      {/* Percentage — muted when empty */}
       <span
         className="w-8 text-[11px] font-mono font-medium text-right"
-        style={{ color: isEmpty ? M.textSubtle : hasDiff ? M.accent : M.textMuted }}
+        style={{ color: isEmpty ? M.textMuted : hasDiff ? M.accent : M.textMuted }}
       >
         {current}%
       </span>

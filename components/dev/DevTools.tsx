@@ -1,6 +1,6 @@
 // ━━━ Dev Tools: Scenario Switcher ━━━
-// v0.3.1 · ca-story12 · 2026-02-11
-// Floating pill to toggle between demo scenarios. Dev mode only.
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: glassmorphic panel, warm accent
 
 'use client';
 
@@ -18,18 +18,18 @@ interface DevToolsProps {
 export default function DevTools({ activeScenario, onScenarioChange }: DevToolsProps) {
   const [open, setOpen] = useState(false);
 
-  // Only render in development
   if (process.env.NODE_ENV !== 'development') return null;
 
   return (
     <div className="fixed top-3 right-3 z-50">
-      {/* Toggle button */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10px] font-semibold border-none cursor-pointer transition-opacity hover:opacity-100 opacity-60"
           style={{
             background: M.surfaceElevated,
+            backdropFilter: M.surfaceBlur,
+            WebkitBackdropFilter: M.surfaceBlur,
             color: M.accent,
             border: `1px solid ${M.border}`,
           }}
@@ -40,17 +40,17 @@ export default function DevTools({ activeScenario, onScenarioChange }: DevToolsP
         </button>
       )}
 
-      {/* Panel */}
       {open && (
         <div
-          className="rounded-xl p-3 min-w-[160px]"
+          className="rounded-3xl p-3 min-w-[160px]"
           style={{
             background: M.surfaceElevated,
+            backdropFilter: M.surfaceBlur,
+            WebkitBackdropFilter: M.surfaceBlur,
             border: `1px solid ${M.border}`,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
           }}
         >
-          {/* Header */}
           <div className="flex items-center justify-between mb-2">
             <span
               className="text-[10px] font-semibold"
@@ -67,7 +67,6 @@ export default function DevTools({ activeScenario, onScenarioChange }: DevToolsP
             </button>
           </div>
 
-          {/* Scenario buttons */}
           <div className="flex flex-col gap-1">
             {(Object.values(scenarios)).map((s) => {
               const isActive = s.id === activeScenario;
@@ -75,7 +74,7 @@ export default function DevTools({ activeScenario, onScenarioChange }: DevToolsP
                 <button
                   key={s.id}
                   onClick={() => onScenarioChange(s.id)}
-                  className="text-left px-2.5 py-1.5 rounded-lg text-xs border-none cursor-pointer transition-colors"
+                  className="text-left px-2.5 py-1.5 rounded-xl text-xs border-none cursor-pointer transition-colors"
                   style={{
                     background: isActive ? M.accentMuted : 'transparent',
                     color: isActive ? M.accent : M.textSecondary,
@@ -88,16 +87,14 @@ export default function DevTools({ activeScenario, onScenarioChange }: DevToolsP
             })}
           </div>
 
-          {/* Version tag */}
           <div
             className="text-[9px] mt-2 pt-2 text-center"
-            style={{ color: M.textSubtle, borderTop: `1px solid ${M.borderSubtle}` }}
+            style={{ color: M.textMuted, borderTop: `1px solid ${M.borderSubtle}` }}
           >
-            v0.3.1 · ca-story12
+            v0.5.0 · ca-story66
           </div>
         </div>
       )}
     </div>
   );
 }
-

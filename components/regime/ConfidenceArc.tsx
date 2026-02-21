@@ -1,7 +1,6 @@
 // ━━━ Confidence Arc ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
-// 270° SVG arc gauge with green→amber gradient
-// Pure CSS transition for fill animation
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: teal→accent gradient, warm text
 
 import { M } from '@/lib/meridian';
 
@@ -20,7 +19,6 @@ export default function ConfidenceArc({ value = 87, size = 100 }: ConfidenceArcP
   const dashOffset = circumference - (filledAngle / 360) * circumference;
   const trackDash = (totalAngle / 360) * circumference;
 
-  // Unique gradient ID to avoid conflicts if multiple arcs render
   const gradientId = `arcGrad-${size}`;
 
   return (
@@ -33,7 +31,7 @@ export default function ConfidenceArc({ value = 87, size = 100 }: ConfidenceArcP
           </linearGradient>
         </defs>
 
-        {/* Track (background arc) */}
+        {/* Track */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -63,10 +61,9 @@ export default function ConfidenceArc({ value = 87, size = 100 }: ConfidenceArcP
         />
       </svg>
 
-      {/* Center label */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
         <span
-          className="font-display text-[32px] font-semibold leading-none tracking-tight"
+          className="font-display text-[32px] font-medium leading-none tracking-tight"
           style={{ color: M.text, letterSpacing: '-0.03em' }}
         >
           {value}
@@ -81,4 +78,3 @@ export default function ConfidenceArc({ value = 87, size = 100 }: ConfidenceArcP
     </div>
   );
 }
-

@@ -1,39 +1,49 @@
 // ━━━ Meridian Design Tokens ━━━
-// v0.3.1 · ca-story11 · 2026-02-11
-// Centralized token map for inline styles (SVG gradients, etc.)
-// Tailwind classes handle most styling via tailwind.config tokens.
+// v2.0.0 · ca-story66 · 2026-02-21
+// Meridian v2: Light/warm theme with glassmorphic surfaces
+// Centralized token map for inline styles. Tailwind config mirrors these.
 
 export const M = {
   // Backgrounds
-  bg: '#0B1120',
-  bgGrad: 'linear-gradient(180deg, #0B1120 0%, #0D1526 50%, #0B1120 100%)',
-  surface: '#131B2E',
-  surfaceHover: '#172036',
-  surfaceLight: '#1A2540',
-  surfaceElevated: '#16203A',
+  bg: 'linear-gradient(135deg, #F5F1ED, #E8DED6)',
+  bgFlat: '#F5F1ED',
+  surface: 'rgba(255,255,255,0.6)',
+  surfaceHover: 'rgba(255,255,255,0.8)',
+  surfaceLight: '#E8DED6',
+  surfaceElevated: 'rgba(255,255,255,0.9)',
+  surfaceBlur: 'blur(12px)',
 
   // Borders
-  border: 'rgba(245, 183, 77, 0.10)',
-  borderSubtle: 'rgba(148, 163, 184, 0.08)',
+  border: 'rgba(255,255,255,0.8)',
+  borderSubtle: '#E8DED6',
+  borderAccent: 'rgba(244,162,97,0.2)',
+  borderPositive: 'rgba(42,157,143,0.3)',
 
   // Accent
-  accent: '#F5B74D',
-  accentDim: '#C4923E',
-  accentGlow: 'rgba(245, 183, 77, 0.06)',
-  accentMuted: 'rgba(245, 183, 77, 0.12)',
+  accent: '#F4A261',
+  accentDeep: '#E76F51',
+  accentGradient: 'linear-gradient(90deg, #F4A261, #E76F51)',
+  accentDim: 'rgba(244,162,97,0.15)',
+  accentMuted: 'rgba(244,162,97,0.12)',
+  accentGlow: 'rgba(244,162,97,0.06)',
 
   // Semantic
-  positive: '#34D399',
-  positiveDim: 'rgba(52, 211, 153, 0.12)',
-  negative: '#F87171',
-  negativeDim: 'rgba(248, 113, 113, 0.12)',
-  neutral: '#94A3B8',
-  neutralDim: 'rgba(148, 163, 184, 0.10)',
+  positive: '#2A9D8F',
+  positiveDim: 'rgba(42,157,143,0.1)',
+  negative: '#E76F51',
+  negativeDim: 'rgba(231,111,81,0.1)',
+  neutral: '#8B7565',
+  neutralDim: 'rgba(139,117,101,0.1)',
+
+  // Crypto branding
+  btcOrange: '#F7931A',
+  ethBlue: '#627EEA',
+  blue: '#60A5FA',
+  purple: '#A78BFA',
 
   // Text
-  text: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
-  textSubtle: '#475569',
+  text: '#2D2416',
+  textSecondary: '#6B5A4A',
+  textMuted: '#8B7565',
+  textSubtle: '#5C4A3D',
 } as const;
-

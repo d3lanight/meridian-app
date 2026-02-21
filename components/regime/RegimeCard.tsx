@@ -1,9 +1,6 @@
 // ━━━ Regime Card (Hero) ━━━
-// v0.4.1 · ca-story38 · 2026-02-17
-// Top card showing current market regime with confidence arc
-// Changelog (from v0.3.1):
-//  - Removed redundant "{trend} (7d)" from subtitle (already in metrics row)
-//  - Persistence now shows real computed days from regime_persistence_days()
+// v0.5.0 · ca-story66 · 2026-02-21
+// Meridian v2: glassmorphic, 24px radius, medium weight
 
 import { M } from '@/lib/meridian';
 import type { RegimeData } from '@/types';
@@ -22,26 +19,16 @@ export default function RegimeCard({ data }: RegimeCardProps) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl p-6 mb-3"
+      className="relative overflow-hidden rounded-3xl p-6 mb-3"
       style={{
-        background: `linear-gradient(135deg, ${M.surfaceElevated} 0%, ${M.surface} 100%)`,
-        border: `1px solid ${M.border}`,
+        background: 'linear-gradient(135deg, rgba(42,157,143,0.1), rgba(42,157,143,0.05))',
+        backdropFilter: M.surfaceBlur,
+        WebkitBackdropFilter: M.surfaceBlur,
+        border: `1px solid ${M.borderPositive}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
       }}
     >
-      {/* Background glow */}
-      <div
-        className="absolute pointer-events-none rounded-full"
-        style={{
-          top: '-40px',
-          right: '-40px',
-          width: '160px',
-          height: '160px',
-          background: `radial-gradient(circle, ${M.accentGlow}, transparent 70%)`,
-        }}
-      />
-
       <div className="relative">
-        {/* Top row: regime info + arc */}
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div
@@ -51,24 +38,19 @@ export default function RegimeCard({ data }: RegimeCardProps) {
               CURRENT REGIME
             </div>
             <div
-              className="font-display text-[28px] font-semibold leading-tight mb-2"
+              className="font-display text-[28px] font-medium leading-tight mb-2"
               style={{ color: M.positive, letterSpacing: '-0.03em' }}
             >
               {data.current}
             </div>
             <div className="flex items-center gap-1 text-xs" style={{ color: M.textMuted }}>
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: M.positive }}
-              />
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: M.positive }} />
               <span>{data.persistence} days</span>
             </div>
           </div>
-
           <ConfidenceArc value={data.confidence} size={100} />
         </div>
 
-        {/* Quick metrics row */}
         <div
           className="flex gap-2 mt-4 pt-4"
           style={{ borderTop: `1px solid ${M.borderSubtle}` }}
@@ -76,24 +58,18 @@ export default function RegimeCard({ data }: RegimeCardProps) {
           {quickMetrics.map((m) => (
             <div
               key={m.label}
-              className="flex-1 rounded-[10px] p-2.5 text-center"
-              style={{ background: M.surfaceLight }}
+              className="flex-1 rounded-2xl p-2.5 text-center"
+              style={{ background: 'rgba(255,255,255,0.4)' }}
             >
-              <div
-                className="text-[10px] mb-1"
-                style={{ color: M.textSubtle, letterSpacing: '0.03em' }}
-              >
+              <div className="text-[10px] mb-1" style={{ color: M.textMuted, letterSpacing: '0.03em' }}>
                 {m.label}
               </div>
               <div
                 className="font-display text-sm font-semibold"
                 style={{
-                  color:
-                    m.positive === true
-                      ? M.positive
-                      : m.positive === false
-                        ? M.negative
-                        : M.textSecondary,
+                  color: m.positive === true ? M.positive
+                    : m.positive === false ? M.negative
+                    : M.textSecondary,
                 }}
               >
                 {m.value}
