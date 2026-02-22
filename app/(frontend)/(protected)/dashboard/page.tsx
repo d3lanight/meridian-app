@@ -1,19 +1,147 @@
 // ━━━ Dashboard (Home Screen) ━━━
-// v0.5.0 · ca-story66 · 2026-02-21
-// Meridian v2: warm theme, glassmorphic cards
+// v0.6.0 · design-unification · 2026-02-22
+// Migrated to match meridian-today-v2.jsx design artifact
+// Changes: RegimeCard → inline, PostureCard → inline, SignalCard → dot style,
+//          removed MarketPulseCard + Market Context link
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronRight, RefreshCw, Wifi, WifiOff, Activity } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { useMarketData } from '@/hooks/useMarketData'
 import MeridianMark from '@/components/brand/MeridianMark'
-import RegimeCard from '@/components/regime/RegimeCard'
-import PostureCard from '@/components/portfolio/PostureCard'
-import SignalCard from '@/components/signals/SignalCard'
-import MarketPulseCard from '@/components/market/MarketPulseCard'
 import DevTools from '@/components/dev/DevTools'
-import Link from 'next/link'
+
+// ── Shared Helpers ────────────────────────────
+
+const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
+  background: M.surface,
+  backdropFilter: M.surfaceBlur,
+  WebkitBackdropFilter: M.surfaceBlur,
+  borderRadius: '24px',
+  padding: '20px',
+  border: `1px solid ${M.border}`,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+  ...extra,
+})
+
+function GradientBar({
+  pct,
+  gradient = M.accentGradient,
+  h = 8,
+}: {
+  pct: number
+  gradient?: string
+  h?: number
+}) {
+  return (
+    <div style={{ height: h, borderRadius: h, background: '#E8DED6', overflow: 'hidden', width: '100%' }}>
+      <div
+        style={{
+          height: '100%',
+          borderRadius: h,
+          background: gradient,
+          width: `${Math.min(100, Math.max(0, pct))}%`,
+          transition: 'width 0.5s ease',
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Signal Card (v2 dot style) ────────────────
+
+type SignalTier = 'info' | 'watch' | 'actionable'
+
+const SIGNAL_STYLES: Record<SignalTier, { bg: string; border: string; dot: string }> = {
+  info: { bg: 'rgba(42,157,143,0.05)', border: 'rgba(42,157,143,0.2)', dot: M.positive },
+  watch: { bg: 'rgba(244,162,97,0.05)', border: 'rgba(244,162,97,0.2)', dot: M.accent },
+  actionable: { bg: 'rgba(231,111,81,0.05)', border: 'rgba(231,111,81,0.2)', dot: M.accentDeep },
+}
+
+function DashSignalCard({
+  type,
+  title,
+  desc,
+  time,
+}: {
+  type: SignalTier
+  title: string
+  desc: string
+  time: string
+}) {
+  const c = SIGNAL_STYLES[type] || SIGNAL_STYLES.info
+  return (
+    <div style={{ background: c.bg, borderRadius: 20, padding: 16, border: `1px solid ${c.border}` }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: c.dot,
+            marginTop: 6,
+            flexShrink: 0,
+          }}
+        />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 4 }}>{title}</div>
+          <p style={{ fontSize: 12, color: M.textSecondary, lineHeight: 1.5, margin: '0 0 6px' }}>{desc}</p>
+          <div style={{ fontSize: 10, color: M.textMuted }}>{time}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Regime icon helper ────────────────────────
+
+function RegimeIcon({ regime }: { regime: string }) {
+  const r = regime.toLowerCase()
+  if (r.includes('bull')) return <TrendingUp size={24} color="white" strokeWidth={2.5} />
+  if (r.includes('bear')) return <TrendingDown size={24} color="white" strokeWidth={2.5} />
+  return <Minus size={24} color="white" strokeWidth={2.5} />
+}
+
+function regimeIconBg(regime: string): string {
+  const r = regime.toLowerCase()
+  if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
+  if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
+  return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
+}
+
+function regimeNarrative(regime: string): string {
+  const r = regime.toLowerCase()
+  if (r.includes('bull'))
+    return 'Market shows upward momentum within a defined range. Breakout potential exists, but volatility remains contained.'
+  if (r.includes('bear'))
+    return 'Market in downward trend with elevated volatility. Risk-off conditions prevail across major assets.'
+  return 'Market moving sideways with no clear directional bias. Consolidation phase with moderate activity.'
+}
+
+// ── Severity mapping ──────────────────────────
+
+function severityToTier(severity: number): SignalTier {
+  if (severity >= 70) return 'actionable'
+  if (severity >= 50) return 'watch'
+  return 'info'
+}
+
+// ── Posture helpers ───────────────────────────
+
+function postureNarrative(posture: string, regime: string): string {
+  if (posture === 'Aligned')
+    return `Your holdings show moderate alignment with the current ${regime.toLowerCase()} regime. Portfolio exposure is within expected range.`
+  if (posture === 'Watch' || posture === 'Moderate')
+    return 'Your holdings are drifting from regime targets. Monitor allocation for potential rebalancing.'
+  if (posture === 'Misaligned')
+    return "Your holdings diverge significantly from the current regime's recommended allocation."
+  return 'Add holdings to see portfolio posture analysis.'
+}
+
+// ═══════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
@@ -21,7 +149,6 @@ export default function DashboardPage() {
     scenario,
     activeScenario,
     setScenario,
-    pulseMetrics,
     lastAnalysis,
     isLoading,
     error,
@@ -40,13 +167,27 @@ export default function DashboardPage() {
     transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
   })
 
+  const { regime, portfolio, signals } = scenario
+  const postureScore = Math.max(0, 100 - portfolio.misalignment)
+  const postureIsAligned = portfolio.posture === 'Aligned'
+
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
   return (
     <>
-      <DevTools activeScenario={activeScenario === 'live' ? 'bull' : activeScenario} onScenarioChange={setScenario} />
+      <DevTools
+        activeScenario={activeScenario === 'live' ? 'bull' : activeScenario}
+        onScenarioChange={setScenario}
+      />
 
       {/* ── Header ── */}
-      <div className="px-5 pt-5 pb-4" style={anim(0)}>
-        <div className="flex items-center justify-between">
+      <div className="px-5 pt-5 pb-1" style={anim(0)}>
+        <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2.5">
             <MeridianMark size={28} />
             <span
@@ -89,123 +230,228 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── Loading skeleton ── */}
+      {/* ── Page Title (matches artifact) ── */}
+      <div style={{ padding: '12px 20px 0', ...anim(1) }}>
+        <h1
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: 24,
+            fontWeight: 500,
+            color: M.text,
+            margin: '0 0 4px',
+          }}
+        >
+          Today
+        </h1>
+        <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>{today}</p>
+      </div>
+
+      {/* ── Content ── */}
       {isLoading && !mounted ? (
-        <div className="px-4 space-y-3">
+        <div className="px-5 pt-5 space-y-3">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
               className="rounded-3xl animate-pulse"
-              style={{ background: M.surfaceLight, height: i === 1 ? 160 : 100 }}
+              style={{ background: M.surfaceLight, height: i === 1 ? 200 : 140 }}
             />
           ))}
         </div>
       ) : (
-        <div className="px-4">
-          <div style={anim(1)}>
-            <RegimeCard data={scenario.regime} />
-          </div>
+        <div style={{ padding: '20px 20px 0' }}>
 
-          <div style={anim(2)}>
-            <PostureCard data={scenario.portfolio} />
-          </div>
-
-          {/* Active signals */}
-          <div style={anim(3)} className="mb-3">
-            <div className="flex items-center justify-between px-1 mb-2.5">
-              <span
-                className="text-[10px] font-semibold font-body"
-                style={{ letterSpacing: '0.1em', color: M.textMuted }}
-              >
-                ACTIVE SIGNALS
-              </span>
-              {scenario.signals.length > 0 && (
-                <button
-                  className="text-[11px] font-medium flex items-center gap-0.5 bg-transparent border-none cursor-pointer"
-                  style={{ color: M.accent }}
-                >
-                  View all <ChevronRight size={14} />
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              {scenario.signals.length === 0 ? (
+          {/* ── Market Regime Card ── */}
+          <div style={{ ...card(), marginBottom: 16, ...anim(2) }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, color: M.textMuted, marginBottom: 4 }}>Market Regime</div>
                 <div
-                  className="text-center py-6 rounded-3xl"
                   style={{
-                    background: M.surface,
-                    backdropFilter: M.surfaceBlur,
-                    WebkitBackdropFilter: M.surfaceBlur,
-                    border: `1px solid ${M.border}`,
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 24,
+                    fontWeight: 600,
+                    color: M.text,
                   }}
                 >
-                  <div className="text-[12px] font-medium mb-1" style={{ color: M.textSecondary }}>
+                  {regime.current}
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: regimeIconBg(regime.current),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <RegimeIcon regime={regime.current} />
+              </div>
+            </div>
+            <p
+              style={{
+                fontSize: 14,
+                color: M.textSecondary,
+                lineHeight: 1.6,
+                margin: '0 0 16px',
+              }}
+            >
+              {regimeNarrative(regime.current)}
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, background: M.positiveDim, borderRadius: 16, padding: 12 }}>
+                <div style={{ fontSize: 10, color: M.textMuted, marginBottom: 4 }}>Strength</div>
+                <div
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 20,
+                    fontWeight: 600,
+                    color: M.text,
+                  }}
+                >
+                  {regime.trend}
+                </div>
+              </div>
+              <div style={{ flex: 1, background: M.positiveDim, borderRadius: 16, padding: 12 }}>
+                <div style={{ fontSize: 10, color: M.textMuted, marginBottom: 4 }}>Confidence</div>
+                <div
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 20,
+                    fontWeight: 600,
+                    color: M.text,
+                  }}
+                >
+                  {regime.confidence}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Portfolio Posture Card ── */}
+          <div
+            style={{
+              ...card({
+                background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                border: `1px solid ${M.borderAccent}`,
+              }),
+              marginBottom: 16,
+              ...anim(3),
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, color: M.textMuted, marginBottom: 4 }}>
+                  Portfolio Posture
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 36,
+                    fontWeight: 600,
+                    color: M.text,
+                  }}
+                >
+                  {postureScore}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: postureIsAligned ? M.positive : M.negative,
+                    fontWeight: 500,
+                    marginBottom: 4,
+                  }}
+                >
+                  {portfolio.posture}
+                </div>
+                <div style={{ fontSize: 12, color: M.textSecondary }}>
+                  {portfolio.misalignment}% misaligned
+                </div>
+              </div>
+            </div>
+            <GradientBar pct={postureScore} />
+            <p
+              style={{
+                fontSize: 14,
+                color: M.textSecondary,
+                lineHeight: 1.6,
+                margin: '12px 0 0',
+              }}
+            >
+              {postureNarrative(portfolio.posture, regime.current)}
+            </p>
+          </div>
+
+          {/* ── Signals ── */}
+          <div style={anim(4)}>
+            <h2
+              style={{
+                fontFamily: "'Outfit', sans-serif",
+                fontSize: 18,
+                fontWeight: 600,
+                color: M.text,
+                margin: '0 0 12px',
+              }}
+            >
+              Signals
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {signals.length === 0 ? (
+                <div
+                  style={{
+                    ...card(),
+                    textAlign: 'center',
+                    padding: '24px 20px',
+                  }}
+                >
+                  <div
+                    style={{ fontSize: 12, fontWeight: 500, color: M.textSecondary, marginBottom: 4 }}
+                  >
                     No active signals
                   </div>
-                  <div className="text-[11px]" style={{ color: M.textMuted }}>
-                    Market conditions unchanged
-                  </div>
+                  <div style={{ fontSize: 11, color: M.textMuted }}>Market conditions unchanged</div>
                 </div>
               ) : (
-                scenario.signals.map((signal) => (
-                  <SignalCard key={signal.id} signal={signal} />
+                signals.map((signal) => (
+                  <DashSignalCard
+                    key={signal.id}
+                    type={severityToTier(signal.severity)}
+                    title={signal.asset}
+                    desc={signal.reason}
+                    time={signal.time}
+                  />
                 ))
               )}
             </div>
           </div>
 
-          {/* Market pulse */}
-          <div style={anim(7)}>
-            <MarketPulseCard metrics={pulseMetrics} />
-          </div>
-
-          {/* Market Context link */}
-          <div style={anim(8)}>
-            <Link
-              href="/market"
-              className="flex items-center justify-between rounded-3xl px-4 py-3.5 no-underline"
-              style={{
-                background: M.surface,
-                backdropFilter: M.surfaceBlur,
-                WebkitBackdropFilter: M.surfaceBlur,
-                border: `1px solid ${M.border}`,
-                marginTop: '8px',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center rounded-2xl"
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    background: M.accentMuted,
-                  }}
-                >
-                  <Activity size={18} color={M.accent} />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span
-                    className="text-[13px] font-medium"
-                    style={{ color: M.text }}
-                  >
-                    Market Context
-                  </span>
-                  <span className="text-[11px]" style={{ color: M.textMuted }}>
-                    Regime history, prices & volatility
-                  </span>
-                </div>
-              </div>
-              <ChevronRight size={18} color={M.textMuted} />
-            </Link>
-          </div>
-
-          {/* Last updated */}
+          {/* ── Last Updated ── */}
           <div
-            className="text-center text-[11px] py-2 pb-4"
-            style={{ color: M.textMuted, ...anim(9) }}
+            style={{
+              textAlign: 'center',
+              fontSize: 11,
+              color: M.textMuted,
+              padding: '16px 0 8px',
+              ...anim(5),
+            }}
           >
             Last analysis: {lastAnalysis}
           </div>

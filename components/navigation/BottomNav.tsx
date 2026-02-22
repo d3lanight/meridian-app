@@ -1,6 +1,6 @@
 // ━━━ Bottom Navigation ━━━
-// v0.5.0 · ca-story66 · 2026-02-21
-// Meridian v2: glassmorphic nav, warm accent, teal-free active state
+// v0.6.0 · design-unification · 2026-02-22
+// Label updates: Home→Today, Market→Pulse (matches v2 design artifacts)
 'use client';
 
 import { Home, Target, Activity, Settings } from 'lucide-react';
@@ -8,9 +8,9 @@ import { M } from '@/lib/meridian';
 import type { NavTab } from '@/types';
 
 const tabs: { id: NavTab; icon: typeof Home; label: string }[] = [
-  { id: 'home', icon: Home, label: 'Home' },
+  { id: 'home', icon: Home, label: 'Today' },
+  { id: 'market', icon: Activity, label: 'Pulse' },
   { id: 'portfolio', icon: Target, label: 'Portfolio' },
-  { id: 'market', icon: Activity, label: 'Market' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 

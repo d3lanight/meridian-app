@@ -1,145 +1,47 @@
-// ━━━ Market Context Screen ━━━
-// v1.1.0 · ca-story66 · 2026-02-21
-// Meridian v2: warm theme, glassmorphic cards, shared M tokens
-'use client';
+// ━━━ Market Pulse Screen ━━━
+// v1.2.0 · design-unification · 2026-02-22
+// Migrated to match meridian-pulse-v2.jsx design artifact
+// Renamed from "Market Context" to "Market Pulse"
+// Changes: Removed regime timeline, sparklines, volatility section.
+//          Added: info tooltips, sentiment indicators, ETH confirmation,
+//          volume profile, signal coherence card
+'use client'
 
-import { useState, useEffect } from 'react';
-import {
-  ChevronLeft,
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  BarChart3,
-  Clock,
-  Shield,
-  BookOpen,
-} from 'lucide-react';
-import Link from 'next/link';
-import { M } from '@/lib/meridian';
+import { useState, useEffect } from 'react'
+import { TrendingUp, TrendingDown, Minus, Check, Activity } from 'lucide-react'
+import { M } from '@/lib/meridian'
 
-// ——— TYPES ———
+// ── Types ─────────────────────────────────────
+
 interface RegimeRow {
-  timestamp: string;
-  regime: string;
-  previous_regime: string | null;
-  regime_changed: boolean;
-  confidence: number;
-  price_now: number;
-  r_1d: number;
-  r_7d: number;
-  vol_7d: number;
-  eth_price_now: number;
-  eth_r_7d: number;
-  eth_vol_7d: number;
+  timestamp: string
+  regime: string
+  previous_regime: string | null
+  regime_changed: boolean
+  confidence: number
+  price_now: number
+  r_1d: number
+  r_7d: number
+  vol_7d: number
+  eth_price_now: number
+  eth_r_7d: number
+  eth_vol_7d: number
 }
 
 interface PriceRow {
-  timestamp: string;
-  btc_usd: number;
-  eth_usd: number;
+  timestamp: string
+  btc_usd: number
+  eth_usd: number
 }
 
 interface MarketContextData {
-  regimes: RegimeRow[];
-  prices: PriceRow[];
-  generated_at: string;
+  regimes: RegimeRow[]
+  prices: PriceRow[]
+  generated_at: string
 }
 
-// ——— HELPERS ———
-function formatUsd(n: number): string {
-  return n >= 1000
-    ? `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-    : `$${n.toFixed(2)}`;
-}
+// ── Shared Helpers ────────────────────────────
 
-function formatPct(n: number): string {
-  const pct = n * 100;
-  const sign = pct >= 0 ? '+' : '';
-  return `${sign}${pct.toFixed(1)}%`;
-}
-
-function formatDate(ts: string): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function regimeLabel(regime: string): string {
-  return regime.charAt(0).toUpperCase() + regime.slice(1);
-}
-
-function regimeColor(regime: string): string {
-  switch (regime.toLowerCase()) {
-    case 'bull': return M.positive;
-    case 'bear': return M.negative;
-    case 'range': return M.accent;
-    default: return M.neutral;
-  }
-}
-
-function regimeDimColor(regime: string): string {
-  switch (regime.toLowerCase()) {
-    case 'bull': return M.positiveDim;
-    case 'bear': return M.negativeDim;
-    case 'range': return M.accentDim;
-    default: return M.neutralDim;
-  }
-}
-
-function volLevel(vol: number): { label: string; color: string; bg: string } {
-  if (vol < 0.015) return { label: 'Low', color: M.positive, bg: M.positiveDim };
-  if (vol <= 0.025) return { label: 'Moderate', color: M.accent, bg: M.accentMuted };
-  return { label: 'Elevated', color: M.negative, bg: M.negativeDim };
-}
-
-function computePersistence(regimes: RegimeRow[]): number {
-  if (regimes.length === 0) return 0;
-  const current = regimes[0].regime;
-  let count = 0;
-  for (const r of regimes) {
-    if (r.regime === current) count++;
-    else break;
-  }
-  return count;
-}
-
-// ——— SPARKLINE ———
-function Sparkline({
-  data,
-  color,
-  width = 120,
-  height = 32,
-}: {
-  data: number[];
-  color: string;
-  width?: number;
-  height?: number;
-}) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const points = data
-    .map(
-      (v, i) =>
-        `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * (height - 4) - 2}`
-    )
-    .join(' ');
-
-  return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-// ——— CARD HELPER ———
 const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
   background: M.surface,
   backdropFilter: M.surfaceBlur,
@@ -149,501 +51,628 @@ const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
   border: `1px solid ${M.border}`,
   boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
   ...extra,
-});
+})
 
-// ——— SKELETON ———
-function Skeleton() {
+function GradientBar({
+  pct,
+  gradient = M.accentGradient,
+  h = 8,
+}: {
+  pct: number
+  gradient?: string
+  h?: number
+}) {
   return (
-    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {[1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          style={{
-            background: M.surfaceLight,
-            borderRadius: '24px',
-            height: i === 1 ? '180px' : '120px',
-            animation: 'pulse 1.5s ease-in-out infinite',
-          }}
-        />
-      ))}
-      <style>{`@keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.3; } }`}</style>
+    <div style={{ height: h, borderRadius: h, background: '#E8DED6', overflow: 'hidden', width: '100%' }}>
+      <div
+        style={{
+          height: '100%',
+          borderRadius: h,
+          background: gradient,
+          width: `${Math.min(100, Math.max(0, pct))}%`,
+          transition: 'width 0.5s ease',
+        }}
+      />
     </div>
-  );
+  )
 }
 
-// ——— EMPTY STATE ———
-function EmptyState() {
+// ── Info Tooltip Pattern ──────────────────────
+
+function InfoBtn({
+  id,
+  active,
+  onClick,
+}: {
+  id: string
+  active: string | null
+  onClick: (id: string | null) => void
+}) {
   return (
-    <div
+    <button
+      onClick={() => onClick(active === id ? null : id)}
       style={{
+        width: 16,
+        height: 16,
+        borderRadius: '50%',
+        background: 'rgba(139,117,101,0.2)',
+        border: 'none',
+        cursor: 'pointer',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '64px 24px',
-        textAlign: 'center',
+        flexShrink: 0,
       }}
     >
-      <BarChart3 size={48} color={M.textMuted} style={{ marginBottom: '12px' }} />
-      <p style={{ fontSize: '14px', color: M.textSecondary, margin: 0 }}>
-        No market data available
-      </p>
-      <p style={{ fontSize: '12px', color: M.textMuted, marginTop: '4px' }}>
-        Check back when market data starts flowing
-      </p>
-    </div>
-  );
+      <svg
+        width={10}
+        height={10}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={M.textMuted}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
+      </svg>
+    </button>
+  )
 }
 
-// ——— MAIN PAGE ———
-export default function MarketContextPage() {
-  const [data, setData] = useState<MarketContextData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+function InfoPanel({ children, visible }: { children: React.ReactNode; visible: boolean }) {
+  if (!visible) return null
+  return (
+    <div style={{ margin: '0 0 12px', padding: 12, background: 'rgba(244,162,97,0.05)', borderRadius: 12 }}>
+      <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>{children}</p>
+    </div>
+  )
+}
+
+// ── Indicator Card ────────────────────────────
+
+function Indicator({
+  label,
+  value,
+  desc,
+  pct,
+  gradient,
+  infoId,
+  info,
+  setInfo,
+  infoText,
+}: {
+  label: string
+  value: string
+  desc: string
+  pct: number
+  gradient: string
+  infoId: string
+  info: string | null
+  setInfo: (id: string | null) => void
+  infoText: string
+}) {
+  return (
+    <div style={{ ...card(), marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>{label}</span>
+          <InfoBtn id={infoId} active={info} onClick={setInfo} />
+        </div>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
+          {value}
+        </span>
+      </div>
+      <InfoPanel visible={info === infoId}>{infoText}</InfoPanel>
+      <GradientBar pct={pct} gradient={gradient} h={8} />
+      <p style={{ fontSize: 12, color: M.textSecondary, margin: '8px 0 0' }}>{desc}</p>
+    </div>
+  )
+}
+
+// ── Regime helpers ────────────────────────────
+
+function RegimeIcon({ regime }: { regime: string }) {
+  const r = regime.toLowerCase()
+  if (r.includes('bull')) return <TrendingUp size={28} color="white" strokeWidth={2.5} />
+  if (r.includes('bear')) return <TrendingDown size={28} color="white" strokeWidth={2.5} />
+  return <Minus size={28} color="white" strokeWidth={2.5} />
+}
+
+function regimeIconBg(regime: string): string {
+  const r = regime.toLowerCase()
+  if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
+  if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
+  return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
+}
+
+function regimeNarrative(regime: string): string {
+  const r = regime.toLowerCase()
+  if (r.includes('bull'))
+    return 'Upward momentum within a defined range. Breakout potential exists, though volatility remains contained. Not directional enough to signal a clear trend shift.'
+  if (r.includes('bear'))
+    return 'Downward pressure with elevated volatility. Capital is consolidating into safer positions. Not yet at capitulation levels.'
+  return 'Market moving sideways with no clear directional bias. Consolidation phase with moderate activity.'
+}
+
+function computePersistence(regimes: RegimeRow[]): number {
+  if (regimes.length === 0) return 0
+  const current = regimes[0].regime
+  let count = 0
+  for (const r of regimes) {
+    if (r.regime === current) count++
+    else break
+  }
+  return count
+}
+
+function volumeLabel(vol: number): string {
+  if (vol < 0.015) return 'Low'
+  if (vol <= 0.025) return 'Moderate'
+  return 'High'
+}
+
+// ── Skeleton ──────────────────────────────────
+
+function Skeleton() {
+  return (
+    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          className="rounded-3xl animate-pulse"
+          style={{ background: M.surfaceLight, height: i === 1 ? 280 : 100 }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════
+
+export default function MarketPulsePage() {
+  const [data, setData] = useState<MarketContextData | null>(null)
+  const [metrics, setMetrics] = useState<{
+    fearGreed: number
+    fearGreedLabel: string
+    btcDominance: number
+    altSeason: number
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+  const [info, setInfo] = useState<string | null>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 100);
-    return () => clearTimeout(t);
-  }, []);
+    const t = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/market-context');
-        if (!res.ok) throw new Error(`API returned ${res.status}`);
-        const json: MarketContextData = await res.json();
-        setData(json);
+        const [contextRes, marketRes] = await Promise.all([
+          fetch('/api/market-context'),
+          fetch('/api/market'),
+        ])
+        if (contextRes.ok) {
+          const json: MarketContextData = await contextRes.json()
+          setData(json)
+        }
+        if (marketRes.ok) {
+          const marketJson = await marketRes.json()
+          if (marketJson.metrics) {
+            setMetrics({
+              fearGreed: marketJson.metrics.fearGreed ?? 50,
+              fearGreedLabel: marketJson.metrics.fearGreedLabel ?? 'Neutral',
+              btcDominance: marketJson.metrics.btcDominance ?? 50,
+              altSeason: marketJson.metrics.altSeason ?? 50,
+            })
+          }
+        }
       } catch (err) {
-        console.error('Market context fetch error:', err);
-        setError('Failed to load market data');
+        console.error('Market pulse fetch error:', err)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    fetchData();
-  }, []);
+    fetchData()
+  }, [])
 
-  const animDelay = (i: number) => ({
+  const anim = (i: number): React.CSSProperties => ({
     opacity: mounted && !loading ? 1 : 0,
     transform: mounted && !loading ? 'translateY(0)' : 'translateY(12px)',
     transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
-  });
+  })
 
-  const current = data?.regimes?.[0] ?? null;
-  const persistence = data ? computePersistence(data.regimes) : 0;
-  const btcSparkData = data?.prices ? [...data.prices].reverse().map((p) => p.btc_usd) : [];
-  const ethSparkData = data?.prices ? [...data.prices].reverse().map((p) => p.eth_usd) : [];
-  const btcUp = current ? current.r_7d >= 0 : true;
-  const ethUp = current ? current.eth_r_7d >= 0 : true;
-  const btcVol = current ? volLevel(current.vol_7d) : null;
-  const ethVol = current ? volLevel(current.eth_vol_7d) : null;
+  const current = data?.regimes?.[0] ?? null
+  const persistence = data ? computePersistence(data.regimes) : 0
+  const ethAligned = current ? (current.r_7d >= 0) === (current.eth_r_7d >= 0) : false
+  const vol = current ? volumeLabel(current.vol_7d) : 'Moderate'
 
-  const narrative = current
-    ? `The market has been in a ${regimeLabel(current.regime)} regime for ${persistence} day${persistence !== 1 ? 's' : ''}. BTC is ${btcUp ? 'up' : 'down'} ${formatPct(current.r_7d)} over the past week at ${formatUsd(current.price_now)}. Volatility is ${btcVol?.label.toLowerCase()} at ${(current.vol_7d * 100).toFixed(2)}%.`
-    : '';
+  // Sentiment values from /api/market or fallback
+  const fearGreed = metrics?.fearGreed ?? 50
+  const fearGreedLabel = metrics?.fearGreedLabel ?? 'Neutral'
+  const btcDom = metrics?.btcDominance ?? 50
+  const altSeason = metrics?.altSeason ?? 50
+
+  // Fear & Greed description
+  const fgDesc =
+    fearGreed >= 75 ? 'Extreme greed — caution warranted'
+    : fearGreed >= 50 ? `${fearGreedLabel} — cautious optimism`
+    : fearGreed >= 25 ? `${fearGreedLabel} — uncertainty in the market`
+    : 'Extreme fear — risk-off environment'
+
+  // BTC Dominance description
+  const domDesc =
+    btcDom >= 55 ? 'Rising — capital consolidating into Bitcoin'
+    : btcDom >= 45 ? 'Stable — balanced between BTC and alts'
+    : 'Falling — capital rotating into altcoins'
+
+  // ALT Season description
+  const altDesc =
+    altSeason >= 60 ? 'Alt season — altcoins outperforming BTC'
+    : altSeason >= 40 ? 'Neutral — mixed performance'
+    : 'BTC-led — altcoins underperforming'
+
+  // Signal coherence narrative
+  const coherenceNarrative = current
+    ? `${current.regime.charAt(0).toUpperCase() + current.regime.slice(1)} regime with ${Math.round(current.confidence * 100)}% confidence${
+        !ethAligned ? ', but ETH and BTC are diverging' : ''
+      }. ${fearGreed >= 50 ? 'Greed is present' : 'Fear dominates'} but ${
+        altSeason < 40 ? 'altcoins are underperforming' : 'altcoins are gaining ground'
+      } — ${vol === 'Low' ? 'volume is low, suggesting indecision' : vol === 'Moderate' ? 'volume is neutral' : 'volume is elevated, suggesting conviction'}. This is a ${fearGreed >= 60 && ethAligned ? 'moderately confident' : 'wait-and-watch'} environment.`
+    : 'Loading market data...'
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        color: M.text,
-        fontFamily: "'DM Sans', sans-serif",
-        maxWidth: '428px',
-        margin: '0 auto',
-      }}
-    >
-      {/* ——— HEADER ——— */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          background: 'rgba(245,241,237,0.95)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-        }}
-      >
-        <Link
-          href="/dashboard"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px',
-            borderRadius: '12px',
-            background: M.surface,
-            backdropFilter: M.surfaceBlur,
-            border: `1px solid ${M.border}`,
-            cursor: 'pointer',
-            textDecoration: 'none',
-          }}
-        >
-          <ChevronLeft size={20} color={M.textSecondary} />
-        </Link>
+    <div style={{ padding: '24px 20px 0' }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 24, ...anim(0) }}>
         <h1
           style={{
             fontFamily: "'Outfit', sans-serif",
-            fontSize: '20px',
+            fontSize: 24,
             fontWeight: 500,
-            margin: 0,
             color: M.text,
+            margin: '0 0 4px',
           }}
         >
-          Market Context
+          Market Pulse
         </h1>
-      </header>
+        <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>
+          Current environment and signals
+        </p>
+      </div>
 
-      {/* ——— CONTENT ——— */}
-      <div style={{ padding: '0 16px 100px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {loading ? (
-          <Skeleton />
-        ) : error || !data || data.regimes.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <>
-            {/* ——— A) REGIME TIMELINE ——— */}
-            <section style={animDelay(0)}>
-              {/* Current regime hero */}
-              <div style={{ ...card({ border: `1px solid ${M.borderPositive}` }), marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Shield size={18} color={M.accent} />
-                    <span style={{ fontSize: '11px', letterSpacing: '0.1em', color: M.accent, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                      Current Regime
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock size={13} color={M.textMuted} />
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px', color: M.textMuted }}>
-                      {persistence}d
-                    </span>
-                  </div>
+      {loading ? (
+        <Skeleton />
+      ) : !current ? (
+        <div style={{ ...card(), textAlign: 'center', padding: '48px 20px' }}>
+          <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>
+            No market data available
+          </p>
+          <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>
+            Check back when market data starts flowing
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ── Regime Card (teal variant) ── */}
+          <div
+            style={{
+              ...card({
+                background: 'linear-gradient(135deg, rgba(42,157,143,0.1), rgba(42,157,143,0.05))',
+                border: `1px solid ${M.borderPositive}`,
+              }),
+              marginBottom: 16,
+              ...anim(1),
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: M.textMuted }}>Market Regime</span>
+                  <InfoBtn id="regime" active={info} onClick={setInfo} />
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                  <div
-                    style={{
-                      background: regimeDimColor(current!.regime),
-                      borderRadius: '16px',
-                      padding: '10px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: regimeColor(current!.regime),
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontFamily: "'Outfit', sans-serif",
-                        fontSize: '22px',
-                        fontWeight: 500,
-                        color: regimeColor(current!.regime),
-                      }}
-                    >
-                      {regimeLabel(current!.regime)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '10px', color: M.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 600 }}>
-                      Confidence
-                    </span>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '18px', fontWeight: 600, color: M.text }}>
-                      {Math.round(current!.confidence * 100)}%
-                    </span>
-                  </div>
-                </div>
-
-                <p style={{ fontSize: '12px', color: M.textMuted, margin: 0, lineHeight: 1.5 }}>
-                  The regime has been consistent across all {persistence} recent observations, suggesting a stable market environment.
-                </p>
-              </div>
-
-              {/* Timeline */}
-              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                  <Clock size={14} color={M.textMuted} />
-                  <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                    7-Day History
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                  {data.regimes.map((r, i) => (
-                    <div
-                      key={r.timestamp}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 0',
-                        borderBottom: i < data.regimes.length - 1 ? `1px solid ${M.borderSubtle}` : 'none',
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px', flexShrink: 0 }}>
-                        <div
-                          style={{
-                            width: i === 0 ? '10px' : '8px',
-                            height: i === 0 ? '10px' : '8px',
-                            borderRadius: '50%',
-                            background: i === 0 ? regimeColor(r.regime) : M.textMuted,
-                            border: i === 0 ? `2px solid ${regimeColor(r.regime)}` : 'none',
-                            boxShadow: i === 0 ? `0 0 8px ${regimeColor(r.regime)}40` : 'none',
-                          }}
-                        />
-                      </div>
-
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: M.textMuted, width: '48px', flexShrink: 0 }}>
-                        {formatDate(r.timestamp)}
-                      </span>
-
-                      <div
-                        style={{
-                          background: regimeDimColor(r.regime),
-                          borderRadius: '8px',
-                          padding: '2px 8px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: regimeColor(r.regime),
-                          }}
-                        />
-                        <span style={{ fontSize: '11px', fontWeight: 500, color: regimeColor(r.regime) }}>
-                          {regimeLabel(r.regime)}
-                        </span>
-                      </div>
-
-                      {r.regime_changed && (
-                        <span style={{ fontSize: '9px', color: M.negative, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
-                          SHIFT
-                        </span>
-                      )}
-
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '12px', color: M.textSecondary, marginLeft: 'auto' }}>
-                        {formatUsd(r.price_now)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            {/* ——— B) PRICE TREND ——— */}
-            <section style={animDelay(1)}>
-              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <Activity size={14} color={M.textMuted} />
-                  <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                    Price Trend
-                  </span>
-                </div>
-
-                {/* BTC */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: M.textSecondary }}>Bitcoin</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '20px', fontWeight: 600, color: M.text }}>
-                        {formatUsd(current!.price_now)}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          color: btcUp ? M.positive : M.negative,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                        }}
-                      >
-                        {btcUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                        {formatPct(current!.r_7d)}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '10px', color: M.textMuted }}>7-day change</span>
-                  </div>
-                  <Sparkline data={btcSparkData} color={btcUp ? M.positive : M.negative} />
-                </div>
-
-                <div style={{ height: '1px', background: M.borderSubtle, margin: '0 0 16px' }} />
-
-                {/* ETH */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 500, color: M.textSecondary }}>Ethereum</span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '20px', fontWeight: 600, color: M.text }}>
-                        {formatUsd(current!.eth_price_now)}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          color: ethUp ? M.positive : M.negative,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                        }}
-                      >
-                        {ethUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                        {formatPct(current!.eth_r_7d)}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '10px', color: M.textMuted }}>7-day change</span>
-                  </div>
-                  <Sparkline data={ethSparkData} color={ethUp ? M.positive : M.negative} />
-                </div>
-              </div>
-            </section>
-
-            {/* ——— C) VOLATILITY CONTEXT ——— */}
-            <section style={animDelay(2)}>
-              <div style={card({ border: `1px solid ${M.borderSubtle}` })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <BarChart3 size={14} color={M.textMuted} />
-                  <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.textMuted, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                    Volatility Context
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                  {/* BTC Vol */}
-                  <div
-                    style={{
-                      flex: 1,
-                      background: M.surfaceHover,
-                      borderRadius: '16px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                    }}
-                  >
-                    <span style={{ fontSize: '11px', color: M.textMuted, fontWeight: 500 }}>BTC 7d Vol</span>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '22px', fontWeight: 600, color: M.text }}>
-                      {(current!.vol_7d * 100).toFixed(2)}%
-                    </span>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: btcVol!.bg,
-                        borderRadius: '20px',
-                        padding: '3px 10px',
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: btcVol!.color }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: btcVol!.color }}>{btcVol!.label}</span>
-                    </div>
-                  </div>
-
-                  {/* ETH Vol */}
-                  <div
-                    style={{
-                      flex: 1,
-                      background: M.surfaceHover,
-                      borderRadius: '16px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                    }}
-                  >
-                    <span style={{ fontSize: '11px', color: M.textMuted, fontWeight: 500 }}>ETH 7d Vol</span>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '22px', fontWeight: 600, color: M.text }}>
-                      {(current!.eth_vol_7d * 100).toFixed(2)}%
-                    </span>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: ethVol!.bg,
-                        borderRadius: '20px',
-                        padding: '3px 10px',
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: ethVol!.color }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: ethVol!.color }}>{ethVol!.label}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Educational explainer */}
                 <div
                   style={{
-                    background: 'rgba(244,162,97,0.05)',
-                    borderRadius: '12px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    gap: '10px',
-                    alignItems: 'flex-start',
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 30,
+                    fontWeight: 600,
+                    color: M.text,
+                    marginBottom: 4,
                   }}
                 >
-                  <BookOpen size={14} color={M.accent} style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <p style={{ fontSize: '12px', color: M.textSecondary, margin: 0, lineHeight: 1.6 }}>
-                    Volatility measures price fluctuation intensity over 7 days. <strong style={{ color: M.positive }}>Low</strong> ({'<'}1.5%) suggests calm conditions, <strong style={{ color: M.accent }}>Moderate</strong> (1.5–2.5%) is typical, and <strong style={{ color: M.negative }}>Elevated</strong> ({'>'}2.5%) may indicate heightened uncertainty.
-                  </p>
+                  {current.regime.charAt(0).toUpperCase() + current.regime.slice(1)}
+                </div>
+                <div style={{ fontSize: 14, color: M.textSecondary }}>
+                  {persistence} days in state
                 </div>
               </div>
-            </section>
-
-            {/* ——— D) NARRATIVE ——— */}
-            <section style={animDelay(3)}>
               <div
                 style={{
-                  ...card({ border: `1px solid ${M.borderAccent}` }),
-                  borderLeft: `3px solid ${M.accent}`,
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: regimeIconBg(current.regime),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 16px rgba(42,157,143,0.3)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <BookOpen size={14} color={M.accent} />
-                  <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: M.accent, fontWeight: 600, textTransform: 'uppercase' as const }}>
-                    How Did We Get Here
-                  </span>
+                <RegimeIcon regime={current.regime} />
+              </div>
+            </div>
+
+            <InfoPanel visible={info === 'regime'}>
+              The market is categorized as Bull (upward), Bear (downward), Range (sideways), or
+              Volatile (unstable). This classification is based on BTC momentum and volatility over
+              1-day and 7-day periods.
+            </InfoPanel>
+
+            <p
+              style={{
+                fontSize: 14,
+                color: M.textSecondary,
+                lineHeight: 1.6,
+                margin: '0 0 16px',
+              }}
+            >
+              {regimeNarrative(current.regime)}
+            </p>
+
+            {/* Confidence sub-card */}
+            <div style={{ background: 'rgba(255,255,255,0.4)', borderRadius: 20, padding: 16 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ fontSize: 12, color: M.textMuted }}>Confidence in classification</span>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: M.text,
+                  }}
+                >
+                  {Math.round(current.confidence * 100)}%
+                </span>
+              </div>
+              <GradientBar
+                pct={current.confidence * 100}
+                gradient="linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))"
+              />
+              <p style={{ fontSize: 10, color: M.textSecondary, lineHeight: 1.6, margin: '8px 0 0' }}>
+                {current.confidence >= 0.7
+                  ? 'Strong signal. BTC and ETH show aligned 7-day trends with moderate volatility. A reading above 70% indicates the pattern is clear and sustained.'
+                  : current.confidence >= 0.5
+                  ? 'Moderate signal. Indicators are leaning in one direction but not yet fully committed.'
+                  : 'Weak signal. Mixed indicators suggest the current classification may shift soon.'}
+              </p>
+            </div>
+          </div>
+
+          {/* ── ETH Confirmation Card ── */}
+          <div
+            style={{
+              ...card({ background: 'rgba(255,255,255,0.5)' }),
+              marginBottom: 16,
+              ...anim(2),
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: M.textMuted, marginBottom: 4 }}>
+                  ETH confirmation
                 </div>
-                <p style={{ fontSize: '14px', color: M.textSecondary, margin: 0, lineHeight: 1.7 }}>
-                  {narrative}
-                </p>
-                <p style={{ fontSize: '11px', color: M.textMuted, margin: '12px 0 0', fontStyle: 'italic' }}>
-                  This summary is auto-generated from observable market data. It describes conditions, not predictions.
+                <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 4 }}>
+                  {ethAligned ? 'Aligned with BTC' : 'Diverging from BTC'}
+                </div>
+                <p style={{ fontSize: 12, color: M.textSecondary, lineHeight: 1.5, margin: 0 }}>
+                  {ethAligned
+                    ? 'ETH shows matching 7-day direction, reinforcing the reading'
+                    : 'ETH and BTC show different 7-day trends, weakening confidence'}
                 </p>
               </div>
-            </section>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: ethAligned ? M.positiveDim : M.negativeDim,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginLeft: 16,
+                }}
+              >
+                <Check
+                  size={20}
+                  color={ethAligned ? M.positive : M.negative}
+                  strokeWidth={2.5}
+                />
+              </div>
+            </div>
+          </div>
 
-            {/* ——— GENERATED TIMESTAMP ——— */}
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <span style={{ fontSize: '10px', color: M.textSubtle, fontFamily: "'DM Mono', monospace" }}>
-                Updated {new Date(data.generated_at).toLocaleString()}
+          {/* ── Sentiment Indicators ── */}
+          <h2
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 18,
+              fontWeight: 600,
+              color: M.text,
+              margin: '0 0 12px',
+              ...anim(3),
+            }}
+          >
+            Sentiment indicators
+          </h2>
+
+          <div style={anim(3)}>
+            <Indicator
+              label="Fear & Greed Index"
+              value={String(fearGreed)}
+              desc={fgDesc}
+              pct={fearGreed}
+              gradient={M.accentGradient}
+              infoId="fear"
+              info={info}
+              setInfo={setInfo}
+              infoText="Composite score 0–100. Low = fear (risk-off). High = greed (risk-on). 50-75 typically indicates moderate optimism without euphoria."
+            />
+            <Indicator
+              label="Bitcoin Dominance"
+              value={`${btcDom.toFixed(1)}%`}
+              desc={domDesc}
+              pct={btcDom}
+              gradient="linear-gradient(90deg, #F7931A, #F79A1F)"
+              infoId="dom"
+              info={info}
+              setInfo={setInfo}
+              infoText="BTC's share of total crypto market cap. Rising = capital consolidating into Bitcoin. Falling = rotating into alts."
+            />
+            <Indicator
+              label="ALT Season Index"
+              value={String(altSeason)}
+              desc={altDesc}
+              pct={altSeason}
+              gradient="linear-gradient(90deg, #14F195, #9945FF)"
+              infoId="alt"
+              info={info}
+              setInfo={setInfo}
+              infoText="Measures whether altcoins outperform Bitcoin. High score = alts running. Low score = BTC leading."
+            />
+          </div>
+
+          {/* ── Volume Profile ── */}
+          <div style={{ ...card(), marginBottom: 16, ...anim(4) }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Volume Profile</span>
+                <InfoBtn id="vol" active={info} onClick={setInfo} />
+              </div>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
+                {vol}
               </span>
             </div>
-          </>
-        )}
-      </div>
-    </main>
-  );
+            <InfoPanel visible={info === 'vol'}>
+              Market activity level. High volume in bull = reinforcement. High volume in bear =
+              panic/capitulation. Low volume in range = indecision.
+            </InfoPanel>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <div
+                style={{
+                  flex: 1,
+                  height: 32,
+                  background: vol === 'Low' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                  borderRadius: 4,
+                  opacity: vol === 'Low' ? 1 : 0.3,
+                }}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  height: 32,
+                  background: vol === 'Moderate' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                  borderRadius: 4,
+                  opacity: vol === 'Moderate' ? 1 : 0.3,
+                }}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  height: 32,
+                  background: vol === 'High' ? 'linear-gradient(90deg, #E76F51, rgba(231,111,81,0.8))' : '#E8DED6',
+                  borderRadius: 4,
+                  opacity: vol === 'High' ? 1 : 0.3,
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
+              {vol === 'Low' ? 'Below average activity — suggests indecision'
+                : vol === 'Moderate' ? 'Average activity — neither confirming nor contradicting'
+                : 'Above average activity — conviction in the current direction'}
+            </p>
+          </div>
+
+          {/* ── Signal Coherence ── */}
+          <div
+            style={{
+              ...card({
+                background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                border: `1px solid ${M.borderAccent}`,
+              }),
+              ...anim(5),
+            }}
+          >
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: 'rgba(244,162,97,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Activity size={16} color={M.accent} strokeWidth={2} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 6 }}>
+                  {ethAligned && fearGreed >= 50 && altSeason >= 40
+                    ? 'Strong signal coherence'
+                    : 'Mixed signal coherence'}
+                </div>
+                <p style={{ fontSize: 12, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
+                  {coherenceNarrative}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Timestamp ── */}
+          <div
+            style={{
+              textAlign: 'center',
+              fontSize: 10,
+              color: M.textSubtle,
+              fontFamily: "'DM Mono', monospace",
+              padding: '16px 0 8px',
+              ...anim(6),
+            }}
+          >
+            Updated {data?.generated_at ? new Date(data.generated_at).toLocaleString() : '—'}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }

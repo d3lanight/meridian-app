@@ -1,253 +1,363 @@
-// ━━━ Admin Config Editor ━━━
-// v0.4.0 · ca-story19 · 2026-02-14
-// Grouped config table with inline editing. Admin only.
+// ━━━ Settings Screen ━━━
+// v1.0.0 · design-unification · 2026-02-22
+// New user-facing settings page matching meridian-settings-v2.jsx artifact
+// Replaces admin config editor at /settings/config
+// Note: Toggles/selects are UI-only for now — backend persistence is future scope
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Save, RotateCcw, Shield, ChevronLeft } from 'lucide-react'
+import { useState } from 'react'
+import { Mail, Bell, Globe, DollarSign, ChevronRight } from 'lucide-react'
 import { M } from '@/lib/meridian'
-import Link from 'next/link'
 
-interface ConfigEntry {
-  id: string
-  name: string
-  value: string
-  default_value: string | null
-  description: string | null
-  type: string | null
-  category: string | null
-  unit: string | null
-}
+// ── Shared Helpers ────────────────────────────
 
-const CATEGORY_LABELS: Record<string, string> = {
-  archival: 'Archival',
-  email: 'Email',
-  portfolio: 'Portfolio',
-  regime: 'Regime',
-  suppression: 'Suppression',
-}
+const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
+  background: M.surface,
+  backdropFilter: M.surfaceBlur,
+  WebkitBackdropFilter: M.surfaceBlur,
+  borderRadius: '24px',
+  padding: '20px',
+  border: `1px solid ${M.border}`,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+  ...extra,
+})
 
-export default function ConfigPage() {
-  const [config, setConfig] = useState<ConfigEntry[]>([])
-  const [editValues, setEditValues] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+// ── Toggle ────────────────────────────────────
 
-  const fetchConfig = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const res = await fetch('/api/config')
-      if (res.status === 401) {
-        setError('Not authenticated')
-        return
-      }
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        return
-      }
-      setConfig(data.config)
-      // Initialize edit values
-      const vals: Record<string, string> = {}
-      data.config.forEach((c: ConfigEntry) => { vals[c.id] = c.value })
-      setEditValues(vals)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchConfig() }, [fetchConfig])
-
-  const handleSave = async (entry: ConfigEntry) => {
-    const newValue = editValues[entry.id]
-    if (newValue === entry.value) return // No change
-
-    setSaving(entry.id)
-    setSaveSuccess(null)
-    try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: entry.id, value: newValue }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error)
-        return
-      }
-      // Update local state
-      setConfig(prev => prev.map(c => c.id === entry.id ? { ...c, value: newValue } : c))
-      setSaveSuccess(entry.id)
-      setTimeout(() => setSaveSuccess(null), 2000)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  const handleReset = (entry: ConfigEntry) => {
-    if (entry.default_value !== null) {
-      setEditValues(prev => ({ ...prev, [entry.id]: entry.default_value! }))
-    }
-  }
-
-  const isChanged = (entry: ConfigEntry) => editValues[entry.id] !== entry.value
-
-  // Group by category
-  const grouped = config.reduce<Record<string, ConfigEntry[]>>((acc, c) => {
-    const cat = c.category || 'system'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(c)
-    return acc
-  }, {})
-
-  if (isLoading) {
-    return (
-      <div className="px-5 pt-5">
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="rounded-2xl animate-pulse" style={{ background: M.surfaceLight, height: 80 }} />
-          ))}
-        </div>
+function Toggle({
+  label,
+  desc,
+  defaultValue = true,
+  disabled = false,
+}: {
+  label: string
+  desc?: string
+  defaultValue?: boolean
+  disabled?: boolean
+}) {
+  const [on, setOn] = useState(defaultValue)
+  return (
+    <div
+      style={{
+        ...card({ padding: '16px' }),
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>{label}</div>
+        {desc && <div style={{ fontSize: 12, color: M.textMuted }}>{desc}</div>}
       </div>
-    )
-  }
+      <button
+        onClick={() => !disabled && setOn(!on)}
+        style={{
+          width: 48,
+          height: 28,
+          borderRadius: 28,
+          background: on ? M.accentGradient : '#E8DED6',
+          border: 'none',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          position: 'relative',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            background: 'white',
+            position: 'absolute',
+            top: 4,
+            left: on ? 24 : 4,
+            transition: 'left 0.2s ease',
+          }}
+        />
+      </button>
+    </div>
+  )
+}
+
+// ── Select ────────────────────────────────────
+
+function SelectField({
+  label,
+  options,
+  defaultValue,
+  disabled = false,
+}: {
+  label: string
+  options: string[]
+  defaultValue: string
+  disabled?: boolean
+}) {
+  return (
+    <div style={{ ...card({ padding: '16px' }), marginBottom: 12, opacity: disabled ? 0.5 : 1 }}>
+      <label style={{ fontSize: 12, color: M.textMuted, display: 'block', marginBottom: 8 }}>
+        {label}
+      </label>
+      <select
+        defaultValue={defaultValue}
+        disabled={disabled}
+        style={{
+          width: '100%',
+          background: 'transparent',
+          border: 'none',
+          fontSize: 14,
+          fontWeight: 500,
+          color: M.text,
+          outline: 'none',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// ── Section Detail Views ──────────────────────
+
+function EmailSettings({ onBack }: { onBack: () => void }) {
+  const [emailOn, setEmailOn] = useState(true)
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 14,
+          color: M.accentDeep,
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
+        }}
+      >
+        ← Back
+      </button>
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 22,
+          fontWeight: 500,
+          color: M.text,
+          margin: '0 0 4px',
+        }}
+      >
+        Email
+      </h2>
+      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
+        Control when and how you receive emails
+      </p>
+      <Toggle label="Email notifications" desc="Master switch for all email" defaultValue={emailOn} />
+      <SelectField
+        label="Delivery frequency"
+        options={['Immediately', 'Daily digest', 'Weekly digest']}
+        defaultValue="Daily digest"
+        disabled={!emailOn}
+      />
+      <SelectField
+        label="Minimum severity"
+        options={['Info (all)', 'Watch (notable)', 'Actionable (high)']}
+        defaultValue="Watch (notable)"
+        disabled={!emailOn}
+      />
+    </div>
+  )
+}
+
+function NotificationSettings({ onBack }: { onBack: () => void }) {
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 14,
+          color: M.accentDeep,
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
+        }}
+      >
+        ← Back
+      </button>
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 22,
+          fontWeight: 500,
+          color: M.text,
+          margin: '0 0 4px',
+        }}
+      >
+        Notifications
+      </h2>
+      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
+        Choose which signals trigger alerts
+      </p>
+      <Toggle label="Posture mismatch" desc="When portfolio diverges from regime" />
+      <Toggle label="Regime change" desc="When market regime shifts" />
+      <Toggle label="ALT concentration" desc="When altcoin allocation is flagged" />
+      <Toggle label="Band breach" desc="When weights move outside targets" />
+    </div>
+  )
+}
+
+function DisplaySettings({ onBack }: { onBack: () => void }) {
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 14,
+          color: M.accentDeep,
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
+        }}
+      >
+        ← Back
+      </button>
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 22,
+          fontWeight: 500,
+          color: M.text,
+          margin: '0 0 4px',
+        }}
+      >
+        Display
+      </h2>
+      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
+        Customize how information appears
+      </p>
+      <SelectField
+        label="Timezone"
+        options={['Europe/Brussels', 'America/New_York', 'Asia/Tokyo', 'UTC']}
+        defaultValue="Europe/Brussels"
+      />
+      <SelectField
+        label="Date format"
+        options={['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY']}
+        defaultValue="YYYY-MM-DD"
+      />
+      <SelectField
+        label="Currency"
+        options={['USD', 'EUR', 'BTC']}
+        defaultValue="USD"
+      />
+    </div>
+  )
+}
+
+// ── Settings Item Config ──────────────────────
+
+interface SettingsItem {
+  id: string
+  Icon: typeof Mail
+  title: string
+  desc: string
+  disabled?: boolean
+}
+
+const SETTINGS_ITEMS: SettingsItem[] = [
+  { id: 'email', Icon: Mail, title: 'Email', desc: 'Delivery and digest settings' },
+  { id: 'notifications', Icon: Bell, title: 'Notifications', desc: 'Signal triggers and alerts' },
+  { id: 'display', Icon: Globe, title: 'Display', desc: 'Timezone, format, currency' },
+  { id: 'portfolio', Icon: DollarSign, title: 'Portfolio', desc: 'Target bands and benchmarks', disabled: true },
+]
+
+// ═══════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════
+
+export default function SettingsPage() {
+  const [section, setSection] = useState<string | null>(null)
+
+  if (section === 'email') return <EmailSettings onBack={() => setSection(null)} />
+  if (section === 'notifications') return <NotificationSettings onBack={() => setSection(null)} />
+  if (section === 'display') return <DisplaySettings onBack={() => setSection(null)} />
 
   return (
-    <div className="px-5 pt-5 pb-4">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: M.surfaceLight }}>
-          <ChevronLeft size={18} style={{ color: M.textSecondary }} />
-        </Link>
-        <div className="flex items-center gap-2">
-          <Shield size={18} style={{ color: M.accent }} />
-          <span className="font-display text-lg font-semibold" style={{ color: M.text }}>
-            System Config
-          </span>
-        </div>
-        <div
-          className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded"
-          style={{ color: M.accent, background: `${M.accent}15` }}
+    <div style={{ padding: '24px 20px' }}>
+      {/* ── Page Header ── */}
+      <div style={{ marginBottom: 28 }}>
+        <h1
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: 24,
+            fontWeight: 500,
+            color: M.text,
+            margin: '0 0 4px',
+          }}
         >
-          ADMIN
-        </div>
+          Settings
+        </h1>
+        <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>
+          Preferences and notifications
+        </p>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div
-          className="mb-3 text-[11px] px-3 py-2 rounded-lg"
-          style={{ color: M.negative, background: `${M.negative}15` }}
-          onClick={() => setError(null)}
-        >
-          {error}
-        </div>
-      )}
-
-      {/* Config groups */}
-      {Object.entries(grouped).sort().map(([category, entries]) => (
-        <div key={category} className="mb-4">
-          {/* Category header */}
-          <div
-            className="text-[10px] font-semibold font-body px-1 mb-2"
-            style={{ letterSpacing: '0.1em', color: M.textMuted }}
-          >
-            {(CATEGORY_LABELS[category] || category).toUpperCase()}
-          </div>
-
-          {/* Entries */}
-          <div className="rounded-2xl overflow-hidden" style={{ background: M.surfaceLight }}>
-            {entries.map((entry, i) => (
+      {/* ── Settings Cards ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {SETTINGS_ITEMS.map((item) => {
+          const { Icon } = item
+          return (
+            <button
+              key={item.id}
+              onClick={() => !item.disabled && setSection(item.id)}
+              style={{
+                ...card({ padding: '16px' }),
+                cursor: item.disabled ? 'not-allowed' : 'pointer',
+                opacity: item.disabled ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                width: '100%',
+                textAlign: 'left' as const,
+              }}
+            >
               <div
-                key={entry.id}
-                className="px-4 py-3"
                 style={{
-                  borderBottom: i < entries.length - 1 ? `1px solid ${M.surface}` : 'none',
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
                 }}
               >
-                {/* Name + description */}
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <div>
-                    <div className="text-[12px] font-medium font-mono" style={{ color: M.text }}>
-                      {entry.name.split('.').pop()}
-                    </div>
-                    {entry.description && (
-                      <div className="text-[10px] mt-0.5" style={{ color: M.textMuted }}>
-                        {entry.description}
-                      </div>
-                    )}
-                  </div>
-                  {entry.unit && (
-                    <span
-                      className="text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                      style={{ color: M.textSubtle, background: M.surface }}
-                    >
-                      {entry.unit}
-                    </span>
-                  )}
-                </div>
-
-                {/* Value input + actions */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={editValues[entry.id] ?? entry.value}
-                    onChange={(e) => setEditValues(prev => ({ ...prev, [entry.id]: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSave(entry) }}
-                    className="flex-1 text-[13px] font-mono px-2.5 py-1.5 rounded-lg border-none outline-none"
-                    style={{
-                      background: M.surface,
-                      color: isChanged(entry) ? M.accent : M.text,
-                    }}
-                  />
-
-                  {/* Reset to default */}
-                  {entry.default_value !== null && isChanged(entry) && (
-                    <button
-                      onClick={() => handleReset(entry)}
-                      className="p-1.5 rounded-lg border-none cursor-pointer"
-                      style={{ background: M.surface, color: M.textMuted }}
-                      title={`Default: ${entry.default_value}`}
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                  )}
-
-                  {/* Save */}
-                  {isChanged(entry) && (
-                    <button
-                      onClick={() => handleSave(entry)}
-                      disabled={saving === entry.id}
-                      className="p-1.5 rounded-lg border-none cursor-pointer"
-                      style={{
-                        background: `${M.accent}20`,
-                        color: M.accent,
-                      }}
-                    >
-                      <Save size={12} className={saving === entry.id ? 'animate-spin' : ''} />
-                    </button>
-                  )}
-
-                  {/* Success indicator */}
-                  {saveSuccess === entry.id && (
-                    <span className="text-[10px] font-medium" style={{ color: M.positive }}>✓</span>
-                  )}
-                </div>
+                <Icon size={24} color={M.accentDeep} strokeWidth={2} />
               </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Footer */}
-      <div className="text-center text-[10px] py-2" style={{ color: M.textSubtle }}>
-        {config.length} config entries · Changes save immediately
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>
+                  {item.title}
+                </div>
+                <div style={{ fontSize: 12, color: M.textMuted }}>{item.desc}</div>
+              </div>
+              <ChevronRight size={20} color={M.textMuted} strokeWidth={2} />
+            </button>
+          )
+        })}
       </div>
     </div>
   )

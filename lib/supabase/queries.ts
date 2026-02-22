@@ -15,7 +15,7 @@ import type { RegimeData, PortfolioData, Signal, MarketMetrics } from '@/types'
 const REGIME_LABELS: Record<string, string> = {
   bull: 'Bull Market',
   bear: 'Bear Market',
-  range: 'Sideways',
+  range: 'Range',
   volatility: 'High Volatility',
   insufficient_data: 'Insufficient Data',
 }
