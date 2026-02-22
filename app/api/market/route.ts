@@ -1,11 +1,11 @@
-// ============================================================
-// Market Dashboard API — single endpoint for all dashboard data
-// Story: ca-story38-daily-overview-real-data
-// Version: 1.1 · 2026-02-17
-// ============================================================
-// Changelog (from v1.0):
-//  - Added regime_persistence_days() RPC call for accurate day count
-//  - Injects persistence into regime row before mapRegime
+// ━━━ Market Dashboard API ━━━
+// v2.1.0 · ca-story69 · 2026-02-22
+// Single endpoint for all dashboard data
+// Changelog (from v1.1):
+//   - Config-driven 3-bucket posture calculation
+//   - Falls back to hardcoded defaults if config missing
+//   - Fixed timestamp references: regimeRaw uses created_at, not timestamp
+//   - exposureRes.data uses created_at, not timestamp
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -30,7 +30,7 @@ export async function GET() {
   const [regimeRes, exposureRes, signalsRes, persistenceRes] = await Promise.all([
     supabase.from('latest_regime').select('*').single(),
     supabase.from('latest_exposure').select('*').eq('user_id', user.id).single(),
-    supabase.from('active_signals').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(5),
+    supabase.from('active_signals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
     supabase.rpc('regime_persistence_days'),
   ])
 
@@ -52,8 +52,8 @@ export async function GET() {
   // Compute market metrics from live data
   const metrics = computeMetrics(regimeRaw, null)
 
-  // Latest timestamp from regime or exposure
-  const latestTimestamp = regimeRaw?.timestamp ?? exposureRes.data?.timestamp ?? null
+  // Latest timestamp from regime or exposure (use created_at, not timestamp)
+  const latestTimestamp = regimeRaw?.created_at ?? exposureRes.data?.created_at ?? null
   const lastAnalysis = formatLastAnalysis(latestTimestamp)
 
   return NextResponse.json({

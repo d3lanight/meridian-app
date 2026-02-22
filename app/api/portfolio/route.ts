@@ -1,11 +1,14 @@
 // ============================================================
 // Portfolio Holdings API — GET (list) + POST (upsert)
-// Story: ca-story48-portfolio-crud-ui
-// Version: 1.2 · 2026-02-21
+// Story: ca-story69
+// Version: 1.3 · 2026-02-21
 // ============================================================
 // Changelog:
 //  v1.1 — GET returns cost_basis, POST accepts cost_basis
 //  v1.2 — GET returns include_in_exposure, POST accepts include_in_exposure
+//  v1.3 — Fix: removed timestamp from GET select (column dropped), use created_at
+//        — Fix: POST uses created_at instead of timestamp
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -30,7 +33,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('portfolio_holdings')
-    .select('id, asset, quantity, cost_basis, include_in_exposure, timestamp, created_at, updated_at')
+    .select('id, asset, quantity, cost_basis, include_in_exposure, created_at, updated_at')
     .eq('user_id', user.id)
     .order('asset', { ascending: true })
 
@@ -94,12 +97,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Build upsert payload
+  // Build upsert payload (no timestamp field — table uses created_at/updated_at)
   const payload: Record<string, any> = {
     user_id: user.id,
     asset: symbol,
     quantity,
-    timestamp: new Date().toISOString(),
   }
 
   // Only include optional fields if explicitly provided

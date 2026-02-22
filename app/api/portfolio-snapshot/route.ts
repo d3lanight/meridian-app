@@ -1,8 +1,9 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v1.2.0 · ca-story48 · 2026-02-21
+// v1.3.0 · ca-story69 · 2026-02-22
 // Changelog:
 //  v1.1.0 — Enriched holdings with cost_basis + category
 //  v1.2.0 — Enriched holdings include include_in_exposure flag
+//  v1.3.0 — Fix: portfolio_exposure uses created_at, not timestamp
 
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
@@ -21,7 +22,7 @@ interface ExposureRow {
   total_value_usd_all: string | number | null;
   holdings_count: number | null;
   holdings_json: string | unknown[] | null;
-  timestamp: string | null;
+  created_at: string | null;
 }
 
 const EMPTY = {
@@ -52,7 +53,7 @@ export async function GET() {
         .from('latest_exposure')
         .select('*')
         .eq('user_id', user.id)
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .single(),
       supabase
@@ -114,7 +115,8 @@ export async function GET() {
       holdings_count: exposure.holdings_count ?? 0,
       holdings_json: holdingsJson ?? [],
       enriched_holdings: enrichedHoldings,
-      timestamp: exposure.timestamp,
+      // Expose as 'timestamp' for frontend compatibility, sourced from created_at
+      timestamp: exposure.created_at,
     });
   } catch (err) {
     console.error('[portfolio-snapshot] Unexpected error:', err);

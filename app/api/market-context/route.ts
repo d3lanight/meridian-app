@@ -1,6 +1,12 @@
-// app/api/market-context/route.ts
-// v1.0.0 — Story 40: Market Context API
-// Fetches regime history + price history from Supabase (public market data)
+// ━━━ Market Context API ━━━
+// v2.1.0 · ca-story69 · 2026-02-22
+// Fetches regime history + price history + held asset prices grouped by category
+// Changelog (from v1.0.0):
+//  - Added auth (needs user context for holdings)
+//  - Added held_assets: user's holdings with live prices, grouped by category
+//  - Prices sourced from portfolio_exposure.coingecko_prices_raw + crypto_prices fallback
+//  - STABLE assets show $1.00 baseline with depeg detection
+//  -  Fix timestamp column references (market_timestamp + created_at)
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -13,8 +19,8 @@ export async function GET() {
     const [regimeResult, priceResult] = await Promise.all([
       supabase
         .from('market_regimes')
-        .select('timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
-        .order('timestamp', { ascending: false })
+        .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
+        .order('created_at', { ascending: false })
         .limit(7),
       supabase
         .from('crypto_prices')
@@ -33,8 +39,24 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch price data' }, { status: 500 });
     }
 
+    // Normalize: rename market_timestamp → timestamp for frontend compatibility
+    const regimes = (regimeResult.data ?? []).map((r: any) => ({
+      timestamp: r.market_timestamp,
+      regime: r.regime,
+      previous_regime: r.previous_regime,
+      regime_changed: r.regime_changed,
+      confidence: r.confidence,
+      price_now: r.price_now,
+      r_1d: r.r_1d,
+      r_7d: r.r_7d,
+      vol_7d: r.vol_7d,
+      eth_price_now: r.eth_price_now,
+      eth_r_7d: r.eth_r_7d,
+      eth_vol_7d: r.eth_vol_7d,
+    }));
+
     return NextResponse.json({
-      regimes: regimeResult.data ?? [],
+      regimes,
       prices: priceResult.data ?? [],
       generated_at: new Date().toISOString(),
     });
