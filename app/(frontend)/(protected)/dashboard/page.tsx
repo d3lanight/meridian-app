@@ -1,12 +1,15 @@
 // ━━━ Dashboard (Home Screen) ━━━
-// v0.6.0 · design-unification · 2026-02-22
-// Migrated to match meridian-today-v2.jsx design artifact
-// Changes: RegimeCard → inline, PostureCard → inline, SignalCard → dot style,
-//          removed MarketPulseCard + Market Context link
+// v0.7.0 · ca-story55 · 2026-02-24
+// S55: Confidence Trend Indicator
+// Changes from v0.6.0:
+//  - Added confidence trend indicator below confidence number in regime card
+//  - Trend fetched from /api/market response (confidenceTrend field)
+//  - Rising = green up arrow, Declining = red down arrow, Stable = muted right arrow
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Minus, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RefreshCw, Wifi, WifiOff, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react'
+import ProgressiveDisclosure, { DisclosureGroup } from '@/components/education/ProgressiveDisclosure'
 import { M } from '@/lib/meridian'
 import { useMarketData } from '@/hooks/useMarketData'
 import MeridianMark from '@/components/brand/MeridianMark'
@@ -139,12 +142,43 @@ function postureNarrative(posture: string, regime: string): string {
   return 'Add holdings to see portfolio posture analysis.'
 }
 
+// ── Confidence Trend (S55) ────────────────────
+
+interface ConfidenceTrend {
+  direction: 'rising' | 'declining' | 'stable'
+  streak: number
+}
+
+function ConfidenceTrendIndicator({ trend }: { trend: ConfidenceTrend | null }) {
+  if (!trend || trend.streak === -1) {
+    // No trend data or insufficient data — show nothing
+    return null
+  }
+
+  const config = {
+    rising: { Icon: ArrowUp, color: M.positive, label: `Rising for ${trend.streak} days` },
+    declining: { Icon: ArrowDown, color: M.negative, label: `Declining for ${trend.streak} days` },
+    stable: { Icon: ArrowRight, color: M.textMuted, label: 'Stable' },
+  }
+
+  const { Icon, color, label } = config[trend.direction]
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+      <Icon size={11} color={color} strokeWidth={2.5} />
+      <span style={{ fontSize: 11, color, fontWeight: 500 }}>{label}</span>
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
+  const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
+  const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const {
     scenario,
     activeScenario,
@@ -160,6 +194,37 @@ export default function DashboardPage() {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
   }, [])
+
+  // S55: Fetch confidence trend from /api/market
+  useEffect(() => {
+    async function fetchTrend() {
+      try {
+        const res = await fetch('/api/market')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.confidenceTrend) {
+            setConfidenceTrend(json.confidenceTrend)
+          }
+        }
+      } catch {
+        // Non-critical — trend indicator just won't show
+      }
+    }
+    fetchTrend()
+  }, [])
+  
+  // S58: Fetch regime explainer from glossary
+  useEffect(() => {
+    if (!scenario?.regime?.current) return
+    const rid = scenario.regime.current.toLowerCase().replace(/\s+/g, '')
+    fetch(`/api/glossary?regime=${rid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const e = Array.isArray(d) ? d[0] : d
+        if (e) setRegimeExplainer({ summary: e.summary, slug: e.slug })
+      })
+      .catch(() => {})
+  }, [scenario?.regime?.current])
 
   const anim = (i: number): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
@@ -179,7 +244,7 @@ export default function DashboardPage() {
   })
 
   return (
-    <>
+    <DisclosureGroup>
       <DevTools
         activeScenario={activeScenario === 'live' ? 'bull' : activeScenario}
         onScenarioChange={setScenario}
@@ -271,7 +336,14 @@ export default function DashboardPage() {
               }}
             >
               <div>
-                <div style={{ fontSize: 12, color: M.textMuted, marginBottom: 4 }}>Market Regime</div>
+                <ProgressiveDisclosure
+                  id="regime"
+                  summary={
+                    <span style={{ fontSize: 12, color: M.textMuted }}>Market Regime</span>
+                  }
+                  context={regimeExplainer?.summary ?? 'The current market condition based on BTC momentum and volatility.'}
+                  learnMoreHref={regimeExplainer ? `/settings/learn/glossary#${regimeExplainer.slug}` : undefined}
+                />
                 <div
                   style={{
                     fontFamily: "'Outfit', sans-serif",
@@ -333,6 +405,8 @@ export default function DashboardPage() {
                 >
                   {regime.confidence}%
                 </div>
+                {/* S55: Confidence trend indicator */}
+                <ConfidenceTrendIndicator trend={confidenceTrend} />
               </div>
             </div>
           </div>
@@ -457,6 +531,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </>
+    </DisclosureGroup>
   )
 }

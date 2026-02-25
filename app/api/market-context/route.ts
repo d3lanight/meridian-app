@@ -1,32 +1,93 @@
 // ━━━ Market Context API ━━━
-// v2.1.0 · ca-story69 · 2026-02-22
-// Fetches regime history + price history + held asset prices grouped by category
-// Changelog (from v1.0.0):
-//  - Added auth (needs user context for holdings)
-//  - Added held_assets: user's holdings with live prices, grouped by category
-//  - Prices sourced from portfolio_exposure.coingecko_prices_raw + crypto_prices fallback
-//  - STABLE assets show $1.00 baseline with depeg detection
-//  -  Fix timestamp column references (market_timestamp + created_at)
+// v3.2.0 · ca-story56 · 2026-02-25
+// Fetches regime history + price history + duration patterns + transitions
+// Changelog (from v3.1.0):
+//  - Aggregates regime transitions from rows where regime_changed = true
+//  - Response includes transitions array + transition_count
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-export async function GET() {
+const VALID_DAYS = [7, 30, 90] as const;
+type ValidDays = (typeof VALID_DAYS)[number];
+
+function parseDays(param: string | null): ValidDays {
+  const n = Number(param);
+  if (VALID_DAYS.includes(n as ValidDays)) return n as ValidDays;
+  return 7;
+}
+
+// ── Transition Aggregation ────────────────────
+
+interface Transition {
+  from: string;
+  to: string;
+  count: number;
+  last_seen: string;
+}
+
+function aggregateTransitions(regimes: any[]): Transition[] {
+  // Filter for regime-change rows only
+  const changes = regimes.filter(r => r.regime_changed && r.previous_regime);
+
+  // Aggregate by from→to pair
+  const map = new Map<string, { count: number; last_seen: string }>();
+
+  for (const r of changes) {
+    const key = `${r.previous_regime}→${r.regime}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { count: 1, last_seen: r.market_timestamp });
+    } else {
+      existing.count++;
+      // Keep the most recent (changes are sorted DESC, so first seen = most recent)
+      if (!existing.last_seen || r.market_timestamp > existing.last_seen) {
+        existing.last_seen = r.market_timestamp;
+      }
+    }
+  }
+
+  // Convert to array
+  const transitions: Transition[] = [];
+  for (const [key, val] of map) {
+    const [from, to] = key.split('→');
+    transitions.push({ from, to, count: val.count, last_seen: val.last_seen });
+  }
+
+  // Sort by count DESC, then by last_seen DESC
+  transitions.sort((a, b) => b.count - a.count || b.last_seen.localeCompare(a.last_seen));
+
+  return transitions;
+}
+
+// ═══════════════════════════════════════════════
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Parallel fetch: regime history + price history
-    const [regimeResult, priceResult] = await Promise.all([
+    // Parse ?days param
+    const { searchParams } = new URL(request.url);
+    const days = parseDays(searchParams.get('days'));
+
+    // Calculate date cutoff
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffISO = cutoff.toISOString();
+
+    // Parallel fetch: regime history (date-range) + price history + duration stats
+    const [regimeResult, priceResult, durationResult] = await Promise.all([
       supabase
         .from('market_regimes')
         .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
-        .order('created_at', { ascending: false })
-        .limit(7),
+        .gte('created_at', cutoffISO)
+        .order('created_at', { ascending: false }),
       supabase
         .from('crypto_prices')
         .select('timestamp, btc_usd, eth_usd')
         .order('timestamp', { ascending: false })
         .limit(14),
+      supabase.rpc('regime_duration_stats'),
     ]);
 
     if (regimeResult.error) {
@@ -37,6 +98,11 @@ export async function GET() {
     if (priceResult.error) {
       console.error('crypto_prices fetch error:', priceResult.error);
       return NextResponse.json({ error: 'Failed to fetch price data' }, { status: 500 });
+    }
+
+    if (durationResult.error) {
+      console.error('regime_duration_stats error:', durationResult.error);
+      // Non-fatal — continue without duration patterns
     }
 
     // Normalize: rename market_timestamp → timestamp for frontend compatibility
@@ -55,9 +121,18 @@ export async function GET() {
       eth_vol_7d: r.eth_vol_7d,
     }));
 
+    // S56: Aggregate transitions from the full dataset (not just current timeframe)
+    // Use raw regimeResult.data which has all rows in the date range
+    const transitions = aggregateTransitions(regimeResult.data ?? []);
+
     return NextResponse.json({
       regimes,
       prices: priceResult.data ?? [],
+      duration_patterns: durationResult.data ?? [],
+      transitions,
+      transition_count: transitions.reduce((sum, t) => sum + t.count, 0),
+      row_count: regimes.length,
+      days_requested: days,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

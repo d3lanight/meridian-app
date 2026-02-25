@@ -1,8 +1,9 @@
 // ━━━ Crypto Analyst · Meridian Types ━━━
-// v0.5.0 · ca-story48 · 2026-02-21
+// v0.6.0 · ca-story52 · 2026-02-21
 // Changelog:
 //  v0.4.0 — Added EnrichedHolding, enriched_holdings on PortfolioExposure
 //  v0.5.0 — Added include_in_exposure to EnrichedHolding, Holding type for CRUD
+//  v0.6.0 — Added name to AssetMapping, HeldAssetPrice type for market context
 
 export interface RegimeData {
   current: string;
@@ -120,7 +121,16 @@ export interface Holding {
 export interface AssetMapping {
   id: string;
   symbol: string;
+  name: string | null;
   coingecko_id: string | null;
   category: 'core' | 'alt' | 'stable' | null;
   active: boolean;
+}
+
+export interface HeldAssetPrice {
+  symbol: string;
+  name: string;
+  category: 'core' | 'alt' | 'stable';
+  price_usd: number;
+  depeg: boolean;
 }

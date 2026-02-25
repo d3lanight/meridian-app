@@ -6,8 +6,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, Bell, Globe, DollarSign, ChevronRight } from 'lucide-react'
+import { Mail, Bell, Globe, DollarSign, ChevronRight, BookOpen } from 'lucide-react'
 import { M } from '@/lib/meridian'
+import Link from 'next/link'
 
 // ── Shared Helpers ────────────────────────────
 
@@ -358,7 +359,54 @@ export default function SettingsPage() {
             </button>
           )
         })}
-      </div>
+</div>
+
+      {/* ── Learn Section (S60) ── */}
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 18,
+          fontWeight: 600,
+          color: M.text,
+          margin: '28px 0 12px',
+        }}
+      >
+        Learn
+      </h2>
+      <Link href="/settings/learn/glossary" style={{ textDecoration: 'none' }}>
+        <div
+          style={{
+            ...card({ padding: '16px' }),
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            width: '100%',
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <BookOpen size={24} color={M.accentDeep} strokeWidth={2} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>
+              Glossary
+            </div>
+            <div style={{ fontSize: 12, color: M.textMuted }}>18 terms explained</div>
+          </div>
+          <ChevronRight size={20} color={M.textMuted} strokeWidth={2} />
+        </div>
+      </Link>
     </div>
   )
 }

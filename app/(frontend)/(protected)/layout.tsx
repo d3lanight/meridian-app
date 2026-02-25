@@ -27,7 +27,7 @@ export default function ProtectedLayout({
       home: '/dashboard',
       portfolio: '/portfolio',
       market: '/market',
-      settings: '/settings/config',
+      settings: '/settings',
     };
     window.location.href = routes[tab];
   };

@@ -1,5 +1,7 @@
 // ━━━ Assets API — GET (list available assets) ━━━
-// v1.0.0 · ca-story48 · 2026-02-21
+// v1.1.0 · ca-story52 · 2026-02-21
+// Changelog (from v1.0.0):
+//  - Added name field to SELECT (from asset_mapping.name column)
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -14,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('asset_mapping')
-    .select('id, symbol, coingecko_id, category, active')
+    .select('id, symbol, name, coingecko_id, category, active')
     .eq('active', true)
     .order('symbol', { ascending: true });
 
