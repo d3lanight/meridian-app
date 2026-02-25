@@ -1,9 +1,9 @@
-// ━━━ Portfolio Screen ━━━
-// v2.2.0 · design-unification · 2026-02-22
-// Migrated to match meridian-portfolio-v2.1.jsx design artifact
-// Layout: allocation card on top → holdings list below
-// Data: usePortfolio hook + snapshot API (unchanged)
-// CRUD: AddHoldingSheet / EditHoldingSheet (unchanged)
+// v2.4.0 · ca-story59 · 2026-02-25
+// S59: Educational Tooltip Triggers
+// Changes from v2.3.0:
+//  - Added ProgressiveDisclosure on allocation card header
+//  - Added ProgressiveDisclosure on posture contribution label
+//  - Both pull L2 content from /api/glossary at mount
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -12,7 +12,9 @@ import { M } from '@/lib/meridian'
 import { usePortfolio } from '@/hooks/usePortfolio'
 import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
 import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
+import MisalignmentFramingCard from '@/components/portfolio/MisalignmentFramingCard'
 import type { PortfolioExposure, Holding } from '@/types'
+import { DisclosureGroup as ProgressiveDisclosure } from "@/components/education/ProgressiveDisclosure"
 
 // ── Helpers ───────────────────────────────────
 
@@ -221,6 +223,7 @@ export default function PortfolioPage() {
   const [snapshotLoading, setSnapshotLoading] = useState(true)
   const [sheet, setSheet] = useState<SheetState>({ type: 'closed' })
   const [mounted, setMounted] = useState(false)
+  const [regime, setRegime] = useState<string>('range')
 
   const { holdings, assets, isLoading: holdingsLoading, addHolding, updateHolding, removeHolding } =
     usePortfolio()
@@ -238,9 +241,29 @@ export default function PortfolioPage() {
     }
   }
 
+  const [allocationExplainer, setAllocationExplainer] = useState<string>('The percentage each asset or category represents in your total portfolio.')
+const [contributionExplainer, setContributionExplainer] = useState<string>('How much a single holding adds to or subtracts from your overall posture score.')
+
+useEffect(() => {
+  Promise.all([
+    fetch('/api/glossary?slug=glossary-allocation').then(r => r.ok ? r.json() : null),
+    fetch('/api/glossary?slug=glossary-posture-contribution').then(r => r.ok ? r.json() : null),
+  ]).then(([allocation, contribution]) => {
+    if (allocation?.summary) setAllocationExplainer(allocation.summary)
+    if (contribution?.summary) setContributionExplainer(contribution.summary)
+  }).catch(() => {})
+}, [])
+
   useEffect(() => {
     fetchSnapshot()
   }, [])
+  // S61: Fetch regime for misalignment framing
+  useEffect(() => {
+  fetch('/api/market')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d?.regime?.current) setRegime(d.regime.current) })
+    .catch(() => {})
+}, [])
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
@@ -544,17 +567,18 @@ export default function PortfolioPage() {
             ...anim(1),
           }}
         >
-          <h3
-            style={{
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: 14,
-              fontWeight: 600,
-              color: M.text,
-              margin: '0 0 12px',
-            }}
-          >
-            Allocation
-          </h3>
+          <div style={{ marginBottom: 12 }}>
+            <ProgressiveDisclosure
+              id="allocation"
+              summary={
+                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, color: M.text }}>
+                  Allocation
+                </span>
+              }
+              context={allocationExplainer}
+              learnMoreHref="/settings/learn/glossary#glossary-allocation"
+            />
+          </div>
           {allocRows.map((a, i) => (
             <div key={a.label} style={{ marginBottom: i < allocRows.length - 1 ? 8 : 0 }}>
               <div
@@ -581,6 +605,13 @@ export default function PortfolioPage() {
           ))}
         </div>
       )}
+      
+      {/* ── Misalignment framing (S61) ── */}
+        {hasSnapshot && snapshot && (
+          <div style={{ marginBottom: 16, ...anim(1) }}>
+            <MisalignmentFramingCard snapshot={snapshot} regime={regime} />
+          </div>
+        )}
 
       {/* ── No snapshot notice ── */}
       {!hasSnapshot && (
@@ -735,9 +766,16 @@ export default function PortfolioPage() {
                       marginBottom: 6,
                     }}
                   >
-                    <span style={{ fontSize: 10, color: M.textSecondary }}>
-                      Posture contribution
-                    </span>
+                    <ProgressiveDisclosure
+                      id={`contribution-${h.symbol}`}
+                      summary={
+                        <span style={{ fontSize: 10, color: M.textSecondary }}>
+                          Posture contribution
+                        </span>
+                      }
+                      context={contributionExplainer}
+                      learnMoreHref="/settings/learn/glossary#glossary-posture-contribution"
+                    />
                     <span
                       style={{
                         fontSize: 12,
