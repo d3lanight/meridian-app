@@ -1,14 +1,18 @@
-// v1.8.0 · ca-story78 · Sprint 19
-// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
+// v2.0.0 · ca-story82 · Sprint 19
+// S82: Regime history integration — TimelineStrip + AggSection replace per-day list
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Check, Activity } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import ProgressiveDisclosure, { DisclosureGroup,} from '@/components/education/ProgressiveDisclosure'
 import GradientBar from '@/components/shared/GradientBar'
 import RegimeIcon from '@/components/shared/RegimeIcon'
 import { card, regimeIconBg, regimeNarrative, anim } from '@/lib/ui-helpers'
+import TimelineStrip from '@/components/regime/TimelineStrip'
+import AggSection from '@/components/regime/AggSection'
+import { compressToRuns, buildAgg } from '@/lib/regime-utils'
+import type { RegimeRow as UtilRegimeRow } from '@/lib/regime-utils'
 
 // ── Types ─────────────────────────────────────
 
@@ -210,6 +214,19 @@ export default function MarketPulsePage() {
     fetchData()
   }, [period])
 
+  // ── Regime timeline data (S82) ──
+  const regimeRows: UtilRegimeRow[] = useMemo(() => {
+    if (!data?.regimes?.length) return []
+    return data.regimes.map(r => ({
+      timestamp: r.timestamp,
+      regime: r.regime,
+      confidence: r.confidence,
+      price_now: r.price_now,
+    }))
+  }, [data])
+
+  const runs = useMemo(() => compressToRuns(regimeRows), [regimeRows])
+  const agg = useMemo(() => buildAgg(runs, regimeRows), [runs, regimeRows])
 
   const current = data?.regimes?.[0] ?? null
   const persistence = data ? computePersistence(data.regimes) : 0
@@ -393,28 +410,6 @@ export default function MarketPulsePage() {
                     </span>
                   </div>
                 )}
-                {confidenceTrend && confidenceTrend.streak > 0 && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    margin: '8px 0 4px',
-                  }}>
-                    <span style={{ fontSize: 14 }}>
-                      {confidenceTrend.direction === 'rising' ? '↑'
-                        : confidenceTrend.direction === 'declining' ? '↓' : '→'}
-                    </span>
-                    <span style={{
-                      fontSize: 11,
-                      fontFamily: "'DM Sans', sans-serif",
-                      color: confidenceTrend.direction === 'rising' ? M.positive
-                        : confidenceTrend.direction === 'declining' ? M.negative
-                        : M.textMuted,
-                    }}>
-                      {confidenceTrend.direction === 'stable'
-                        ? 'Stable'
-                        : `${confidenceTrend.direction.charAt(0).toUpperCase() + confidenceTrend.direction.slice(1)} for ${confidenceTrend.streak} days`}
-                    </span>
-                  </div>
-                )}
                 <p style={{ fontSize: 10, color: M.textSecondary, lineHeight: 1.6, margin: '8px 0 0' }}>
                   {current.confidence >= 0.7
                     ? 'Strong signal. BTC and ETH show aligned 7-day trends with moderate volatility. A reading above 70% indicates the pattern is clear and sustained.'
@@ -469,8 +464,8 @@ export default function MarketPulsePage() {
               </div>
             </div>
 
-            {/* ── Regime History (S53 + S54) ── */}
-            <div style={{ marginBottom: 16, ...anim(mounted, 2.5) }}>
+              {/* ── Regime History (S82) ── */}
+               <div style={{ marginBottom: 16, ...anim(mounted, 2.5) }}>
               {/* Period tabs */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {([7, 30, 90] as const).map(d => (
@@ -487,7 +482,10 @@ export default function MarketPulsePage() {
                       fontWeight: 600,
                       fontFamily: "'DM Sans', sans-serif",
                       background: period === d ? M.accentGradient : M.surface,
+                      backdropFilter: period === d ? 'none' : M.surfaceBlur,
+                      WebkitBackdropFilter: period === d ? 'none' : M.surfaceBlur,
                       color: period === d ? 'white' : M.textMuted,
+                      boxShadow: period === d ? '0 2px 8px rgba(231,111,81,0.2)' : 'none',
                       transition: 'all 0.2s ease',
                     }}
                   >
@@ -499,7 +497,8 @@ export default function MarketPulsePage() {
               {/* Sparse data notice */}
               {data && data.row_count < period && data.row_count > 0 && (
                 <div style={{
-                  ...card({ padding: 12, marginBottom: 12 }),
+                  ...card({ padding: '12px' }),
+                  marginBottom: 12,
                   background: 'rgba(244,162,97,0.05)',
                   border: `1px solid ${M.borderAccent}`,
                 }}>
@@ -509,101 +508,32 @@ export default function MarketPulsePage() {
                 </div>
               )}
 
-              {/* Duration pattern summary (S54) */}
-              {data?.duration_patterns && data.duration_patterns.length >= 2 && (
-                <div style={{ ...card({ padding: 14, marginBottom: 12 }) }}>
-                  <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
-                    Average regime duration:{' '}
-                    <span style={{ fontWeight: 600, color: M.text, fontFamily: "'DM Mono', monospace" }}>
-                      {Math.round(data.duration_patterns.reduce((s, p) => s + p.avg_duration, 0) / data.duration_patterns.length)} days
-                    </span>
-                    {' '}across {data.duration_patterns.reduce((s, p) => s + p.instance_count, 0)} instances
-                  </p>
-                </div>
-              )}
-
-              {/* Timeline */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {data?.regimes?.map((r, i) => {
-                  // Duration badge: count consecutive same-regime from this point
-                  let streak = 1
-                  for (let j = i + 1; j < data.regimes.length; j++) {
-                    if (data.regimes[j].regime === r.regime) streak++
-                    else break
-                  }
-                  const dayLabel = i === 0 ? `Day ${streak}` : null
-
-                  // Find duration pattern for this regime
-                  const pattern = data.duration_patterns?.find(
-                    p => p.regime.toLowerCase() === r.regime.toLowerCase()
-                  )
-
-                  const isFirst = i === 0
-
-                  return (
-                    <div
-                      key={r.timestamp}
-                      style={{
-                        ...card({ padding: 14 }),
-                        background: isFirst ? 'linear-gradient(135deg, rgba(42,157,143,0.08), rgba(42,157,143,0.03))' : M.surface,
-                        border: isFirst ? `1px solid ${M.borderPositive}` : `1px solid ${M.border}`,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
-                            background: r.regime.toLowerCase().includes('bull') ? M.positive
-                              : r.regime.toLowerCase().includes('bear') ? M.negative
-                              : M.accent,
-                          }} />
-                          <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>
-                            {r.regime.charAt(0).toUpperCase() + r.regime.slice(1)}
-                          </span>
-                          {dayLabel && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 600, color: M.positive,
-                              background: M.positiveDim, padding: '2px 8px', borderRadius: 8,
-                            }}>
-                              {dayLabel}
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: 11, color: M.textMuted, fontFamily: "'DM Mono', monospace" }}>
-                          {new Date(r.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-
-                      <div style={{ marginBottom: 4 }}>
-                        <GradientBar
-                          pct={r.confidence * 100}
-                          gradient="linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))"
-                          h={4}
-                        />
-                      </div>
-
-                      {/* S54: Duration context for first entry only */}
-                      {isFirst && pattern && (
-                        <p style={{ fontSize: 11, color: M.textMuted, margin: '6px 0 0', lineHeight: 1.4 }}>
-                          {pattern.instance_count >= 5
-                            ? `${r.regime.charAt(0).toUpperCase() + r.regime.slice(1)} regimes typically last ${Math.round(pattern.avg_duration)}–${pattern.max_duration} days. This is day ${streak}.`
-                            : pattern.instance_count > 1
-                            ? `Not enough history to show duration patterns yet. ${pattern.instance_count} instances recorded.`
-                            : 'First recorded instance of this regime. Patterns will emerge over time.'}
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Empty state */}
-              {data?.regimes?.length === 0 && (
+              {/* Timeline strip + aggregation */}
+              {runs.length > 0 ? (
+                <>
+                  <TimelineStrip runs={runs} totalDays={agg.td} period={period} />
+                  <AggSection agg={agg} />
+                </>
+              ) : (
                 <div style={{ ...card(), textAlign: 'center', padding: '32px 20px' }}>
                   <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>No data for this period</p>
                   <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>Try a shorter timeframe</p>
                 </div>
               )}
+
+              {/* Educational footer */}
+              <div style={{
+                marginTop: 16,
+                padding: 12,
+                background: 'rgba(244,162,97,0.05)',
+                borderRadius: 12,
+              }}>
+                <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
+                  Regime classification suggests the prevailing market character. Confidence reflects
+                  how clearly the pattern fits — higher values indicate stronger agreement across indicators.
+                  This is an analytical lens, not a trading signal.
+                </p>
+              </div>
             </div>
 
             {/* ── Sentiment Indicators ── */}
