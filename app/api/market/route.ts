@@ -66,16 +66,13 @@ function computeConfidenceTrend(confidenceValues: number[]): ConfidenceTrend {
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Parallel fetch all data (S97: added sentiment)
   const [regimeRes, exposureRes, signalsRes, persistenceRes, trendRes, sentimentRes] = await Promise.all([
     supabase.from('latest_regime').select('*').single(),
-    supabase.from('latest_exposure').select('*').eq('user_id', user.id).single(),
-    supabase.from('active_signals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+    user ? supabase.from('latest_exposure').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null, error: null }),
+    user ? supabase.from('active_signals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: null, error: null }),
     supabase.rpc('regime_persistence_days'),
     // S55: Fetch last 7 confidence values for trend computation
     supabase

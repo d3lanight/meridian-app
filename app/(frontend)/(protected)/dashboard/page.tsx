@@ -1,15 +1,15 @@
-// v0.8.0 · ca-story59 · 2026-02-25
-// S59: Educational Tooltip Triggers
-// Changes from v0.7.0:
-//  - Added ProgressiveDisclosure on posture score label
-//  - Added ProgressiveDisclosure on signals section header
-//  - Both pull L2 content from /api/glossary at mount
+// v0.9.0 · ca-story77 · 2026-02-28
+// S77: Public Access Layer — CTA card for anonymous users
+// Changes from v0.8.0:
+//  - Added isAnon state + auth check
+//  - Posture + Signals replaced with CTA card for anonymous visitors
 'use client'
 
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Wifi, WifiOff, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react'
 import ProgressiveDisclosure, { DisclosureGroup } from '@/components/education/ProgressiveDisclosure'
 import { M } from '@/lib/meridian'
+import { createClient } from '@/lib/supabase/client'
 import { useMarketData } from '@/hooks/useMarketData'
 import MeridianMark from '@/components/brand/MeridianMark'
 import DevTools from '@/components/dev/DevTools'
@@ -176,6 +176,7 @@ function ConfidenceTrendIndicator({ trend }: { trend: ConfidenceTrend | null }) 
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
+  const [isAnon, setIsAnon] = useState(true)
   const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const [postureExplainer, setPostureExplainer] = useState<string>('A score reflecting how well your portfolio aligns with the current market regime.')
@@ -194,6 +195,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      setIsAnon(!user)
+    })
   }, [])
 
   // S55: Fetch confidence trend from /api/market
@@ -423,126 +430,183 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Portfolio Posture Card ── */}
-          <div
-            style={{
-              ...card({
-                background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
-                border: `1px solid ${M.borderAccent}`,
-              }),
-              marginBottom: 16,
-              ...anim(3),
-            }}
-          >
+          {/* ── Portfolio Section (auth-gated) ── */}
+          {isAnon ? (
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: 16,
+                ...card({
+                  background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                  border: `1px solid ${M.borderAccent}`,
+                }),
+                textAlign: 'center' as const,
+                padding: '32px 20px',
+                ...anim(3),
               }}
             >
-              <div>
-               <ProgressiveDisclosure
-                id="posture"
-                summary={
-                  <span style={{ fontSize: 12, color: M.textMuted }}>Portfolio Posture</span>
-                  }
-                context={postureExplainer}
-                learnMoreHref="/profile/learn/glossary#glossary-posture"
-                />
-                <div
-                  style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 36,
-                    fontWeight: 600,
-                    color: M.text,
-                  }}
-                >
-                  {postureScore}
-                </div>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: M.accentDim,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 14px',
+              }}>
+                <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={M.accentDeep} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: postureIsAligned ? M.positive : M.negative,
-                    fontWeight: 500,
-                    marginBottom: 4,
-                  }}
-                >
-                  {portfolio.posture}
-                </div>
-                <div style={{ fontSize: 12, color: M.textSecondary }}>
-                  {portfolio.misalignment}% misaligned
-                </div>
-              </div>
-            </div>
-            <GradientBar pct={postureScore} />
-            <p
-              style={{
-                fontSize: 14,
-                color: M.textSecondary,
-                lineHeight: 1.6,
-                margin: '12px 0 0',
-              }}
-            >
-              {postureNarrative(portfolio.posture, regime.current)}
-            </p>
-          </div>
-
-          {/* ── Signals ── */}
-          <div style={anim(4)}>
-           <div style={{ margin: '0 0 12px' }}>
-            <ProgressiveDisclosure
-             id="signals"
-             summary={
-             <h2
-               style={{
+              <h3 style={{
                 fontFamily: "'Outfit', sans-serif",
-                  fontSize: 18,
-                fontWeight: 600,
-              color: M.text,
-                margin: 0,
-              display: 'inline',
-              }}
+                fontSize: 18, fontWeight: 500, color: M.text,
+                margin: '0 0 8px',
+              }}>
+                Track your portfolio
+              </h3>
+              <p style={{
+                fontSize: 13, color: M.textSecondary,
+                lineHeight: 1.6, margin: '0 auto 18px', maxWidth: 280,
+              }}>
+                See how your holdings align with the current market regime — posture scoring, signals, and allocation insights.
+              </p>
+              <a
+                href="/login"
+                style={{
+                  display: 'inline-block',
+                  padding: '12px 28px',
+                  background: M.accentGradient,
+                  color: 'white',
+                  borderRadius: 16,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+                }}
               >
-              Signals
-              </h2>
-             }     
-            context={signalExplainer}
-             learnMoreHref="/profile/learn/glossary#glossary-signal"
-             />
-             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {signals.length === 0 ? (
+                Create free account
+              </a>
+            </div>
+          ) : (
+            <>
+              {/* ── Portfolio Posture Card ── */}
+              <div
+                style={{
+                  ...card({
+                    background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                    border: `1px solid ${M.borderAccent}`,
+                  }),
+                  marginBottom: 16,
+                  ...anim(3),
+                }}
+              >
                 <div
                   style={{
-                    ...card(),
-                    textAlign: 'center',
-                    padding: '24px 20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: 16,
                   }}
                 >
-                  <div
-                    style={{ fontSize: 12, fontWeight: 500, color: M.textSecondary, marginBottom: 4 }}
-                  >
-                    No active signals
+                  <div>
+                   <ProgressiveDisclosure
+                    id="posture"
+                    summary={
+                      <span style={{ fontSize: 12, color: M.textMuted }}>Portfolio Posture</span>
+                      }
+                    context={postureExplainer}
+                    learnMoreHref="/profile/learn/glossary#glossary-posture"
+                    />
+                    <div
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: 36,
+                        fontWeight: 600,
+                        color: M.text,
+                      }}
+                    >
+                      {postureScore}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: M.textMuted }}>Market conditions unchanged</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: postureIsAligned ? M.positive : M.negative,
+                        fontWeight: 500,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {portfolio.posture}
+                    </div>
+                    <div style={{ fontSize: 12, color: M.textSecondary }}>
+                      {portfolio.misalignment}% misaligned
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                signals.map((signal) => (
-                  <DashSignalCard
-                    key={signal.id}
-                    type={severityToTier(signal.severity)}
-                    title={signal.asset}
-                    desc={signal.reason}
-                    time={signal.time}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+                <GradientBar pct={postureScore} />
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: M.textSecondary,
+                    lineHeight: 1.6,
+                    margin: '12px 0 0',
+                  }}
+                >
+                  {postureNarrative(portfolio.posture, regime.current)}
+                </p>
+              </div>
+
+              {/* ── Signals ── */}
+              <div style={anim(4)}>
+               <div style={{ margin: '0 0 12px' }}>
+                <ProgressiveDisclosure
+                 id="signals"
+                 summary={
+                 <h2
+                   style={{
+                    fontFamily: "'Outfit', sans-serif",
+                      fontSize: 18,
+                    fontWeight: 600,
+                  color: M.text,
+                    margin: 0,
+                  display: 'inline',
+                  }}
+                  >
+                  Signals
+                  </h2>
+                 }     
+                context={signalExplainer}
+                 learnMoreHref="/profile/learn/glossary#glossary-signal"
+                 />
+                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {signals.length === 0 ? (
+                    <div
+                      style={{
+                        ...card(),
+                        textAlign: 'center',
+                        padding: '24px 20px',
+                      }}
+                    >
+                      <div
+                        style={{ fontSize: 12, fontWeight: 500, color: M.textSecondary, marginBottom: 4 }}
+                      >
+                        No active signals
+                      </div>
+                      <div style={{ fontSize: 11, color: M.textMuted }}>Market conditions unchanged</div>
+                    </div>
+                  ) : (
+                    signals.map((signal) => (
+                      <DashSignalCard
+                        key={signal.id}
+                        type={severityToTier(signal.severity)}
+                        title={signal.asset}
+                        desc={signal.reason}
+                        time={signal.time}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* ── Last Updated ── */}
           <div
