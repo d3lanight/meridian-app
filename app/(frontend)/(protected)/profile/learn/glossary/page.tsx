@@ -1,6 +1,6 @@
 // ━━━ Glossary Page ━━━
 // v1.0.0 · ca-story60 · 2026-02-25
-// Route: /settings/learn/glossary
+// Route: /profile/learn/glossary
 // Alphabetical list, search filter, tap-to-expand definitions
 // Data from GET /api/glossary (cached client-side after first fetch)
 
@@ -223,7 +223,7 @@ export default function GlossaryPage() {
     <div style={{ padding: '24px 20px 0' }}>
       {/* Back nav */}
       <Link
-        href="/settings"
+        href="/profile"
         style={{
           display: 'inline-flex',
           alignItems: 'center',

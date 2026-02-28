@@ -354,7 +354,7 @@ export default function DashboardPage() {
                     <span style={{ fontSize: 12, color: M.textMuted }}>Market Regime</span>
                   }
                   context={regimeExplainer?.summary ?? 'The current market condition based on BTC momentum and volatility.'}
-                  learnMoreHref={regimeExplainer ? `/settings/learn/glossary#${regimeExplainer.slug}` : undefined}
+                  learnMoreHref={regimeExplainer ? `/profile/learn/glossary#${regimeExplainer.slug}` : undefined}
                 />
                 <div
                   style={{
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                   <span style={{ fontSize: 12, color: M.textMuted }}>Portfolio Posture</span>
                   }
                 context={postureExplainer}
-                learnMoreHref="/settings/learn/glossary#glossary-posture"
+                learnMoreHref="/profile/learn/glossary#glossary-posture"
                 />
                 <div
                   style={{
@@ -511,7 +511,7 @@ export default function DashboardPage() {
               </h2>
              }     
             context={signalExplainer}
-             learnMoreHref="/settings/learn/glossary#glossary-signal"
+             learnMoreHref="/profile/learn/glossary#glossary-signal"
              />
              </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

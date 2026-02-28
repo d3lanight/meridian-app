@@ -1,7 +1,7 @@
-// ━━━ Settings Screen ━━━
+// ━━━ Profile Screen ━━━
 // v1.0.0 · design-unification · 2026-02-22
 // New user-facing settings page matching meridian-settings-v2.jsx artifact
-// Replaces admin config editor at /settings/config
+// Replaces admin config editor (previously at /settings)
 // Note: Toggles/selects are UI-only for now — backend persistence is future scope
 'use client'
 
@@ -373,7 +373,7 @@ export default function SettingsPage() {
       >
         Learn
       </h2>
-      <Link href="/settings/learn/glossary" style={{ textDecoration: 'none' }}>
+      <Link href="/profile/learn/glossary" style={{ textDecoration: 'none' }}>
         <div
           style={{
             ...card({ padding: '16px' }),

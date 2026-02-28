@@ -51,7 +51,7 @@ export interface MarketMetrics {
   altSeason: number;
 }
 
-export type NavTab = 'home' | 'portfolio' | 'market' | 'settings';
+export type NavTab = 'home' | 'portfolio' | 'market' | 'profile';
 
 // ━━━ Portfolio Snapshot (ca-story39, updated ca-story47, ca-story48) ━━━
 

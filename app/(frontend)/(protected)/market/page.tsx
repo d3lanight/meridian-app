@@ -380,7 +380,7 @@ export default function MarketPulsePage() {
                         <span style={{ fontSize: 12, color: M.textMuted }}>Market Regime</span>
                       }
                       context={regimeExplainer?.summary ?? 'The market is categorized as Bull (upward), Bear (downward), Range (sideways), or Volatile (unstable).'}
-                      learnMoreHref={regimeExplainer ? `/settings/learn/glossary#${regimeExplainer.slug}` : undefined}
+                      learnMoreHref={regimeExplainer ? `/profile/learn/glossary#${regimeExplainer.slug}` : undefined}
                     />
                   </div>
                   <div

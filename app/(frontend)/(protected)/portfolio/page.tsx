@@ -576,7 +576,7 @@ useEffect(() => {
                 </span>
               }
               context={allocationExplainer}
-              learnMoreHref="/settings/learn/glossary#glossary-allocation"
+              learnMoreHref="/profile/learn/glossary#glossary-allocation"
             />
           </div>
           {allocRows.map((a, i) => (
@@ -774,7 +774,7 @@ useEffect(() => {
                         </span>
                       }
                       context={contributionExplainer}
-                      learnMoreHref="/settings/learn/glossary#glossary-posture-contribution"
+                      learnMoreHref="/profile/learn/glossary#glossary-posture-contribution"
                     />
                     <span
                       style={{
