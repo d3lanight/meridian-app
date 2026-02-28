@@ -1,9 +1,5 @@
-// v2.4.0 · ca-story59 · 2026-02-25
-// S59: Educational Tooltip Triggers
-// Changes from v2.3.0:
-//  - Added ProgressiveDisclosure on allocation card header
-//  - Added ProgressiveDisclosure on posture contribution label
-//  - Both pull L2 content from /api/glossary at mount
+// v2.5.0 · ca-story78 · Sprint 19
+// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -15,45 +11,10 @@ import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
 import MisalignmentFramingCard from '@/components/portfolio/MisalignmentFramingCard'
 import type { PortfolioExposure, Holding } from '@/types'
 import ProgressiveDisclosure, { DisclosureGroup } from "@/components/education/ProgressiveDisclosure"
+import { card, anim } from '@/lib/ui-helpers'
+import GradientBar from '@/components/shared/GradientBar'
 
 // ── Helpers ───────────────────────────────────
-
-const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
-  background: M.surface,
-  backdropFilter: M.surfaceBlur,
-  WebkitBackdropFilter: M.surfaceBlur,
-  borderRadius: '24px',
-  padding: '20px',
-  border: `1px solid ${M.border}`,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-  ...extra,
-})
-
-function GradientBar({
-  pct,
-  gradient = M.accentGradient,
-  h = 8,
-}: {
-  pct: number
-  gradient?: string
-  h?: number
-}) {
-  return (
-    <div
-      style={{ height: h, borderRadius: h, background: '#E8DED6', overflow: 'hidden', width: '100%' }}
-    >
-      <div
-        style={{
-          height: '100%',
-          borderRadius: h,
-          background: gradient,
-          width: `${Math.min(100, Math.max(0, pct))}%`,
-          transition: 'width 0.5s ease',
-        }}
-      />
-    </div>
-  )
-}
 
 const fmt = (n: number) =>
   n.toLocaleString('en-US', {
@@ -319,11 +280,6 @@ useEffect(() => {
     return ok
   }
 
-  const anim = (i: number): React.CSSProperties => ({
-    opacity: mounted ? 1 : 0,
-    transform: mounted ? 'translateY(0)' : 'translateY(12px)',
-    transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
-  })
 
   const loading = snapshotLoading || holdingsLoading
   const isEmpty = holdings.length === 0
@@ -379,7 +335,7 @@ useEffect(() => {
   if (isEmpty) {
     return (
       <div style={{ padding: '24px 20px' }}>
-        <div style={{ marginBottom: 28, ...anim(0) }}>
+        <div style={{ marginBottom: 28, ...anim(mounted, 0) }}>
           <h1
             style={{
               fontFamily: "'Outfit', sans-serif",
@@ -408,7 +364,7 @@ useEffect(() => {
             alignItems: 'center',
             textAlign: 'center',
             padding: '48px 24px',
-            ...anim(1),
+            ...anim(mounted, 1),
           }}
         >
           <div
@@ -510,7 +466,7 @@ useEffect(() => {
           justifyContent: 'space-between',
           alignItems: 'flex-start',
           marginBottom: 24,
-          ...anim(0),
+          ...anim(mounted, 0),
         }}
       >
         <div>
@@ -565,7 +521,7 @@ useEffect(() => {
               border: `1px solid ${M.borderPositive}`,
             }),
             marginBottom: 16,
-            ...anim(1),
+            ...anim(mounted, 1),
           }}
         >
           <div style={{ marginBottom: 12 }}>
@@ -609,7 +565,7 @@ useEffect(() => {
       
       {/* ── Misalignment framing (S61) ── */}
         {hasSnapshot && snapshot && (
-          <div style={{ marginBottom: 16, ...anim(1) }}>
+          <div style={{ marginBottom: 16, ...anim(mounted, 1) }}>
             <MisalignmentFramingCard snapshot={snapshot} regime={regime} />
           </div>
         )}
@@ -625,7 +581,7 @@ useEffect(() => {
             borderRadius: 16,
             background: M.accentMuted,
             marginBottom: 12,
-            ...anim(1),
+            ...anim(mounted, 1),
           }}
         >
           <span style={{ fontSize: 12, fontWeight: 500, color: M.accent }}>
@@ -642,7 +598,7 @@ useEffect(() => {
           fontWeight: 600,
           color: M.text,
           margin: '0 0 12px',
-          ...anim(2),
+          ...anim(mounted, 2),
         }}
       >
         Holdings
@@ -654,7 +610,7 @@ useEffect(() => {
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
-          ...anim(3),
+          ...anim(mounted, 3),
         }}
       >
         {holdings.map((h) => {
@@ -825,7 +781,7 @@ useEffect(() => {
           fontSize: 11,
           color: M.textMuted,
           lineHeight: 1.5,
-          ...anim(5),
+          ...anim(mounted, 5),
         }}
       >
         Exposure data reflects current holdings, not recommendations.

@@ -1,21 +1,14 @@
-// ━━━ Market Pulse Screen ━━━
-// v1.7.0 · ca-story57 · 2026-02-25
-// Refactored: InfoBtn/InfoPanel replaced with ProgressiveDisclosure component
-// All 5 disclosure instances migrated: regime, fear, dom, alt, vol
-// Visual output unchanged (regression-free)
-// Changelog (from v1.2.0):
-//  - Removed inline InfoBtn, InfoPanel components
-//  - Added DisclosureGroup + ProgressiveDisclosure from components/education/
-//  - Removed local [info, setInfo] state (now managed by DisclosureGroup context)
-//  - Indicator component simplified (no more info/setInfo prop threading)
+// v1.8.0 · ca-story78 · Sprint 19
+// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Minus, Check, Activity } from 'lucide-react'
+import { Check, Activity } from 'lucide-react'
 import { M } from '@/lib/meridian'
-import ProgressiveDisclosure, {
-  DisclosureGroup,
-} from '@/components/education/ProgressiveDisclosure'
+import ProgressiveDisclosure, { DisclosureGroup,} from '@/components/education/ProgressiveDisclosure'
+import GradientBar from '@/components/shared/GradientBar'
+import RegimeIcon from '@/components/shared/RegimeIcon'
+import { card, regimeIconBg, regimeNarrative, anim } from '@/lib/ui-helpers'
 
 // ── Types ─────────────────────────────────────
 
@@ -74,40 +67,6 @@ interface ConfidenceTrend {
 
 // ── Shared Helpers ────────────────────────────
 
-const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
-  background: M.surface,
-  backdropFilter: M.surfaceBlur,
-  WebkitBackdropFilter: M.surfaceBlur,
-  borderRadius: '24px',
-  padding: '20px',
-  border: `1px solid ${M.border}`,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-  ...extra,
-})
-
-function GradientBar({
-  pct,
-  gradient = M.accentGradient,
-  h = 8,
-}: {
-  pct: number
-  gradient?: string
-  h?: number
-}) {
-  return (
-    <div style={{ height: h, borderRadius: h, background: '#E8DED6', overflow: 'hidden', width: '100%' }}>
-      <div
-        style={{
-          height: '100%',
-          borderRadius: h,
-          background: gradient,
-          width: `${Math.min(100, Math.max(0, pct))}%`,
-          transition: 'width 0.5s ease',
-        }}
-      />
-    </div>
-  )
-}
 
 // ── Indicator Card (simplified — no info/setInfo threading) ──
 
@@ -149,29 +108,6 @@ function Indicator({
 }
 
 // ── Regime helpers ────────────────────────────
-
-function RegimeIcon({ regime }: { regime: string }) {
-  const r = regime.toLowerCase()
-  if (r.includes('bull')) return <TrendingUp size={28} color="white" strokeWidth={2.5} />
-  if (r.includes('bear')) return <TrendingDown size={28} color="white" strokeWidth={2.5} />
-  return <Minus size={28} color="white" strokeWidth={2.5} />
-}
-
-function regimeIconBg(regime: string): string {
-  const r = regime.toLowerCase()
-  if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
-  if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
-  return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
-}
-
-function regimeNarrative(regime: string): string {
-  const r = regime.toLowerCase()
-  if (r.includes('bull'))
-    return 'Upward momentum within a defined range. Breakout potential exists, though volatility remains contained. Not directional enough to signal a clear trend shift.'
-  if (r.includes('bear'))
-    return 'Downward pressure with elevated volatility. Capital is consolidating into safer positions. Not yet at capitulation levels.'
-  return 'Market moving sideways with no clear directional bias. Consolidation phase with moderate activity.'
-}
 
 function computePersistence(regimes: RegimeRow[]): number {
   if (regimes.length === 0) return 0
@@ -274,11 +210,6 @@ export default function MarketPulsePage() {
     fetchData()
   }, [period])
 
-  const anim = (i: number): React.CSSProperties => ({
-    opacity: mounted && !loading ? 1 : 0,
-    transform: mounted && !loading ? 'translateY(0)' : 'translateY(12px)',
-    transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
-  })
 
   const current = data?.regimes?.[0] ?? null
   const persistence = data ? computePersistence(data.regimes) : 0
@@ -323,7 +254,7 @@ export default function MarketPulsePage() {
     <DisclosureGroup>
       <div style={{ padding: '24px 20px 0' }}>
         {/* ── Page Header ── */}
-        <div style={{ marginBottom: 24, ...anim(0) }}>
+        <div style={{ marginBottom: 24, ...anim(mounted, 0) }}>
           <h1
             style={{
               fontFamily: "'Outfit', sans-serif",
@@ -361,7 +292,7 @@ export default function MarketPulsePage() {
                   border: `1px solid ${M.borderPositive}`,
                 }),
                 marginBottom: 16,
-                ...anim(1),
+                ...anim(mounted, 1),
               }}
             >
               <div
@@ -499,7 +430,7 @@ export default function MarketPulsePage() {
               style={{
                 ...card({ background: 'rgba(255,255,255,0.5)' }),
                 marginBottom: 16,
-                ...anim(2),
+                ...anim(mounted, 2),
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -539,7 +470,7 @@ export default function MarketPulsePage() {
             </div>
 
             {/* ── Regime History (S53 + S54) ── */}
-            <div style={{ marginBottom: 16, ...anim(2.5) }}>
+            <div style={{ marginBottom: 16, ...anim(mounted, 2.5) }}>
               {/* Period tabs */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 {([7, 30, 90] as const).map(d => (
@@ -683,13 +614,13 @@ export default function MarketPulsePage() {
                 fontWeight: 600,
                 color: M.text,
                 margin: '0 0 12px',
-                ...anim(3),
+                ...anim(mounted, 3),
               }}
             >
               Sentiment indicators
             </h2>
 
-            <div style={anim(3)}>
+            <div style={anim(mounted,3)}>
               <Indicator
                 label="Fear & Greed Index"
                 value={String(fearGreed)}
@@ -720,7 +651,7 @@ export default function MarketPulsePage() {
             </div>
 
             {/* ── Volume Profile ── */}
-            <div style={{ ...card(), marginBottom: 16, ...anim(4) }}>
+            <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 4) }}>
               <div
                 style={{
                   display: 'flex',
@@ -783,7 +714,7 @@ export default function MarketPulsePage() {
                   background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
                   border: `1px solid ${M.borderAccent}`,
                 }),
-                ...anim(5),
+                ...anim(mounted, 5),
               }}
             >
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -815,7 +746,7 @@ export default function MarketPulsePage() {
             </div>
 
             {/* ── Regime Transitions (S56) ── */}
-            <div style={{ marginTop: 16, ...anim(6) }}>
+            <div style={{ marginTop: 16, ...anim(mounted, 6) }}>
               <ProgressiveDisclosure
                 id="transitions"
                 summary={
@@ -901,7 +832,7 @@ export default function MarketPulsePage() {
                 color: M.textSubtle,
                 fontFamily: "'DM Mono', monospace",
                 padding: '16px 0 8px',
-                ...anim(6),
+                ...anim(mounted, 6),
               }}
             >
               Updated {data?.generated_at ? new Date(data.generated_at).toLocaleString() : '—'}

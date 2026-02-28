@@ -1,8 +1,5 @@
-// v0.9.0 · ca-story77 · 2026-02-28
-// S77: Public Access Layer — CTA card for anonymous users
-// Changes from v0.8.0:
-//  - Added isAnon state + auth check
-//  - Posture + Signals replaced with CTA card for anonymous visitors
+// v1.0.0 · ca-story78 · Sprint 19
+// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -13,43 +10,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useMarketData } from '@/hooks/useMarketData'
 import MeridianMark from '@/components/brand/MeridianMark'
 import DevTools from '@/components/dev/DevTools'
+import { card, regimeIconBg, regimeNarrative, postureNarrative, anim } from '@/lib/ui-helpers'
+import GradientBar from '@/components/shared/GradientBar'
+import RegimeIcon from '@/components/shared/RegimeIcon'
 
 // ── Shared Helpers ────────────────────────────
 
-const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
-  background: M.surface,
-  backdropFilter: M.surfaceBlur,
-  WebkitBackdropFilter: M.surfaceBlur,
-  borderRadius: '24px',
-  padding: '20px',
-  border: `1px solid ${M.border}`,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-  ...extra,
-})
 
-function GradientBar({
-  pct,
-  gradient = M.accentGradient,
-  h = 8,
-}: {
-  pct: number
-  gradient?: string
-  h?: number
-}) {
-  return (
-    <div style={{ height: h, borderRadius: h, background: '#E8DED6', overflow: 'hidden', width: '100%' }}>
-      <div
-        style={{
-          height: '100%',
-          borderRadius: h,
-          background: gradient,
-          width: `${Math.min(100, Math.max(0, pct))}%`,
-          transition: 'width 0.5s ease',
-        }}
-      />
-    </div>
-  )
-}
 
 // ── Signal Card (v2 dot style) ────────────────
 
@@ -98,28 +65,7 @@ function DashSignalCard({
 
 // ── Regime icon helper ────────────────────────
 
-function RegimeIcon({ regime }: { regime: string }) {
-  const r = regime.toLowerCase()
-  if (r.includes('bull')) return <TrendingUp size={24} color="white" strokeWidth={2.5} />
-  if (r.includes('bear')) return <TrendingDown size={24} color="white" strokeWidth={2.5} />
-  return <Minus size={24} color="white" strokeWidth={2.5} />
-}
 
-function regimeIconBg(regime: string): string {
-  const r = regime.toLowerCase()
-  if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
-  if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
-  return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
-}
-
-function regimeNarrative(regime: string): string {
-  const r = regime.toLowerCase()
-  if (r.includes('bull'))
-    return 'Market shows upward momentum within a defined range. Breakout potential exists, but volatility remains contained.'
-  if (r.includes('bear'))
-    return 'Market in downward trend with elevated volatility. Risk-off conditions prevail across major assets.'
-  return 'Market moving sideways with no clear directional bias. Consolidation phase with moderate activity.'
-}
 
 // ── Severity mapping ──────────────────────────
 
@@ -131,15 +77,7 @@ function severityToTier(severity: number): SignalTier {
 
 // ── Posture helpers ───────────────────────────
 
-function postureNarrative(posture: string, regime: string): string {
-  if (posture === 'Aligned')
-    return `Your holdings show moderate alignment with the current ${regime.toLowerCase()} regime. Portfolio exposure is within expected range.`
-  if (posture === 'Watch' || posture === 'Moderate')
-    return 'Your holdings are drifting from regime targets. Monitor allocation for potential rebalancing.'
-  if (posture === 'Misaligned')
-    return "Your holdings diverge significantly from the current regime's recommended allocation."
-  return 'Add holdings to see portfolio posture analysis.'
-}
+
 
 // ── Confidence Trend (S55) ────────────────────
 
@@ -245,11 +183,6 @@ export default function DashboardPage() {
   }).catch(() => {})
 }, [])
 
-  const anim = (i: number): React.CSSProperties => ({
-    opacity: mounted ? 1 : 0,
-    transform: mounted ? 'translateY(0)' : 'translateY(12px)',
-    transition: `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`,
-  })
 
   const { regime, portfolio, signals } = scenario
   const postureScore = Math.max(0, 100 - portfolio.misalignment)
@@ -270,7 +203,7 @@ export default function DashboardPage() {
       />
 
       {/* ── Header ── */}
-      <div className="px-5 pt-5 pb-1" style={anim(0)}>
+      <div className="px-5 pt-5 pb-1" style={anim(mounted, 0)}>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2.5">
             <MeridianMark size={28} />
@@ -315,7 +248,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Page Title (matches artifact) ── */}
-      <div style={{ padding: '12px 20px 0', ...anim(1) }}>
+      <div style={{ padding: '12px 20px 0', ...anim(mounted, 1) }}>
         <h1
           style={{
             fontFamily: "'Outfit', sans-serif",
@@ -345,7 +278,7 @@ export default function DashboardPage() {
         <div style={{ padding: '20px 20px 0' }}>
 
           {/* ── Market Regime Card ── */}
-          <div style={{ ...card(), marginBottom: 16, ...anim(2) }}>
+          <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 2) }}>
             <div
               style={{
                 display: 'flex',
@@ -440,7 +373,7 @@ export default function DashboardPage() {
                 }),
                 textAlign: 'center' as const,
                 padding: '32px 20px',
-                ...anim(3),
+                ...anim(mounted, 3),
               }}
             >
               <div style={{
@@ -493,7 +426,7 @@ export default function DashboardPage() {
                     border: `1px solid ${M.borderAccent}`,
                   }),
                   marginBottom: 16,
-                  ...anim(3),
+                  ...anim(mounted, 3),
                 }}
               >
                 <div
@@ -554,7 +487,7 @@ export default function DashboardPage() {
               </div>
 
               {/* ── Signals ── */}
-              <div style={anim(4)}>
+              <div style={anim(mounted,4)}>
                <div style={{ margin: '0 0 12px' }}>
                 <ProgressiveDisclosure
                  id="signals"
@@ -615,7 +548,7 @@ export default function DashboardPage() {
               fontSize: 11,
               color: M.textMuted,
               padding: '16px 0 8px',
-              ...anim(5),
+              ...anim(mounted, 5),
             }}
           >
             Last analysis: {lastAnalysis}
