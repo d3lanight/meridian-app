@@ -1,9 +1,9 @@
 // ━━━ Market Dashboard API ━━━
-// v2.2.0 · ca-story55 · 2026-02-24
+// v2.3.0 · ca-story97 · 2026-02-28
 // Single endpoint for all dashboard data
-// Changelog (from v2.1.0):
-//   - Added confidence_trend computation from last 7 regime rows
-//   - Returns { direction: 'rising'|'declining'|'stable', streak: number }
+// Changelog (from v2.2.0):
+//   - Added market_sentiment fetch for real Fear & Greed, BTC Dominance, ALT Season
+//   - computeMetrics now receives sentiment row, uses real data with fallback
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -71,8 +71,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Parallel fetch all data
-  const [regimeRes, exposureRes, signalsRes, persistenceRes, trendRes] = await Promise.all([
+  // Parallel fetch all data (S97: added sentiment)
+  const [regimeRes, exposureRes, signalsRes, persistenceRes, trendRes, sentimentRes] = await Promise.all([
     supabase.from('latest_regime').select('*').single(),
     supabase.from('latest_exposure').select('*').eq('user_id', user.id).single(),
     supabase.from('active_signals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
@@ -83,6 +83,13 @@ export async function GET() {
       .select('confidence')
       .order('created_at', { ascending: false })
       .limit(7),
+    // S97: Fetch latest sentiment row
+    supabase
+      .from('market_sentiment')
+      .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, market_date')
+      .order('market_date', { ascending: false })
+      .limit(1)
+      .single(),
   ])
 
   // Inject persistence into regime row before mapping
@@ -100,8 +107,18 @@ export async function GET() {
   // Map signals (may be empty)
   const signals = signalsRes.data ? mapSignals(signalsRes.data) : []
 
-  // Compute market metrics from live data
-  const metrics = computeMetrics(regimeRaw, null)
+  // S97: Check sentiment freshness (stale if > 48h old)
+  const sentimentRow = sentimentRes.data ?? null
+  let sentimentFresh = false
+  if (sentimentRow?.market_date) {
+    const sentimentDate = new Date(sentimentRow.market_date)
+    const now = new Date()
+    const hoursSince = (now.getTime() - sentimentDate.getTime()) / 3600000
+    sentimentFresh = hoursSince < 48
+  }
+
+  // Compute market metrics — pass real sentiment if fresh
+  const metrics = computeMetrics(regimeRaw, sentimentFresh ? sentimentRow : null)
 
   // S55: Compute confidence trend
   const confidenceValues = (trendRes.data ?? []).map((r: any) => r.confidence as number)
@@ -122,6 +139,8 @@ export async function GET() {
       hasRegime: !!regimeRes.data,
       hasExposure: !!exposureRes.data,
       signalCount: signals.length,
+      sentimentFresh,
+      sentimentDate: sentimentRow?.market_date ?? null,
       timestamp: new Date().toISOString(),
     },
   })

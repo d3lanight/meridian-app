@@ -1,12 +1,10 @@
 // ━━━ Supabase Queries — fetch + map to UI types ━━━
-// v3.0.0 · ca-story50 · 2026-02-21
-// Changelog (from v2.0):
-//  v3.0.0 — S50: Real posture calculation
-//   - mapExposure accepts configTargets from config table (not hardcoded)
-//   - Switched to 3-bucket model: Core (BTC+ETH) / ALT / STABLE
-//   - Posture label: Aligned (<10%), Moderate (10-20%), Misaligned (>20%)
-//   - emptyExposure updated for 3 buckets
-//   - Removed hardcoded REGIME_TARGETS
+// v3.1.0 · ca-story97 · 2026-02-28
+// Changelog (from v3.0.0):
+//  v3.1.0 — S97: computeMetrics uses real sentiment data from market_sentiment
+//   - Accepts sentiment row as second param (replaces unused prices param)
+//   - Uses real fear_greed_value, btc_dominance, alt_season_value when available
+//   - Falls back to computed approximation when sentiment is null/stale
 
 import type { RegimeData, PortfolioData, Signal, MarketMetrics } from '@/types'
 
@@ -123,33 +121,56 @@ export function mapSignals(rows: any[]): Signal[] {
 }
 
 // ━━━ MARKET METRICS ━━━
+// S97: Now accepts sentiment row from market_sentiment table
+// Uses real data when available, falls back to computed approximation
 
-export function computeMetrics(regime: any, prices: any): MarketMetrics {
-  const confidence = Math.round((regime?.confidence ?? 0.5) * 100)
-  const r7d = (regime?.r_7d ?? 0) * 100
-  const vol = (regime?.vol_7d ?? 0) * 100
+export function computeMetrics(regime: any, sentiment: any): MarketMetrics {
+  // ── Real sentiment data (from market_sentiment table via n8n Flow 1.8) ──
+  if (sentiment) {
+    const fearGreed = sentiment.fear_greed_value ?? fallbackFearGreed(regime)
+    const fearGreedLabel = sentiment.fear_greed_label ?? deriveFearGreedLabel(fearGreed)
+    const btcDominance = sentiment.btc_dominance ?? fallbackBtcDominance(regime)
+    const altSeason = sentiment.alt_season_value ?? fallbackAltSeason(regime)
 
-  const fearGreed = Math.min(100, Math.max(0, Math.round(50 + r7d * 2 + (confidence - 50) * 0.3)))
+    return { fearGreed, fearGreedLabel, btcDominance, altSeason }
+  }
 
-  const btcDom = regime?.price_now && regime?.eth_price_now
-    ? Math.round(regime.price_now / (regime.price_now + regime.eth_price_now * 10) * 100 * 10) / 10
-    : 54.0
-
-  const altSeason = Math.min(100, Math.max(0, Math.round(50 - vol * 0.5 + r7d * 1.5)))
-
-  const fearGreedLabel =
-    fearGreed >= 75 ? 'Extreme Greed' :
-    fearGreed >= 55 ? 'Greed' :
-    fearGreed >= 45 ? 'Neutral' :
-    fearGreed >= 25 ? 'Fear' :
-    'Extreme Fear'
-
+  // ── Fallback: computed approximation (pre-S97 behavior) ──
+  const fearGreed = fallbackFearGreed(regime)
   return {
     fearGreed,
-    fearGreedLabel,
-    btcDominance: btcDom,
-    altSeason,
+    fearGreedLabel: deriveFearGreedLabel(fearGreed),
+    btcDominance: fallbackBtcDominance(regime),
+    altSeason: fallbackAltSeason(regime),
   }
+}
+
+// ── Fallback helpers (preserve pre-S97 computed values) ──
+
+function fallbackFearGreed(regime: any): number {
+  const confidence = Math.round((regime?.confidence ?? 0.5) * 100)
+  const r7d = (regime?.r_7d ?? 0) * 100
+  return Math.min(100, Math.max(0, Math.round(50 + r7d * 2 + (confidence - 50) * 0.3)))
+}
+
+function fallbackBtcDominance(regime: any): number {
+  return regime?.price_now && regime?.eth_price_now
+    ? Math.round(regime.price_now / (regime.price_now + regime.eth_price_now * 10) * 100 * 10) / 10
+    : 54.0
+}
+
+function fallbackAltSeason(regime: any): number {
+  const r7d = (regime?.r_7d ?? 0) * 100
+  const vol = (regime?.vol_7d ?? 0) * 100
+  return Math.min(100, Math.max(0, Math.round(50 - vol * 0.5 + r7d * 1.5)))
+}
+
+function deriveFearGreedLabel(value: number): string {
+  if (value >= 75) return 'Extreme Greed'
+  if (value >= 55) return 'Greed'
+  if (value >= 45) return 'Neutral'
+  if (value >= 25) return 'Fear'
+  return 'Extreme Fear'
 }
 
 // ━━━ TIMESTAMP ━━━
