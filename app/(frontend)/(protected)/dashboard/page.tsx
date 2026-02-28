@@ -1,10 +1,9 @@
-// ━━━ Dashboard (Home Screen) ━━━
-// v0.7.0 · ca-story55 · 2026-02-24
-// S55: Confidence Trend Indicator
-// Changes from v0.6.0:
-//  - Added confidence trend indicator below confidence number in regime card
-//  - Trend fetched from /api/market response (confidenceTrend field)
-//  - Rising = green up arrow, Declining = red down arrow, Stable = muted right arrow
+// v0.8.0 · ca-story59 · 2026-02-25
+// S59: Educational Tooltip Triggers
+// Changes from v0.7.0:
+//  - Added ProgressiveDisclosure on posture score label
+//  - Added ProgressiveDisclosure on signals section header
+//  - Both pull L2 content from /api/glossary at mount
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -179,6 +178,8 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
   const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
+  const [postureExplainer, setPostureExplainer] = useState<string>('A score reflecting how well your portfolio aligns with the current market regime.')
+  const [signalExplainer, setSignalExplainer] = useState<string>('A notification triggered by a change in regime, posture, or market condition.')
   const {
     scenario,
     activeScenario,
@@ -225,6 +226,17 @@ export default function DashboardPage() {
       })
       .catch(() => {})
   }, [scenario?.regime?.current])
+
+  // S59: Fetch posture + signal glossary entries
+  useEffect(() => {
+  Promise.all([
+    fetch('/api/glossary?slug=glossary-posture').then(r => r.ok ? r.json() : null),
+    fetch('/api/glossary?slug=glossary-signal').then(r => r.ok ? r.json() : null),
+  ]).then(([posture, signal]) => {
+    if (posture?.summary) setPostureExplainer(posture.summary)
+    if (signal?.summary) setSignalExplainer(signal.summary)
+  }).catch(() => {})
+}, [])
 
   const anim = (i: number): React.CSSProperties => ({
     opacity: mounted ? 1 : 0,
@@ -431,9 +443,14 @@ export default function DashboardPage() {
               }}
             >
               <div>
-                <div style={{ fontSize: 12, color: M.textMuted, marginBottom: 4 }}>
-                  Portfolio Posture
-                </div>
+               <ProgressiveDisclosure
+                id="posture"
+                summary={
+                  <span style={{ fontSize: 12, color: M.textMuted }}>Portfolio Posture</span>
+                  }
+                context={postureExplainer}
+                learnMoreHref="/settings/learn/glossary#glossary-posture"
+                />
                 <div
                   style={{
                     fontFamily: "'DM Mono', monospace",
@@ -476,17 +493,27 @@ export default function DashboardPage() {
 
           {/* ── Signals ── */}
           <div style={anim(4)}>
-            <h2
-              style={{
+           <div style={{ margin: '0 0 12px' }}>
+            <ProgressiveDisclosure
+             id="signals"
+             summary={
+             <h2
+               style={{
                 fontFamily: "'Outfit', sans-serif",
-                fontSize: 18,
+                  fontSize: 18,
                 fontWeight: 600,
-                color: M.text,
-                margin: '0 0 12px',
+              color: M.text,
+                margin: 0,
+              display: 'inline',
               }}
-            >
+              >
               Signals
-            </h2>
+              </h2>
+             }     
+            context={signalExplainer}
+             learnMoreHref="/settings/learn/glossary#glossary-signal"
+             />
+             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {signals.length === 0 ? (
                 <div
