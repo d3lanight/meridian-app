@@ -14,7 +14,7 @@ import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
 import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
 import MisalignmentFramingCard from '@/components/portfolio/MisalignmentFramingCard'
 import type { PortfolioExposure, Holding } from '@/types'
-import { DisclosureGroup as ProgressiveDisclosure } from "@/components/education/ProgressiveDisclosure"
+import ProgressiveDisclosure, { DisclosureGroup } from "@/components/education/ProgressiveDisclosure"
 
 // ── Helpers ───────────────────────────────────
 
@@ -501,6 +501,7 @@ useEffect(() => {
   }
 
   return (
+    <DisclosureGroup>
     <div style={{ padding: '24px 20px' }}>
       {/* ── Header ── */}
       <div
@@ -767,7 +768,7 @@ useEffect(() => {
                     }}
                   >
                     <ProgressiveDisclosure
-                      id={`contribution-${h.symbol}`}
+                      id={`contribution-${h.asset}`}
                       summary={
                         <span style={{ fontSize: 10, color: M.textSecondary }}>
                           Posture contribution
@@ -832,5 +833,6 @@ useEffect(() => {
         Actual values may vary by exchange.
       </div>
     </div>
+    </DisclosureGroup>
   )
 }
