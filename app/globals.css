@@ -6,3 +6,9 @@ body {
   background-color: #F5F1ED;
   color: #2D2416;
 }
+
+/* Regime timeline — live indicator pulse */
+@keyframes livePulse {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
+}
