@@ -35,6 +35,11 @@ export const M = {
   neutral: '#8B7565',
   neutralDim: 'rgba(139,117,101,0.1)',
 
+  // Volatility regime (amber)
+  volatility: '#D4A017',
+  volatilityDim: 'rgba(212,160,23,0.12)',
+  volatilityGlow: 'rgba(212,160,23,0.06)',
+
   // Crypto branding
   btcOrange: '#F7931A',
   ethBlue: '#627EEA',

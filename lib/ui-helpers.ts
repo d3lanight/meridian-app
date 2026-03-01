@@ -23,7 +23,7 @@ export function regimeIconBg(regime: string): string {
   const r = regime.toLowerCase()
   if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
   if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
-  if (r.includes('volatile')) return 'linear-gradient(135deg, #8B7565, rgba(139,117,101,0.8))'
+  if (r.includes('volat')) return 'linear-gradient(135deg, #D4A017, rgba(212,160,23,0.8))'
   return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
 }
 
@@ -35,7 +35,7 @@ export function regimeNarrative(regime: string): string {
     return 'Upward momentum within a defined range. Breakout potential exists, though volatility remains contained.'
   if (r.includes('bear'))
     return 'Downward pressure with elevated volatility. Capital is consolidating into safer positions.'
-  if (r.includes('volatile'))
+  if (r.includes('volat'))
     return 'Elevated price swings without clear direction. Risk management takes priority in this environment.'
   return 'Market moving sideways with no clear directional bias. Consolidation phase with moderate activity.'
 }

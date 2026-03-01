@@ -194,18 +194,23 @@ export default function DashboardPage() {
         >
           <button
             onClick={toggleHidden}
+            aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
             style={{
-              background: 'none',
-              border: 'none',
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.5)',
+              border: `1px solid ${M.border}`,
               cursor: 'pointer',
-              padding: 4,
-              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             {hidden ? (
               <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
             ) : (
-              <Eye size={16} color={M.textMuted} strokeWidth={2} />
+              <Eye size={16} color={M.textSecondary} strokeWidth={2} />
             )}
           </button>
         </div>

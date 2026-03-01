@@ -24,8 +24,13 @@ const fmt = (n: number) =>
     minimumFractionDigits: 2,
   })
 const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`
-const qtyFmt = (n: number) =>
-  n < 1 ? n.toFixed(4) : n < 100 ? n.toFixed(2) : n.toFixed(0)
+const qtyFmt = (n: number) => {
+  if (n === 0) return '0'
+  if (n < 0.0001) return n.toPrecision(2)
+  if (n < 1) return n.toFixed(4)
+  if (n < 100) return n.toFixed(2)
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
 
 function getSegKey(symbol: string): 'BTC' | 'ETH' | 'ALT' {
   if (symbol === 'BTC') return 'BTC'
@@ -93,6 +98,48 @@ const CRYPTO_CONFIGS: Record<
       </>
     ),
   },
+  DOT: {
+    bg: 'linear-gradient(135deg, #E6007A, #FF1E8E)',
+    shadow: 'rgba(230,0,122,0.3)',
+    vb: '0 0 32 32',
+    path: (<><ellipse cx="16" cy="5" rx="2.5" ry="2.5" fill="white"/><ellipse cx="16" cy="27" rx="2.5" ry="2.5" fill="white"/><ellipse cx="24" cy="11" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="8" cy="11" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="24" cy="21" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="8" cy="21" rx="2" ry="2" fill="white" fillOpacity=".7"/></>),
+  },
+  ADA: {
+    bg: 'linear-gradient(135deg, #0033AD, #0D47A1)',
+    shadow: 'rgba(0,51,173,0.3)',
+    vb: '0 0 32 32',
+    path: (<><circle cx="16" cy="16" r="2.5" fill="white"/><circle cx="16" cy="8" r="1.5" fill="white" fillOpacity=".8"/><circle cx="16" cy="24" r="1.5" fill="white" fillOpacity=".8"/><circle cx="10" cy="12" r="1.3" fill="white" fillOpacity=".7"/><circle cx="22" cy="12" r="1.3" fill="white" fillOpacity=".7"/></>),
+  },
+  RUNE: {
+    bg: 'linear-gradient(135deg, #33FF99, #00CCFF)',
+    shadow: 'rgba(51,255,153,0.3)',
+    vb: '0 0 32 32',
+    path: (<path d="M16 4L20 12L28 16L20 20L16 28L12 20L4 16L12 12L16 4Z" fill="white"/>),
+  },
+  CHZ: {
+    bg: 'linear-gradient(135deg, #CD0124, #E31E3B)',
+    shadow: 'rgba(205,1,36,0.3)',
+    vb: '0 0 32 32',
+    path: (<path d="M16 6C12 6 10 9 10 12C10 15 11 16 13 18C15 20 16 21 16 24C16 21 17 20 19 18C21 16 22 15 22 12C22 9 20 6 16 6Z" fill="white"/>),
+  },
+  DOGE: {
+    bg: 'linear-gradient(135deg, #C3A634, #D4AF37)',
+    shadow: 'rgba(195,166,52,0.3)',
+    vb: '0 0 32 32',
+    path: (<path d="M16 6h-4v7H9v2h3v7h4c4 0 7-2 7-8s-3-8-7-8zm0 14h-2v-5h5v-2h-5V8h2c3 0 5 1 5 6s-2 6-5 6z" fill="white"/>),
+  },
+  THETA: {
+    bg: 'linear-gradient(135deg, #2AB8E6, #29C5F6)',
+    shadow: 'rgba(42,184,230,0.3)',
+    vb: '0 0 32 32',
+    path: (<><circle cx="16" cy="16" r="9" stroke="white" strokeWidth="2" fill="none"/><path d="M16 11v10M11 16h10" stroke="white" strokeWidth="2"/></>),
+  },
+  GRT: {
+    bg: 'linear-gradient(135deg, #6F4FF2, #8B5CF6)',
+    shadow: 'rgba(111,79,242,0.3)',
+    vb: '0 0 32 32',
+    path: (<><path d="M16 8L10 14L16 20L22 14L16 8Z" fill="white"/><circle cx="8" cy="16" r="2" fill="white" fillOpacity=".7"/><circle cx="24" cy="16" r="2" fill="white" fillOpacity=".7"/></>),
+  },
 }
 
 function CryptoIcon({ symbol, size = 48 }: { symbol: string; size?: number }) {
@@ -155,6 +202,7 @@ const ALLOC_GRADIENTS: Record<string, string> = {
   BTC: 'linear-gradient(90deg, #F7931A, #F79A1F)',
   ETH: 'linear-gradient(90deg, #627EEA, #7B9FF5)',
   ALT: 'linear-gradient(90deg, #14F195, #9945FF)',
+  Stable: 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.7))',
 }
 
 // ── Asset name lookup ─────────────────────────
@@ -456,6 +504,13 @@ useEffect(() => {
         gradient: ALLOC_GRADIENTS.ALT,
       })
     }
+    // Stable row — always show (design v3.1)
+    const usedPct = allocRows.reduce((s, r) => s + r.pct, 0)
+    allocRows.push({
+      label: 'Stable',
+      pct: Math.max(0, 100 - usedPct),
+      gradient: ALLOC_GRADIENTS.Stable,
+    })
   }
 
   return (
@@ -475,21 +530,21 @@ useEffect(() => {
           <h1
             style={{
               fontFamily: "'Outfit', sans-serif",
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: 500,
               color: M.text,
-              margin: '0 0 4px',
+              margin: '0 0 2px',
             }}
           >
             Your portfolio
           </h1>
-          <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>
-            <span style={{ fontFamily: "'DM Mono', monospace" }}>{holdings.length}</span> holding
+          <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>{holdings.length}</span> holding
             {holdings.length !== 1 ? 's' : ''}
             {hasSnapshot && (
               <>
                 {' · '}
-                <span style={{ fontFamily: "'DM Mono', monospace" }}>{hidden ? '$••••••' : fmt(totalValue)}</span>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>{hidden ? '$••••' : fmt(totalValue)}</span>
               </>
             )}
           </p>
@@ -497,26 +552,31 @@ useEffect(() => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button
             onClick={toggleHidden}
+            aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
             style={{
-              background: 'none',
-              border: 'none',
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.5)',
+              border: `1px solid ${M.border}`,
               cursor: 'pointer',
-              padding: 4,
-              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               marginRight: 8,
             }}
           >
             {hidden ? (
               <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
             ) : (
-              <Eye size={16} color={M.textMuted} strokeWidth={2} />
+              <Eye size={16} color={M.textSecondary} strokeWidth={2} />
             )}
           </button>
           <button
             onClick={() => setSheet({ type: 'add' })}
             style={{
-              width: 44,
-              height: 44,
+              width: 38,
+              height: 38,
               borderRadius: '50%',
               background: M.accentGradient,
               border: 'none',
@@ -524,10 +584,10 @@ useEffect(() => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+              boxShadow: '0 4px 12px rgba(231,111,81,0.25)',
             }}
           >
-            <Plus size={24} color="white" strokeWidth={2.5} />
+            <Plus size={20} color="white" strokeWidth={2.5} />
           </button>
         </div>
       </div>
@@ -558,13 +618,13 @@ useEffect(() => {
             />
           </div>
           {allocRows.map((a, i) => (
-            <div key={a.label} style={{ marginBottom: i < allocRows.length - 1 ? 8 : 0 }}>
+            <div key={a.label} style={{ marginBottom: i < allocRows.length - 1 ? 6 : 0 }}>
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: 12,
-                  marginBottom: 4,
+                  fontSize: 11,
+                  marginBottom: 3,
                 }}
               >
                 <span style={{ color: M.textSecondary }}>{a.label}</span>
@@ -572,13 +632,14 @@ useEffect(() => {
                   style={{
                     fontWeight: 600,
                     color: M.text,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontFeatureSettings: "'tnum' 1, 'lnum' 1",
                   }}
                 >
                   {a.pct}%
                 </span>
               </div>
-              <GradientBar pct={a.pct} gradient={a.gradient} h={8} />
+              <GradientBar pct={a.pct} gradient={a.gradient} h={5} />
             </div>
           ))}
         </div>
@@ -615,10 +676,10 @@ useEffect(() => {
       <h2
         style={{
           fontFamily: "'Outfit', sans-serif",
-          fontSize: 18,
+          fontSize: 15,
           fontWeight: 600,
           color: M.text,
-          margin: '0 0 12px',
+          margin: '0 0 8px',
           ...anim(mounted, 2),
         }}
       >
@@ -630,7 +691,7 @@ useEffect(() => {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 8,
           ...anim(mounted, 3),
         }}
       >
@@ -639,71 +700,82 @@ useEffect(() => {
           const valueUsd = price ? price.usd_price * h.quantity : null
           const weight = price?.weight ?? null
           const name = ASSET_NAMES[h.asset] || h.asset
+          const weightPct = weight !== null ? Math.round(weight * 100) : null
 
           return (
             <div
               key={h.id}
               style={{
-                ...card(),
-                opacity: h.include_in_exposure ? 1 : 0.6,
+                ...card({ padding: '14px' }),
+                opacity: h.include_in_exposure ? 1 : 0.55,
               }}
             >
-              {/* Top row: icon, name/qty, value, edit */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: 12,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <CryptoIcon symbol={h.asset} size={48} />
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: M.text,
-                        marginBottom: 2,
-                      }}
-                    >
-                      {name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: M.textMuted,
-                        fontFamily: "'DM Mono', monospace",
-                      }}
-                    >
-                      {qtyFmt(h.quantity)} {h.asset}
-                    </div>
+              {/* Main row: icon | name+qty | value+edit — single horizontal line */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CryptoIcon symbol={h.asset} size={36} />
+
+                {/* Left: name + qty inline + since-added or excluded */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>{name}</span>
+                    <span style={{
+                      fontSize: 10, color: M.textMuted,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                    }}>
+                      {hidden ? '\u2022\u2022\u2022\u2022' : qtyFmt(h.quantity)} {h.asset}
+                    </span>
                   </div>
+                  {h.include_in_exposure ? (
+                    h.cost_basis != null && price ? (() => {
+                      const pctChange = ((price.usd_price - h.cost_basis!) / h.cost_basis!) * 100
+                      const up = pctChange >= 0
+                      const addedDate = new Date(h.created_at)
+                      const dateLbl = addedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      return hidden ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: M.textMuted, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>\u2022\u2022%</span>
+                          <span style={{ fontSize: 9, color: M.textMuted }}>since \u2022\u2022\u2022</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                            color: up ? M.positive : M.negative,
+                          }}>
+                            {up ? '+' : ''}{pctChange.toFixed(1)}%
+                          </span>
+                          <span style={{ fontSize: 9, color: M.textMuted }}>since {dateLbl}</span>
+                        </div>
+                      )
+                    })() : null
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                      <EyeOff size={9} color={M.textMuted} strokeWidth={2} />
+                      <span style={{ fontSize: 9, color: M.textMuted }}>Excluded from posture</span>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+
+                {/* Right: value + edit */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {valueUsd !== null && (
                     <div style={{ textAlign: 'right' }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: M.text,
-                          fontFamily: "'DM Mono', monospace",
-                          marginBottom: 2,
-                        }}
-                      >
-                        {hidden ? '$••••' : fmt(valueUsd)}
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: M.text,
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                      }}>
+                        {hidden ? '$\u2022\u2022\u2022\u2022' : fmt(valueUsd)}
                       </div>
-                      {weight !== null && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: M.textMuted,
-                            fontFamily: "'DM Mono', monospace",
-                          }}
-                        >
-                          {pctFmt(weight)}
+                      {weightPct !== null && weightPct > 0 && (
+                        <div style={{
+                          fontSize: 10, color: M.textMuted,
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                        }}>
+                          {hidden ? '\u2022\u2022%' : `${weightPct}%`}
                         </div>
                       )}
                     </div>
@@ -711,82 +783,66 @@ useEffect(() => {
                   <button
                     onClick={() => setSheet({ type: 'edit', holding: h })}
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: '50%',
-                      background: M.surface,
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.5)',
                       border: `1px solid ${M.border}`,
                       cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
-                    <Pencil size={14} color={M.textSecondary} strokeWidth={2} />
+                    <Pencil size={12} color={M.textSecondary} strokeWidth={2} />
                   </button>
                 </div>
               </div>
 
-              {/* Posture contribution bar (when included in exposure) */}
-              {h.include_in_exposure && weight !== null && (
-                <div
-                  style={{
-                    background: 'rgba(244,162,97,0.05)',
-                    borderRadius: 16,
-                    padding: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 6,
-                    }}
-                  >
-                    <ProgressiveDisclosure
-                      id={`contribution-${h.asset}`}
-                      summary={
-                        <span style={{ fontSize: 10, color: M.textSecondary }}>
-                          Posture contribution
-                        </span>
-                      }
-                      context={contributionExplainer}
-                      learnMoreHref="/profile/learn/glossary#glossary-posture-contribution"
-                    />
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: M.text,
-                        fontFamily: "'DM Mono', monospace",
-                      }}
-                    >
-                      {pctFmt(weight)}
-                    </span>
-                  </div>
-                  <GradientBar
-                    pct={Math.min(weight * 100 * 2.5, 100)}
-                    h={6}
-                  />
+              {/* Posture contribution bar — inline compact (v3.1) */}
+              {h.include_in_exposure && weightPct !== null && weightPct > 0 && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 9, color: M.textMuted, whiteSpace: 'nowrap' }}>Posture</span>
+                  <GradientBar pct={hidden ? 0 : Math.min(weightPct * 2.5, 100)} h={4} />
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, color: M.text, whiteSpace: 'nowrap',
+                    fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                  }}>
+                    {hidden ? '\u2022\u2022%' : `${weightPct}%`}
+                  </span>
                 </div>
               )}
 
-              {/* Excluded notice */}
-              {!h.include_in_exposure && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 12px',
-                    background: 'rgba(139,117,101,0.05)',
-                    borderRadius: 12,
-                  }}
-                >
-                  <span style={{ fontSize: 10, color: M.textMuted, fontStyle: 'italic' }}>
-                    Excluded from posture
-                  </span>
+              {/* Pro teaser — regime performance preview (v3.1) */}
+              {h.include_in_exposure && (
+                <div style={{
+                  marginTop: 10, padding: '8px 10px', borderRadius: 12,
+                  background: 'linear-gradient(135deg, rgba(42,157,143,0.04), rgba(244,162,97,0.04))',
+                  border: '1px solid rgba(42,157,143,0.08)',
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  {/* Blurred mini regime strip */}
+                  <div style={{ display: 'flex', gap: 2, marginBottom: 6, filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}>
+                    {[
+                      { w: '35%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
+                      { w: '15%', bg: 'linear-gradient(90deg,#F4A261,#F7B87A)' },
+                      { w: '25%', bg: 'linear-gradient(90deg,#2A9D8F,#5CC4B5)' },
+                      { w: '10%', bg: 'linear-gradient(90deg,#E76F51,#F08C70)' },
+                      { w: '15%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
+                    ].map((b, i) => (
+                      <div key={i} style={{ width: b.w, height: 16, borderRadius: 4, background: b.bg }} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{
+                        width: 12, height: 12, borderRadius: 4,
+                        background: M.accentGradient,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <span style={{ fontSize: 7, color: 'white', fontWeight: 700 }}>P</span>
+                      </div>
+                      <span style={{ fontSize: 9, color: M.textMuted }}>Regime performance · P&L tracking</span>
+                    </div>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: M.accent }}>Pro</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -806,8 +862,6 @@ useEffect(() => {
         }}
       >
         Exposure data reflects current holdings, not recommendations.
-        <br />
-        Actual values may vary by exchange.
       </div>
     </div>
     </DisclosureGroup>

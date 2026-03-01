@@ -11,7 +11,7 @@ import RegimeIcon from '@/components/shared/RegimeIcon'
 import { card, regimeIconBg, regimeNarrative, anim } from '@/lib/ui-helpers'
 import TimelineStrip from '@/components/regime/TimelineStrip'
 import AggSection from '@/components/regime/AggSection'
-import { compressToRuns, buildAgg } from '@/lib/regime-utils'
+import { compressToRuns, buildAgg, getRegimeConfig } from '@/lib/regime-utils'
 import type { RegimeRow as UtilRegimeRow } from '@/lib/regime-utils'
 
 // ── Types ─────────────────────────────────────
@@ -72,7 +72,7 @@ interface ConfidenceTrend {
 // ── Shared Helpers ────────────────────────────
 
 
-// ── Indicator Card (simplified — no info/setInfo threading) ──
+// ── Indicator Card (v2 — clean label + inline info) ──
 
 function Indicator({
   label,
@@ -91,20 +91,41 @@ function Indicator({
   infoId: string
   infoText: string
 }) {
+  const [showInfo, setShowInfo] = useState(false)
   return (
     <div style={{ ...card(), marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <ProgressiveDisclosure
-          id={infoId}
-          summary={
-            <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>{label}</span>
-          }
-          context={infoText}
-        />
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: M.text, whiteSpace: 'nowrap' }}>{label}</span>
+          <button
+            onClick={() => setShowInfo(!showInfo)}
+            aria-label={`Info about ${label}`}
+            style={{
+              width: 18, height: 18, borderRadius: '50%',
+              background: showInfo ? M.accentDim : 'rgba(139,117,101,0.1)',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700,
+              color: showInfo ? M.accent : M.textMuted,
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+          >
+            i
+          </button>
+        </div>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text, flexShrink: 0, marginLeft: 12 }}>
           {value}
         </span>
       </div>
+      {showInfo && (
+        <div style={{
+          marginBottom: 12, padding: '10px 12px', borderRadius: 12,
+          background: M.accentGlow, border: `1px solid ${M.borderAccent}`,
+        }}>
+          <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>{infoText}</p>
+        </div>
+      )}
       <GradientBar pct={pct} gradient={gradient} h={8} />
       <p style={{ fontSize: 12, color: M.textSecondary, margin: '8px 0 0' }}>{desc}</p>
     </div>
@@ -162,6 +183,7 @@ export default function MarketPulsePage() {
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
   const [period, setPeriod] = useState<7 | 30 | 90>(7)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
@@ -262,7 +284,7 @@ export default function MarketPulsePage() {
 
   // Signal coherence narrative
   const coherenceNarrative = current
-    ? `${current.regime.charAt(0).toUpperCase() + current.regime.slice(1)} regime with ${Math.round(current.confidence * 100)}% confidence${
+    ? `${getRegimeConfig(current.regime).l} regime with ${Math.round(current.confidence * 100)}% confidence${
         !ethAligned ? ', but ETH and BTC are diverging' : ''
       }. ${fearGreed >= 50 ? 'Greed is present' : 'Fear dominates'} but ${
         altSeason < 40 ? 'altcoins are underperforming' : 'altcoins are gaining ground'
@@ -342,7 +364,7 @@ export default function MarketPulsePage() {
                       marginBottom: 4,
                     }}
                   >
-                    {current.regime.charAt(0).toUpperCase() + current.regime.slice(1)}
+                    {getRegimeConfig(current.regime).l}
                   </div>
                   <div style={{ fontSize: 14, color: M.textSecondary }}>
                     {persistence} days in state
@@ -466,6 +488,57 @@ export default function MarketPulsePage() {
               </div>
             </div>
 
+            {/* ── BTC + ETH Price Row (design v2.1) ── */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16, ...anim(mounted, 2.2) }}>
+              {([
+                { symbol: 'BTC', name: 'Bitcoin', price: current.price_now, change: current.r_1d * 100, bg: 'linear-gradient(135deg, #F7931A, #FF9D2E)', shadow: 'rgba(247,147,26,0.3)' },
+                { symbol: 'ETH', name: 'Ethereum', price: current.eth_price_now, change: current.eth_r_7d * 100, bg: 'linear-gradient(135deg, #627EEA, #8299EF)', shadow: 'rgba(98,126,234,0.3)' },
+              ] as const).map(coin => {
+                const isPos = coin.change >= 0
+                return (
+                  <div key={coin.symbol} style={{ ...card({ padding: '14px' }), flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 10,
+                        background: coin.bg,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: `0 2px 8px ${coin.shadow}`, flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'white' }}>{coin.symbol.charAt(0)}</span>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'DM Mono', monospace" }}>{coin.symbol}</div>
+                        <div style={{ fontSize: 10, color: M.textMuted }}>{coin.name}</div>
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 18, fontWeight: 700, color: M.text,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                      marginBottom: 6, lineHeight: 1,
+                    }}>
+                      ${coin.price?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}
+                    </div>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      background: isPos ? M.positiveDim : M.negativeDim,
+                      borderRadius: 8, padding: '3px 8px',
+                    }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600,
+                        color: isPos ? M.positive : M.negative,
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                      }}>
+                        {isPos ? '+' : ''}{coin.change.toFixed(2)}%
+                      </span>
+                      <span style={{ fontSize: 9, color: isPos ? M.positive : M.negative, opacity: 0.7 }}>24h</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
               {/* ── Regime History (S82) ── */}
                <div style={{ marginBottom: 16, ...anim(mounted, 2.5) }}>
               {/* Period tabs */}
@@ -496,46 +569,112 @@ export default function MarketPulsePage() {
                 ))}
               </div>
 
-              {/* Sparse data notice */}
-              {data && data.row_count < period && data.row_count > 0 && (
-                <div style={{
-                  ...card({ padding: '12px' }),
-                  marginBottom: 12,
-                  background: 'rgba(244,162,97,0.05)',
-                  border: `1px solid ${M.borderAccent}`,
-                }}>
-                  <p style={{ fontSize: 11, color: M.textSecondary, margin: 0, lineHeight: 1.5 }}>
-                    Meridian has {data.row_count} days of history. This view fills in automatically as data accumulates.
-                  </p>
-                </div>
-              )}
+              {/* Collapsible regime history header (v3.2) */}
+              {(() => {
+                const curRun = runs.length ? runs[runs.length - 1] : null
+                const curRC = curRun ? getRegimeConfig(curRun.regime) : null
+                return (
+                  <>
+                    <button
+                      onClick={() => setHistoryExpanded(!historyExpanded)}
+                      style={{
+                        ...card({ padding: '14px' }),
+                        width: '100%',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: historyExpanded ? 16 : 0,
+                        border: historyExpanded
+                          ? `1px solid ${M.borderPositive}`
+                          : `1px solid ${M.border}`,
+                        background: historyExpanded
+                          ? 'linear-gradient(135deg, rgba(42,157,143,0.06), rgba(42,157,143,0.02))'
+                          : M.surface,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: curRC?.bg || M.accentGradient,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, color: 'white', fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {curRC?.icon || '—'}
+                        </div>
+                        <div style={{ textAlign: 'left' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: M.text }}>
+                            {curRun ? `${curRC!.l} for ${curRun.days} days` : 'No history'}
+                          </div>
+                          <div style={{ fontSize: 11, color: M.textMuted }}>
+                            {agg.tc} shift{agg.tc !== 1 ? 's' : ''} · {agg.ac}% avg conf
+                            {agg.dom && agg.bd.length > 1 && (
+                              <span> · {agg.dom.pct}% {getRegimeConfig(agg.dom.regime).l}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{
+                        display: 'inline-block',
+                        transform: historyExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.25s ease',
+                        fontSize: 16, color: M.textMuted,
+                      }}>
+                        ▾
+                      </span>
+                    </button>
 
-              {/* Timeline strip + aggregation */}
-              {runs.length > 0 ? (
-                <>
-                  <TimelineStrip runs={runs} totalDays={agg.td} period={period} />
-                  <AggSection agg={agg} />
-                </>
-              ) : (
-                <div style={{ ...card(), textAlign: 'center', padding: '32px 20px' }}>
-                  <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>No data for this period</p>
-                  <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>Try a shorter timeframe</p>
-                </div>
-              )}
+                    {/* Expanded content */}
+                    <div style={{
+                      maxHeight: historyExpanded ? 900 : 0,
+                      opacity: historyExpanded ? 1 : 0,
+                      overflow: 'hidden',
+                      transition: 'max-height 0.35s ease, opacity 0.25s ease',
+                    }}>
+                      {/* Sparse data notice */}
+                      {data && data.row_count < period && data.row_count > 0 && (
+                        <div style={{
+                          ...card({ padding: '12px' }),
+                          marginBottom: 12,
+                          background: 'rgba(244,162,97,0.05)',
+                          border: `1px solid ${M.borderAccent}`,
+                        }}>
+                          <p style={{ fontSize: 11, color: M.textSecondary, margin: 0, lineHeight: 1.5 }}>
+                            Meridian has {data.row_count} days of history. This view fills in automatically as data accumulates.
+                          </p>
+                        </div>
+                      )}
 
-              {/* Educational footer */}
-              <div style={{
-                marginTop: 16,
-                padding: 12,
-                background: 'rgba(244,162,97,0.05)',
-                borderRadius: 12,
-              }}>
-                <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
-                  Regime classification suggests the prevailing market character. Confidence reflects
-                  how clearly the pattern fits — higher values indicate stronger agreement across indicators.
-                  This is an analytical lens, not a trading signal.
-                </p>
-              </div>
+                      {/* Timeline strip + aggregation */}
+                      {runs.length > 0 ? (
+                        <>
+                          <TimelineStrip runs={runs} totalDays={agg.td} period={period} />
+                          <AggSection agg={agg} />
+                        </>
+                      ) : (
+                        <div style={{ ...card(), textAlign: 'center', padding: '32px 20px' }}>
+                          <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>No data for this period</p>
+                          <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>Try a shorter timeframe</p>
+                        </div>
+                      )}
+
+                      {/* Educational footer */}
+                      <div style={{
+                        marginTop: 16,
+                        padding: 12,
+                        background: 'rgba(244,162,97,0.05)',
+                        borderRadius: 12,
+                      }}>
+                        <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
+                          Regime classification suggests the prevailing market character. Confidence reflects
+                          how clearly the pattern fits — higher values indicate stronger agreement across indicators.
+                          This is an analytical lens, not a trading signal.
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
 
             {/* ── Sentiment Indicators ── */}
@@ -592,13 +731,7 @@ export default function MarketPulsePage() {
                   marginBottom: 12,
                 }}
               >
-                <ProgressiveDisclosure
-                  id="vol"
-                  summary={
-                    <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Volatility</span>
-                  }
-                  context="7-day price volatility. High volatility means larger daily swings. Low volatility suggests a calmer, more predictable market. Not the same as trading volume."
-                />
+                <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Volatility</span>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
                   {volLabel}
                 </span>
@@ -701,84 +834,7 @@ export default function MarketPulsePage() {
               </div>
             </div>
 
-            {/* ── Regime Transitions (S56) ── */}
-            <div style={{ marginTop: 16, ...anim(mounted, 6) }}>
-              <ProgressiveDisclosure
-                id="transitions"
-                summary={
-                  <h2 style={{
-                    fontFamily: "'Outfit', sans-serif",
-                    fontSize: 18, fontWeight: 600, color: M.text, margin: 0,
-                  }}>
-                    Regime transitions
-                  </h2>
-                }
-                context="Transitions show how market conditions typically shift. Tracking which regimes follow each other helps you anticipate what may come next."
-              />
-
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {data && data.transition_count > 0 ? (
-                  data.transitions.map((t, i) => {
-                    const LABELS: Record<string, string> = {
-                      bull: 'Bull', bear: 'Bear', range: 'Range',
-                      volatile: 'Volatile', 'bull range': 'Bull Range',
-                    }
-                    const FRAMING: Record<string, string> = {
-                      'range→bull': 'Range-to-bull transitions often follow sustained volume increases and improving sentiment.',
-                      'range→bear': 'A shift from range to bear typically reflects deteriorating momentum across major assets.',
-                      'bull→range': 'Bull markets often cool into range-bound conditions before the next directional move.',
-                      'bear→range': 'Bear markets frequently transition to range as selling pressure exhausts.',
-                      'bull→bear': 'Direct bull-to-bear transitions are uncommon and typically driven by sudden market shocks.',
-                      'bear→bull': 'Bear-to-bull reversals usually signal a strong shift in sentiment and momentum.',
-                    }
-                    const fromLabel = LABELS[t.from.toLowerCase()] ?? t.from
-                    const toLabel = LABELS[t.to.toLowerCase()] ?? t.to
-                    const key = `${t.from.toLowerCase()}→${t.to.toLowerCase()}`
-                    const framing = FRAMING[key] ?? `This transition pattern has been observed ${t.count} time${t.count > 1 ? 's' : ''}.`
-
-                    return (
-                      <div key={`${t.from}-${t.to}`} style={card({ padding: 14 })}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>
-                            {fromLabel}
-                          </span>
-                          <span style={{ fontSize: 12, color: M.textMuted }}>→</span>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>
-                            {toLabel}
-                          </span>
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, color: M.accent,
-                            background: M.accentDim, padding: '2px 8px', borderRadius: 8,
-                            marginLeft: 'auto',
-                          }}>
-                            {t.count}×
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.5, margin: 0 }}>
-                          {framing}
-                        </p>
-                        <p style={{ fontSize: 10, color: M.textMuted, margin: '4px 0 0', fontFamily: "'DM Mono', monospace" }}>
-                          Last seen {new Date(t.last_seen).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </p>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <div style={{
-                    ...card({ padding: 20 }),
-                    background: 'rgba(244,162,97,0.05)',
-                    border: `1px solid ${M.borderAccent}`,
-                  }}>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: M.text, margin: '0 0 8px' }}>
-                      No transitions recorded yet
-                    </p>
-                    <p style={{ fontSize: 12, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
-                      The market has remained in a single regime since Meridian started tracking. When the regime shifts, you'll see transition patterns here — showing which conditions typically follow each other.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Transitions removed — now inside regime history component */}
 
             {/* ── Timestamp ── */}
             <div

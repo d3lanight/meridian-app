@@ -69,12 +69,33 @@ export const REGIMES: Record<string, RegimeConfig> = {
   bull:     { bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)', s: '#2A9D8F', d: 'rgba(42,157,143,0.12)',  l: 'Bull',     icon: '↗' },
   bear:     { bg: 'linear-gradient(135deg,#E76F51,#F08C70)', s: '#E76F51', d: 'rgba(231,111,81,0.12)',  l: 'Bear',     icon: '↘' },
   range:    { bg: 'linear-gradient(135deg,#F4A261,#F7B87A)', s: '#F4A261', d: 'rgba(244,162,97,0.12)',  l: 'Range',    icon: '→' },
-  volatile: { bg: 'linear-gradient(135deg,#8B7565,#A08B7B)', s: '#8B7565', d: 'rgba(139,117,101,0.12)', l: 'Volatile', icon: '↕' },
+  volatile: { bg: 'linear-gradient(135deg,#D4A017,#E8B84B)', s: '#D4A017', d: 'rgba(212,160,23,0.12)', l: 'Volatile', icon: '↕' },
 }
 
-/** Lookup regime config by name (case-insensitive, defaults to range) */
+/** Reverse-lookup: display label → regime key */
+const LABEL_TO_KEY: Record<string, string> = {
+  'bull market': 'bull',
+  'bear market': 'bear',
+  'range': 'range',
+  'high volatility': 'volatile',
+  'volatile': 'volatile',
+  'volatility': 'volatile',
+  'insufficient data': 'range',
+}
+
+/** Lookup regime config by key, display label, or partial match (case-insensitive, defaults to range) */
 export function getRegimeConfig(regime: string | undefined | null): RegimeConfig {
-  return REGIMES[regime?.toLowerCase() ?? ''] ?? REGIMES.range
+  const r = regime?.toLowerCase() ?? ''
+  // Direct key match
+  if (REGIMES[r]) return REGIMES[r]
+  // Display label reverse-lookup
+  const key = LABEL_TO_KEY[r]
+  if (key && REGIMES[key]) return REGIMES[key]
+  // Partial match fallback
+  if (r.includes('bull')) return REGIMES.bull
+  if (r.includes('bear')) return REGIMES.bear
+  if (r.includes('volat')) return REGIMES.volatile
+  return REGIMES.range
 }
 
 // ── Compress to Runs ──────────────────────────

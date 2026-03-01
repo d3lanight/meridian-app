@@ -37,7 +37,7 @@ export default function TimelineStrip({ runs, totalDays, period }: TimelineStrip
   const totalW = Math.max(totalDays * pxPerDay, 320)
 
   // Date axis ticks
-  const startD = new Date(runs[0].startDate + 'T00:00:00')
+  const startD = new Date(runs[0].startDate)
   const interval = period <= 7 ? 1 : period <= 30 ? 5 : 10
   const ticks: { off: number; lbl: string }[] = []
   for (let d = 0; d <= totalDays; d += interval) {
