@@ -1,3 +1,8 @@
+// ━━━ ProUpgradeCard ━━━
+// v1.1.0 · ca-story91 · Sprint 24
+// Tier-aware: rendered conditionally by Profile page (tier === free)
+// CTA links to /pro placeholder (Stripe integration Phase 5)
+
 import { Crown } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
@@ -64,8 +69,7 @@ export function ProUpgradeCard() {
 
       {/* CTA button */}
       <button
-        onClick={() => {
-          /* E15: wire to pro upgrade flow */
+        onClick={() => {window.location.href = '/pro'
         }}
         style={{
           width: '100%',

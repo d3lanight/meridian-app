@@ -1,3 +1,7 @@
+// ━━━ MenuRow ━━━
+// v1.1.0 · ca-story92 · Sprint 24
+// Added onProTap callback for Pro-locked rows upgrade prompt
+
 import { ChevronRight, type LucideIcon } from 'lucide-react'
 import { M } from '@/lib/meridian'
 
@@ -6,18 +10,23 @@ interface MenuRowProps {
   label: string
   desc?: string
   onClick?: () => void
+  onProTap?: () => void
   pro?: boolean
   disabled?: boolean
   danger?: boolean
   badge?: string
 }
 
-export function MenuRow({ icon: Icon, label, desc, onClick, pro, disabled, danger, badge }: MenuRowProps) {
-  const isDisabled = disabled || pro
+export function MenuRow({ icon: Icon, label, desc, onClick, onProTap, pro, disabled, danger, badge }: MenuRowProps) {
+  const isLocked = pro && !onProTap
+  const isDisabled = disabled || isLocked
 
   return (
     <button
-      onClick={() => !isDisabled && onClick?.()}
+      onClick={() => {
+        if (pro && onProTap) { onProTap(); return }
+        if (!isDisabled) onClick?.()
+      }}
       style={{
         width: '100%',
         textAlign: 'left',
@@ -28,7 +37,7 @@ export function MenuRow({ icon: Icon, label, desc, onClick, pro, disabled, dange
         background: 'transparent',
         border: 'none',
         cursor: isDisabled ? 'not-allowed' : 'pointer',
-        opacity: isDisabled ? 0.45 : 1,
+        opacity: isDisabled ? 0.45 : pro ? 0.7 : 1,
         borderRadius: 0,
         fontFamily: "'DM Sans', sans-serif",
       }}
@@ -73,8 +82,8 @@ export function MenuRow({ icon: Icon, label, desc, onClick, pro, disabled, dange
           style={{
             fontSize: 9,
             fontWeight: 700,
-            color: M.accent,
-            background: M.accentDim,
+            color: 'white',
+            background: M.accentGradient,
             padding: '2px 7px',
             borderRadius: 6,
             flexShrink: 0,

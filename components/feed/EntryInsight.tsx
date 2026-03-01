@@ -1,11 +1,13 @@
 // ━━━ EntryInsight ━━━
-// v1.0.0 · ca-story83 · Sprint 20
+// v1.1.0 · ca-story93 · Sprint 24
+// Pro-gated: first insight free, rest locked for free users
 
 'use client'
 
 import { Zap, Shield, TrendingUp, Activity, ChevronRight } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
+import { ProGate } from '@/components/shared/ProGate'
 import type { EntryInsightData } from '@/lib/feed-types'
 
 const ICONS = {
@@ -22,11 +24,16 @@ const ICON_STYLES = {
   neutral: { bg: M.neutralDim, color: M.neutral },
 } as const
 
-export default function EntryInsight({ data }: { data: EntryInsightData }) {
+interface EntryInsightProps {
+  data: EntryInsightData
+  locked?: boolean
+}
+
+export default function EntryInsight({ data, locked = false }: EntryInsightProps) {
   const Icon = ICONS[data.icon] ?? Zap
   const style = ICON_STYLES[data.iconVariant] ?? ICON_STYLES.accent
 
-  return (
+  const content = (
     <div
       style={{
         ...card({ padding: '14px 16px' }),
@@ -67,4 +74,10 @@ export default function EntryInsight({ data }: { data: EntryInsightData }) {
       )}
     </div>
   )
+
+  if (locked) {
+    return <ProGate isPro={false} label="More insights with Pro">{content}</ProGate>
+  }
+
+  return content
 }

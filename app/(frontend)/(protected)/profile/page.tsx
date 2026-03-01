@@ -222,8 +222,8 @@ function NotificationDetail({ onBack }: { onBack: () => void }) {
 
       <SectionHeader label="Pro" />
       <MenuCard>
-        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro />
-        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro />
+        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro onProTap={() => window.location.href = "/pro"} />
+        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro onProTap={() => window.location.href = "/pro"} />
       </MenuCard>
     </div>
   )

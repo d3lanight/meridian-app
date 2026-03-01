@@ -13,6 +13,8 @@ import TimelineStrip from '@/components/regime/TimelineStrip'
 import AggSection from '@/components/regime/AggSection'
 import { compressToRuns, buildAgg, getRegimeConfig } from '@/lib/regime-utils'
 import type { RegimeRow as UtilRegimeRow } from '@/lib/regime-utils'
+import { useTier } from "@/hooks/useTier"
+import { ProGate } from "@/components/shared/ProGate"
 
 // ── Types ─────────────────────────────────────
 
@@ -183,6 +185,7 @@ export default function MarketPulsePage() {
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
   const [period, setPeriod] = useState<7 | 30 | 90>(7)
+  const { isPro } = useTier()
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -631,6 +634,9 @@ export default function MarketPulsePage() {
                       overflow: 'hidden',
                       transition: 'max-height 0.35s ease, opacity 0.25s ease',
                     }}>
+
+                      <ProGate isPro={isPro || period === 7} label={`${period}-day history is Pro`}>
+
                       {/* Sparse data notice */}
                       {data && data.row_count < period && data.row_count > 0 && (
                         <div style={{
@@ -671,6 +677,7 @@ export default function MarketPulsePage() {
                           This is an analytical lens, not a trading signal.
                         </p>
                       </div>
+                      </ProGate>
                     </div>
                   </>
                 )
