@@ -28,12 +28,12 @@ import {
 import type { ScenarioId } from '@/lib/demo-data'
 import FeedSkeleton from '@/components/feed/FeedSkeleton'
 import EmptyPortfolioCTA from '@/components/feed/EmptyPortfolioCTA'
+import { usePrivacy } from '@/contexts/PrivacyContext'
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
   const [isAnon, setIsAnon] = useState(true)
   const [userName, setUserName] = useState<string | null>(null)
-  const [hidden, setHidden] = useState(false)
   const [metrics, setMetrics] = useState<MarketMetrics | null>(null)
   const [prices, setPrices] = useState<{
     btcPrice: number; btcChange: number; ethPrice: number; ethChange: number
@@ -52,6 +52,8 @@ export default function DashboardPage() {
     isLive,
     refresh,
   } = useMarketData()
+
+  const { hidden, toggleHidden } = usePrivacy()
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
@@ -191,7 +193,7 @@ export default function DashboardPage() {
           }}
         >
           <button
-            onClick={() => setHidden(!hidden)}
+            onClick={toggleHidden}
             style={{
               background: 'none',
               border: 'none',
@@ -294,7 +296,7 @@ function FeedEntryRenderer({ entry, hidden }: { entry: FeedEntry; hidden: boolea
     case 'regime':
       return <EntryRegime data={entry.data} />
     case 'price_pair':
-      return <EntryPricePair data={entry.data} hidden={hidden} />
+      return <EntryPricePair data={entry.data} />
     case 'posture':
       return <EntryPosture data={entry.data} hidden={hidden} />
     case 'insight':

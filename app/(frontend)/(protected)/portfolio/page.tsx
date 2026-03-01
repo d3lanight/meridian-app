@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Pencil, Wallet } from 'lucide-react'
+import { Plus, Pencil, Wallet, Eye, EyeOff } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { usePortfolio } from '@/hooks/usePortfolio'
 import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
@@ -13,6 +13,7 @@ import type { PortfolioExposure, Holding } from '@/types'
 import ProgressiveDisclosure, { DisclosureGroup } from "@/components/education/ProgressiveDisclosure"
 import { card, anim } from '@/lib/ui-helpers'
 import GradientBar from '@/components/shared/GradientBar'
+import { usePrivacy } from '@/contexts/PrivacyContext'
 
 // ── Helpers ───────────────────────────────────
 
@@ -188,6 +189,7 @@ export default function PortfolioPage() {
 
   const { holdings, assets, isLoading: holdingsLoading, addHolding, updateHolding, removeHolding } =
     usePortfolio()
+  const { hidden, toggleHidden } = usePrivacy()
 
   const fetchSnapshot = async () => {
     try {
@@ -487,28 +489,47 @@ useEffect(() => {
             {hasSnapshot && (
               <>
                 {' · '}
-                <span style={{ fontFamily: "'DM Mono', monospace" }}>{fmt(totalValue)}</span>
+                <span style={{ fontFamily: "'DM Mono', monospace" }}>{hidden ? '$••••••' : fmt(totalValue)}</span>
               </>
             )}
           </p>
         </div>
-        <button
-          onClick={() => setSheet({ type: 'add' })}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            background: M.accentGradient,
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
-          }}
-        >
-          <Plus size={24} color="white" strokeWidth={2.5} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            onClick={toggleHidden}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 4,
+              borderRadius: 8,
+              marginRight: 8,
+            }}
+          >
+            {hidden ? (
+              <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
+            ) : (
+              <Eye size={16} color={M.textMuted} strokeWidth={2} />
+            )}
+          </button>
+          <button
+            onClick={() => setSheet({ type: 'add' })}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              background: M.accentGradient,
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+            }}
+          >
+            <Plus size={24} color="white" strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
 
       {/* ── Allocation card (on top) ── */}
@@ -672,7 +693,7 @@ useEffect(() => {
                           marginBottom: 2,
                         }}
                       >
-                        {fmt(valueUsd)}
+                        {hidden ? '$••••' : fmt(valueUsd)}
                       </div>
                       {weight !== null && (
                         <div

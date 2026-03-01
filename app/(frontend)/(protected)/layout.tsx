@@ -6,6 +6,7 @@
 import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/navigation/BottomNav';
 import type { NavTab } from '@/types';
+import { PrivacyProvider } from '@/contexts/PrivacyContext';
 
 function getTabFromPath(pathname: string): NavTab {
   if (pathname.startsWith('/portfolio')) return 'portfolio';
@@ -32,15 +33,12 @@ export default function ProtectedLayout({
     window.location.href = routes[tab];
   };
 
-  return (
-    <div
-      className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden"
-      style={{
-        background: 'linear-gradient(135deg, #F5F1ED, #E8DED6)',
-      }}
-    >
+return (
+  <PrivacyProvider>
+    <div className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden" style={{ background: "linear-gradient(135deg, #F5F1ED, #E8DED6)" }}>
       {children}
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
-  );
+  </PrivacyProvider>
+);
 }
