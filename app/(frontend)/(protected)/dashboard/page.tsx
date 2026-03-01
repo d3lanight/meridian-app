@@ -1,7 +1,6 @@
 // ━━━ Today — Journal Feed ━━━
-// v2.0.0 · ca-story83 · Sprint 20
-// Rebuild: static card layout → scrollable journal feed
-// 9 entry types assembled by feed-composer.ts
+// v2.1.0 · ca-story84 · Sprint 20
+// S84: Data wiring — skeleton, temporal grouping, empty CTA, richer snippets
 
 'use client'
 
@@ -27,6 +26,8 @@ import {
   EntryDivider,
 } from '@/components/feed'
 import type { ScenarioId } from '@/lib/demo-data'
+import FeedSkeleton from '@/components/feed/FeedSkeleton'
+import EmptyPortfolioCTA from '@/components/feed/EmptyPortfolioCTA'
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
@@ -38,6 +39,7 @@ export default function DashboardPage() {
     btcPrice: number; btcChange: number; ethPrice: number; ethChange: number
   } | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
+  const [hasHoldings, setHasHoldings] = useState<boolean | undefined>(undefined)
 
   const {
     scenario,
@@ -56,13 +58,24 @@ export default function DashboardPage() {
   }, [])
 
   // Auth check + user name
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data: { user } }) => {
+ useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
       setIsAnon(!user)
       if (user?.user_metadata?.display_name) {
         setUserName(user.user_metadata.display_name)
       } else if (user?.email) {
         setUserName(user.email.split('@')[0])
+      }
+      // Check if user has holdings
+      if (user) {
+        supabase
+          .from('portfolio_holdings')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .then(({ count }) => {
+            setHasHoldings((count ?? 0) > 0)
+          })
       }
     })
   }, [])
@@ -128,7 +141,7 @@ export default function DashboardPage() {
 
   // ── Compose feed ──
   const { regime, portfolio, signals } = scenario
-  const feed: FeedEntry[] = useMemo(
+  const { entries: feed, showEmptyPortfolioCTA } = useMemo(
     () =>
       composeFeed({
         regime,
@@ -142,8 +155,9 @@ export default function DashboardPage() {
         signals: isAnon ? [] : signals,
         userName: isAnon ? null : userName,
         regimeExplainer,
+        hasHoldings: isAnon ? undefined : hasHoldings,
       }),
-    [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer]
+    [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer, hasHoldings]
   )
 
   return (
@@ -182,16 +196,9 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Loading state ── */}
-        {isLoading && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '60px 20px',
-              color: M.textMuted,
-              fontSize: 14,
-            }}
-          >
-            Loading your feed...
+       {isLoading && (
+          <div style={{ padding: '0 0 24px' }}>
+            <FeedSkeleton />
           </div>
         )}
 
@@ -238,6 +245,11 @@ export default function DashboardPage() {
                 <FeedEntryRenderer entry={entry} hidden={hidden} />
               </div>
             ))}
+            {showEmptyPortfolioCTA && (
+              <div style={anim(mounted, feed.length * 0.3)}>
+                <EmptyPortfolioCTA />
+              </div>
+            )}
           </div>
         )}
 

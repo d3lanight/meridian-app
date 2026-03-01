@@ -1,7 +1,7 @@
 // ━━━ Feed Composer ━━━
-// v1.0.0 · ca-story83 · Sprint 20
+// v2.0.0 · ca-story84 · Sprint 20
 // Multi-source assembler: market + portfolio + sentiment → FeedEntry[]
-// Handles auth state: anonymous users get market entries only
+// v2: temporal grouping, richer snippets, empty portfolio detection
 
 import type { FeedEntry } from '@/lib/feed-types'
 import type { RegimeData, PortfolioData, MarketMetrics, Signal } from '@/types'
@@ -20,14 +20,21 @@ interface FeedSources {
   portfolio: PortfolioData | null
   signals: Signal[]
   userName: string | null
+  hasHoldings?: boolean
 
   // Educational
   regimeExplainer?: { summary: string; slug: string } | null
 }
 
-export function composeFeed(sources: FeedSources): FeedEntry[] {
+interface ComposedFeed {
+  entries: FeedEntry[]
+  showEmptyPortfolioCTA: boolean
+}
+
+export function composeFeed(sources: FeedSources): ComposedFeed {
   const entries: FeedEntry[] = []
   const isAuthed = !!sources.userName
+  let showEmptyPortfolioCTA = false
 
   // ── 1. Greeting ──
   entries.push({
@@ -69,12 +76,11 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
   }
 
   // ── 4. Posture (auth only) ──
-  if (isAuthed && sources.portfolio) {
+  if (isAuthed && sources.portfolio && sources.hasHoldings !== false) {
     const p = sources.portfolio
     const postureScore = Math.round((1 - p.misalignment) * 100)
     const label = postureScore >= 70 ? 'Aligned' : postureScore >= 40 ? 'Moderate' : 'Misaligned'
 
-    // Build narrative from allocations
     let narrative = `Your portfolio posture score is ${postureScore}.`
     if (p.allocations.length > 0) {
       const topAlloc = p.allocations[0]
@@ -83,16 +89,14 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
 
     entries.push({
       type: 'posture',
-      data: {
-        score: postureScore,
-        label,
-        narrative,
-      },
+      data: { score: postureScore, label, narrative },
     })
+  } else if (isAuthed && sources.hasHoldings === false) {
+    showEmptyPortfolioCTA = true
   }
 
   // ── 5. Portfolio insight (auth only, template-driven) ──
-  if (isAuthed && sources.portfolio && sources.regime) {
+  if (isAuthed && sources.portfolio && sources.regime && sources.hasHoldings !== false) {
     const p = sources.portfolio
     const r = sources.regime
     if (p.allocations.length > 0) {
@@ -109,10 +113,24 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
           },
         })
       }
+
+      // ETH insight if present
+      const ethAlloc = p.allocations.find(a => a.asset === 'ETH')
+      if (ethAlloc && Math.abs(ethAlloc.current - ethAlloc.target) > 5) {
+        const diff = ethAlloc.current - ethAlloc.target
+        entries.push({
+          type: 'insight',
+          data: {
+            icon: 'shield',
+            iconVariant: 'eth',
+            text: `ETH is at ${ethAlloc.current}% — ${Math.abs(diff).toFixed(0)}% ${diff > 0 ? 'above' : 'below'} target for this regime.`,
+          },
+        })
+      }
     }
   }
 
-  // ── 6. Divider ──
+  // ── 6. Market context divider ──
   entries.push({ type: 'divider', data: { label: 'Market context' } })
 
   // ── 7. Market snippets ──
@@ -123,7 +141,7 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
       data: {
         label: 'Fear & Greed',
         value: String(m.fearGreed),
-        change: m.fearGreed >= 50 ? String(m.fearGreed - 50) : undefined,
+        change: m.fearGreed >= 50 ? `+${m.fearGreed - 50}` : undefined,
         positive: m.fearGreed >= 50,
       },
     })
@@ -134,11 +152,42 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
         value: `${m.btcDominance.toFixed(1)}%`,
       },
     })
+    if (m.altSeason != null) {
+      entries.push({
+        type: 'market_snippet',
+        data: {
+          label: 'ALT Season',
+          value: String(m.altSeason),
+          change: m.altSeason >= 75 ? 'Active' : undefined,
+          positive: m.altSeason >= 50,
+        },
+      })
+    }
+    if (m.totalVolume != null) {
+      entries.push({
+        type: 'market_snippet',
+        data: {
+          label: '24h Volume',
+          value: `$${(m.totalVolume / 1e9).toFixed(1)}B`,
+        },
+      })
+    }
   }
 
-  // ── 8. Signals (auth only) ──
+  // ── 8. Signals with temporal grouping (auth only) ──
   if (isAuthed && sources.signals.length > 0) {
-    for (const sig of sources.signals.slice(0, 3)) {
+    let lastGroup: 'today' | 'yesterday' | 'older' | null = null
+
+    for (const sig of sources.signals.slice(0, 5)) {
+      const group = getTemporalGroup(sig.time)
+
+      // Insert divider at group boundary
+      if (group !== lastGroup && lastGroup !== null) {
+        const dividerLabel = group === 'yesterday' ? 'Yesterday' : group === 'older' ? 'Earlier' : 'Earlier today'
+        entries.push({ type: 'divider', data: { label: dividerLabel } })
+      }
+      lastGroup = group
+
       const sevMap: Record<number, 'info' | 'watch' | 'action'> = { 1: 'info', 2: 'watch', 3: 'action' }
       entries.push({
         type: 'signal',
@@ -164,23 +213,28 @@ export function composeFeed(sources: FeedSources): FeedEntry[] {
     })
   }
 
-  return entries
+  return { entries, showEmptyPortfolioCTA }
 }
 
 // ── Helpers ──
 
-function formatRelativeTime(dateStr: string): string {
-  const date = new Date(dateStr)
+function getTemporalGroup(timeStr: string): 'today' | 'yesterday' | 'older' {
+  // Signal.time can be relative ("2h ago") or absolute date
+  if (!timeStr) return 'today'
+  const lower = timeStr.toLowerCase()
+  if (lower.includes('ago') || lower.includes('just now')) return 'today'
+  if (lower.includes('yesterday')) return 'yesterday'
+
+  // Try parsing as date
+  const date = new Date(timeStr)
+  if (isNaN(date.getTime())) return 'today'
+
   const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffH = Math.floor(diffMs / 3600000)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
 
-  if (diffH < 1) return 'Just now'
-  if (diffH < 24) return `${diffH}h ago`
-
-  const diffD = Math.floor(diffH / 24)
-  if (diffD === 1) {
-    return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-  }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (date >= today) return 'today'
+  if (date >= yesterday) return 'yesterday'
+  return 'older'
 }
