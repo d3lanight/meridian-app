@@ -1,5 +1,5 @@
 // ━━━ MisalignmentFramingCard ━━━
-// v1.0.0 · ca-story61 · 2026-02-25
+// v1.1.0 · ca-story-design-refresh · Sprint 24
 // Regime-aware misalignment framing for the portfolio allocation card.
 // Shows when any allocation category deviates > THRESHOLD from regime target bands.
 // Consequence text sourced from payload_knowledge_entries via /api/glossary.
@@ -149,15 +149,13 @@ export default function MisalignmentFramingCard({ snapshot, regime }: Misalignme
   }
   const consequenceText = consequence?.summary ?? (!loadingConsequence ? FALLBACK_CONSEQUENCE[baseRegime] : null)
 
-  // Color: orange for moderate (10–20pp), deep orange for significant (>20pp)
+  // Color: accent for moderate (10–20pp), negative for significant (>20pp)
   const isSignificant = delta > 20
-  const accentColor = isSignificant ? M.accentDeep : M.accent
-  const bgColor = isSignificant
-    ? 'rgba(231,111,81,0.06)'
-    : 'rgba(244,162,97,0.06)'
+  const accentColor = isSignificant ? M.negative : M.accent
+  const bgColor = isSignificant ? M.negativeDim : M.accentDim
   const borderColor = isSignificant
     ? 'rgba(231,111,81,0.2)'
-    : 'rgba(244,162,97,0.2)'
+    : M.borderAccent
 
   return (
     <div

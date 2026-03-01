@@ -1,31 +1,31 @@
 // ━━━ Meridian Design Tokens ━━━
-// v2.0.0 · ca-story66 · 2026-02-21
-// Meridian v2: Light/warm theme with glassmorphic surfaces
+// v3.0.0 · ca-story-design-refresh · 2026-03-01
+// Meridian v3: Cool Stone bg + Indigo Violet accent
 // Centralized token map for inline styles. Tailwind config mirrors these.
 
 export const M = {
-  // Backgrounds
-  bg: 'linear-gradient(135deg, #F5F1ED, #E8DED6)',
-  bgFlat: '#F5F1ED',
+  // Backgrounds — Cool Stone
+  bg: 'linear-gradient(135deg, #F0EFF2, #E4E1E8)',
+  bgFlat: '#F0EFF2',
   surface: 'rgba(255,255,255,0.6)',
   surfaceHover: 'rgba(255,255,255,0.8)',
-  surfaceLight: '#E8DED6',
+  surfaceLight: '#E4E1E8',
   surfaceElevated: 'rgba(255,255,255,0.9)',
   surfaceBlur: 'blur(12px)',
 
   // Borders
   border: 'rgba(255,255,255,0.8)',
-  borderSubtle: '#E8DED6',
-  borderAccent: 'rgba(244,162,97,0.2)',
+  borderSubtle: '#E4E1E8',
+  borderAccent: 'rgba(90,77,138,0.3)',
   borderPositive: 'rgba(42,157,143,0.3)',
 
-  // Accent
-  accent: '#F4A261',
-  accentDeep: '#E76F51',
-  accentGradient: 'linear-gradient(90deg, #F4A261, #E76F51)',
-  accentDim: 'rgba(244,162,97,0.15)',
-  accentMuted: 'rgba(244,162,97,0.12)',
-  accentGlow: 'rgba(244,162,97,0.06)',
+  // Accent — Indigo Violet
+  accent: '#7B6FA8',
+  accentDeep: '#5A4D8A',
+  accentGradient: 'linear-gradient(90deg, #7B6FA8, #5A4D8A)',
+  accentDim: 'rgba(123,111,168,0.18)',
+  accentMuted: 'rgba(123,111,168,0.12)',
+  accentGlow: 'rgba(90,77,138,0.35)',
 
   // Semantic
   positive: '#2A9D8F',

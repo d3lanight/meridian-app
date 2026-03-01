@@ -1,5 +1,5 @@
 // ━━━ EntrySignal ━━━
-// v1.0.0 · ca-story83 · Sprint 20
+// v1.1.0 · ca-story-design-refresh · Sprint 24
 
 'use client'
 
@@ -14,7 +14,7 @@ const SEVERITY_STYLES = {
     dot: M.positive,
   },
   watch: {
-    bg: 'rgba(244,162,97,0.06)',
+    bg: M.accentDim,
     border: M.borderAccent,
     dot: M.accent,
   },

@@ -1,12 +1,13 @@
 // ━━━ Protected Layout ━━━
-// v0.5.0 · ca-story66 · 2026-02-21
-// Meridian v2: warm cream gradient, glassmorphic nav
+// v0.6.0 · ca-story-design-refresh · Sprint 24
+// Meridian v3: Cool Stone gradient, glassmorphic nav
 'use client';
 
 import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/navigation/BottomNav';
 import type { NavTab } from '@/types';
 import { PrivacyProvider } from '@/contexts/PrivacyContext';
+import { M } from '@/lib/meridian';
 
 function getTabFromPath(pathname: string): NavTab {
   if (pathname.startsWith('/portfolio')) return 'portfolio';
@@ -35,7 +36,7 @@ export default function ProtectedLayout({
 
 return (
   <PrivacyProvider>
-    <div className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden" style={{ background: "linear-gradient(135deg, #F5F1ED, #E8DED6)" }}>
+    <div className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden" style={{ background: M.bg }}>
       {children}
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>

@@ -1,6 +1,6 @@
 // ━━━ Shared UI Helpers ━━━
-// v1.0.0 · ca-story78 · Sprint 19
-// Extracted from dashboard, market, portfolio pages
+// v1.1.0 · ca-story-design-refresh · Sprint 24
+// v1.1: Range regime color → neutral taupe (decoupled from accent)
 
 import { M } from '@/lib/meridian'
 
@@ -24,7 +24,7 @@ export function regimeIconBg(regime: string): string {
   if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
   if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
   if (r.includes('volat')) return 'linear-gradient(135deg, #D4A017, rgba(212,160,23,0.8))'
-  return 'linear-gradient(135deg, #F4A261, rgba(244,162,97,0.8))'
+  return 'linear-gradient(135deg, #8B7565, rgba(139,117,101,0.8))'
 }
 
 // ── Regime Narrative ──────────────────────────

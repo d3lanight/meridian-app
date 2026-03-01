@@ -1,7 +1,7 @@
 // ━━━ Regime Utilities ━━━
-// v1.0.0 · ca-story79 · Sprint 19
+// v1.1.0 · ca-story-design-refresh · Sprint 24
 // Pure functions for regime timeline processing
-// Source: Designer artifact regime-history-production.jsx
+// v1.1: Range regime color → neutral taupe (decoupled from accent)
 
 // ── Types ─────────────────────────────────────
 
@@ -68,7 +68,7 @@ export interface RegimeConfig {
 export const REGIMES: Record<string, RegimeConfig> = {
   bull:     { bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)', s: '#2A9D8F', d: 'rgba(42,157,143,0.12)',  l: 'Bull',     icon: '↗' },
   bear:     { bg: 'linear-gradient(135deg,#E76F51,#F08C70)', s: '#E76F51', d: 'rgba(231,111,81,0.12)',  l: 'Bear',     icon: '↘' },
-  range:    { bg: 'linear-gradient(135deg,#F4A261,#F7B87A)', s: '#F4A261', d: 'rgba(244,162,97,0.12)',  l: 'Range',    icon: '→' },
+  range:    { bg: 'linear-gradient(135deg,#8B7565,#A08979)', s: '#8B7565', d: 'rgba(139,117,101,0.12)', l: 'Range',    icon: '→' },
   volatile: { bg: 'linear-gradient(135deg,#D4A017,#E8B84B)', s: '#D4A017', d: 'rgba(212,160,23,0.12)', l: 'Volatile', icon: '↕' },
 }
 

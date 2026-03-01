@@ -44,7 +44,7 @@ export default function AggSection({ agg }: AggSectionProps) {
       <div
         style={{
           ...card({ padding: '16px' }),
-          background: M.accentGlow,
+          background: M.accentMuted,
           border: `1px solid ${M.borderAccent}`,
         }}
       >

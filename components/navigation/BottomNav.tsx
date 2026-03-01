@@ -1,5 +1,5 @@
 // ━━━ Bottom Navigation ━━━
-// v0.6.0 · design-unification · 2026-02-22
+// v0.7.0 · ca-story-design-refresh · Sprint 24
 // Label updates: Home→Today, Market→Pulse (matches v2 design artifacts)
 'use client';
 
@@ -54,7 +54,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                     width: '32px',
                     height: '2px',
                     borderRadius: '2px',
-                    background: 'linear-gradient(90deg, #F4A261, #E76F51)',
+                    background: M.accentGradient,
                   }}
                 />
               )}
@@ -64,13 +64,13 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
                 className="w-10 h-10 rounded-[14px] flex items-center justify-center transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
                 style={{
                   background: isActive
-                    ? 'linear-gradient(135deg, rgba(244,162,97,0.15), rgba(231,111,81,0.15))'
+                    ? `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})`
                     : 'transparent',
                 }}
               >
                 <Icon
                   size={20}
-                  color={isActive ? '#E76F51' : M.textMuted}
+                  color={isActive ? M.accentDeep : M.textMuted}
                   strokeWidth={isActive ? 2.5 : 2}
                   className="transition-all duration-[250ms] ease-out"
                 />

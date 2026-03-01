@@ -1,5 +1,5 @@
 // ━━━ Asset Picker v2 — Top 20 + API search ━━━
-// v2.0.0 · ca-story111 · 2026-03-01
+// v2.1.0 · ca-story-design-refresh · Sprint 24
 // Default: top 20 by market cap rank from /api/assets
 // On type: searches /api/asset-search (local 201 + CoinGecko fallback)
 // Uses asset_mapping.name and icon_url instead of hardcoded map
@@ -225,7 +225,7 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                       className="w-10 h-10 rounded-full items-center justify-center text-xs font-semibold"
                       style={{
                         display: asset.icon_url ? 'none' : 'flex',
-                        background: `linear-gradient(135deg, ${M.accentMuted}, rgba(231,111,81,0.15))`,
+                        background: `linear-gradient(135deg, ${M.accentMuted}, ${M.accentDim})`,
                         color: M.accent,
                       }}
                     >

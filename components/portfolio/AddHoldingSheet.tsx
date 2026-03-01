@@ -1,5 +1,5 @@
 // ━━━ Add Holding Sheet — Asset select → Quantity → Confirm ━━━
-// v1.0.0 · ca-story48 · 2026-02-21
+// v1.1.0 · ca-story-design-refresh · Sprint 24
 // Meridian v2: glassmorphic, warm theme, progress steps
 
 'use client';
@@ -92,7 +92,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
         <div className="flex-1 h-1 rounded-full" style={{ background: M.positive }} />
         <div
           className="flex-1 h-1 rounded-full"
-          style={{ background: `linear-gradient(90deg, ${M.accent}, ${M.negative})` }}
+          style={{ background: M.accentGradient }}
         />
       </div>
 
@@ -101,8 +101,8 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
         <div
           className="rounded-3xl p-4 mb-5"
           style={{
-            background: `linear-gradient(135deg, ${M.accentMuted}, rgba(231,111,81,0.1))`,
-            border: `1px solid rgba(244,162,97,0.2)`,
+            background: `linear-gradient(135deg, ${M.accentMuted}, ${M.accentDim})`,
+            border: `1px solid ${M.borderAccent}`,
           }}
         >
           <div className="flex items-center gap-3 mb-3">
@@ -110,7 +110,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
               {selected?.icon_url ? (
                 <img src={selected.icon_url} alt={selected.symbol} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
               ) : (
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: M.accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
                   {selected?.symbol?.slice(0, 3)}
                 </div>
               )}
@@ -123,7 +123,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           <button
             onClick={() => { setStep('select'); setQty(''); setCostBasis(''); }}
             className="bg-transparent border-none text-xs font-medium cursor-pointer p-0 flex items-center gap-1"
-            style={{ color: M.negative }}
+            style={{ color: M.accentDeep }}
           >
             <ChevronLeft size={14} /> Change asset
           </button>
@@ -188,9 +188,9 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           disabled={!isValid || saving}
           className="w-full rounded-2xl py-4 border-none text-base font-medium cursor-pointer flex items-center justify-center gap-2 transition-opacity"
           style={{
-            background: `linear-gradient(90deg, ${M.accent}, ${M.negative})`,
+            background: M.accentGradient,
             color: 'white',
-            boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+            boxShadow: `0 4px 16px ${M.accentGlow}`,
             opacity: (!isValid || saving) ? 0.5 : 1,
           }}
         >

@@ -1,5 +1,5 @@
 // ━━━ EntryPosture ━━━
-// v1.0.0 · ca-story83 · Sprint 20
+// v1.1.0 · ca-story-design-refresh · Sprint 24
 
 'use client'
 
@@ -19,7 +19,7 @@ export default function EntryPosture({
     <div
       style={{
         ...card({
-          background: 'linear-gradient(135deg, rgba(244,162,97,0.06), rgba(231,111,81,0.04))',
+          background: `linear-gradient(135deg, ${M.accentDim}, ${M.accentGlow})`,
           border: `1px solid ${M.borderAccent}`,
           padding: '16px 18px',
         }),

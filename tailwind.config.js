@@ -8,12 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: '#F5F1ED',
+        bg: '#F0EFF2',
         surface: 'rgba(255,255,255,0.6)',
-        'surface-light': '#E8DED6',
+        'surface-light': '#E4E1E8',
         'surface-elevated': 'rgba(255,255,255,0.9)',
-        accent: '#F4A261',
-        'accent-deep': '#E76F51',
+        accent: '#7B6FA8',
+        'accent-deep': '#5A4D8A',
         positive: '#2A9D8F',
         negative: '#E76F51',
         neutral: '#8B7565',

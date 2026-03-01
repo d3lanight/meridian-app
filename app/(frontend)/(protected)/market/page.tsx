@@ -578,7 +578,7 @@ export default function MarketPulsePage() {
                       backdropFilter: period === d ? 'none' : M.surfaceBlur,
                       WebkitBackdropFilter: period === d ? 'none' : M.surfaceBlur,
                       color: period === d ? 'white' : M.textMuted,
-                      boxShadow: period === d ? '0 2px 8px rgba(231,111,81,0.2)' : 'none',
+                      boxShadow: period === d ? `0 2px 8px ${M.accentGlow}` : 'none',
                       transition: 'all 0.2s ease',
                     }}
                   >
@@ -657,7 +657,7 @@ export default function MarketPulsePage() {
                         <div style={{
                           ...card({ padding: '12px' }),
                           marginBottom: 12,
-                          background: 'rgba(244,162,97,0.05)',
+                          background: M.accentDim,
                           border: `1px solid ${M.borderAccent}`,
                         }}>
                           <p style={{ fontSize: 11, color: M.textSecondary, margin: 0, lineHeight: 1.5 }}>
@@ -683,7 +683,7 @@ export default function MarketPulsePage() {
                       <div style={{
                         marginTop: 16,
                         padding: 12,
-                        background: 'rgba(244,162,97,0.05)',
+                        background: M.accentDim,
                         borderRadius: 12,
                       }}>
                         <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>
@@ -763,7 +763,7 @@ export default function MarketPulsePage() {
                   style={{
                     flex: 1,
                     height: 32,
-                    background: volLabel === 'Low' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                    background: volLabel === 'Low' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : M.surfaceLight,
                     borderRadius: 4,
                     opacity: volLabel === 'Low' ? 1 : 0.3,
                   }}
@@ -772,7 +772,7 @@ export default function MarketPulsePage() {
                   style={{
                     flex: 1,
                     height: 32,
-                    background: volLabel === 'Moderate' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                    background: volLabel === 'Moderate' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : M.surfaceLight,
                     borderRadius: 4,
                     opacity: volLabel === 'Moderate' ? 1 : 0.3,
                   }}
@@ -781,7 +781,7 @@ export default function MarketPulsePage() {
                   style={{
                     flex: 1,
                     height: 32,
-                    background: volLabel === 'High' ? 'linear-gradient(90deg, #E76F51, rgba(231,111,81,0.8))' : '#E8DED6',
+                    background: volLabel === 'High' ? 'linear-gradient(90deg, #E76F51, rgba(231,111,81,0.8))' : M.surfaceLight,
                     borderRadius: 4,
                     opacity: volLabel === 'High' ? 1 : 0.3,
                   }}
@@ -822,7 +822,7 @@ export default function MarketPulsePage() {
             <div
               style={{
                 ...card({
-                  background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
+                  background: `linear-gradient(135deg, ${M.accentDim}, ${M.accentGlow})`,
                   border: `1px solid ${M.borderAccent}`,
                 }),
                 ...anim(mounted, 5),
@@ -834,7 +834,7 @@ export default function MarketPulsePage() {
                     width: 32,
                     height: 32,
                     borderRadius: '50%',
-                    background: 'rgba(244,162,97,0.2)',
+                    background: M.accentDim,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

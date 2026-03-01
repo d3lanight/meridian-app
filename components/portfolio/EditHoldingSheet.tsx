@@ -1,5 +1,5 @@
 // ━━━ Edit Holding Sheet — Update quantity, cost basis, exposure toggle, remove ━━━
-// v1.1.0 · ca-story48 · 2026-02-21
+// v1.2.0 · ca-story-design-refresh · Sprint 24
 // Meridian v2: glassmorphic, warm theme
 // Fix: toggle + save button state tracking
 
@@ -110,8 +110,8 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
         <div
           className="rounded-3xl p-4 mb-5"
           style={{
-            background: `linear-gradient(135deg, ${M.accentMuted}, rgba(231,111,81,0.1))`,
-            border: '1px solid rgba(244,162,97,0.2)',
+            background: `linear-gradient(135deg, ${M.accentMuted}, ${M.accentDim})`,
+            border: `1px solid ${M.borderAccent}`,
           }}
         >
           <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
               {(holding as any).asset_mapping?.icon_url ? (
                 <img src={(holding as any).asset_mapping.icon_url} alt={holding.asset} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
               ) : (
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: M.accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
                   {holding.asset.slice(0, 3)}
                 </div>
               )}
@@ -198,7 +198,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
               height: 28,
               borderRadius: 28,
               background: includeExposure
-                ? `linear-gradient(90deg, ${M.accent}, ${M.negative})`
+                ? M.accentGradient
                 : M.surfaceLight,
               transition: 'background 0.2s ease',
             }}
@@ -234,9 +234,9 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
           disabled={!isValid || saving || !hasChanges}
           className="w-full rounded-2xl py-4 border-none text-base font-medium cursor-pointer flex items-center justify-center gap-2 transition-opacity mb-4"
           style={{
-            background: `linear-gradient(90deg, ${M.accent}, ${M.negative})`,
+            background: M.accentGradient,
             color: 'white',
-            boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+            boxShadow: `0 4px 16px ${M.accentGlow}`,
             opacity: (!isValid || saving || !hasChanges) ? 0.5 : 1,
           }}
         >

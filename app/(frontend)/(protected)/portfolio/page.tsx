@@ -336,7 +336,7 @@ if (snapshotError && !holdingsLoading) {
           style={{
             ...card({
               background:
-                'linear-gradient(135deg, rgba(244,162,97,0.08), rgba(231,111,81,0.06))',
+                `linear-gradient(135deg, ${M.accentDim}, ${M.accentGlow})`,
               border: `1px solid ${M.borderAccent}`,
             }),
             display: 'flex',
@@ -353,7 +353,7 @@ if (snapshotError && !holdingsLoading) {
               height: 64,
               borderRadius: '50%',
               background:
-                'linear-gradient(135deg, rgba(244,162,97,0.15), rgba(231,111,81,0.15))',
+                `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -398,7 +398,7 @@ if (snapshotError && !holdingsLoading) {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
+              boxShadow: `0 4px 16px ${M.accentGlow}`,
             }}
           >
             <Plus size={20} color="white" strokeWidth={2.5} /> Add a coin
@@ -514,7 +514,7 @@ if (snapshotError && !holdingsLoading) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(231,111,81,0.25)',
+              boxShadow: `0 4px 12px ${M.accentGlow}`,
             }}
           >
             <Plus size={20} color="white" strokeWidth={2.5} />
@@ -754,7 +754,7 @@ if (snapshotError && !holdingsLoading) {
               {h.include_in_exposure && (
                 <div style={{
                   marginTop: 10, padding: '8px 10px', borderRadius: 12,
-                  background: 'linear-gradient(135deg, rgba(42,157,143,0.04), rgba(244,162,97,0.04))',
+                  background: 'linear-gradient(135deg, rgba(42,157,143,0.04), M.accentDim})',
                   border: '1px solid rgba(42,157,143,0.08)',
                   position: 'relative', overflow: 'hidden',
                 }}>
@@ -762,7 +762,7 @@ if (snapshotError && !holdingsLoading) {
                   <div style={{ display: 'flex', gap: 2, marginBottom: 6, filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}>
                     {[
                       { w: '35%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
-                      { w: '15%', bg: 'linear-gradient(90deg,#F4A261,#F7B87A)' },
+                      { w: '15%', bg: 'linear-gradient(90deg,#8B7565,#A08979)' },
                       { w: '25%', bg: 'linear-gradient(90deg,#2A9D8F,#5CC4B5)' },
                       { w: '10%', bg: 'linear-gradient(90deg,#E76F51,#F08C70)' },
                       { w: '15%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
