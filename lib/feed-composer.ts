@@ -4,6 +4,7 @@
 
 import type { FeedEntry } from '@/lib/feed-types'
 import type { RegimeData, PortfolioData, MarketMetrics, Signal } from '@/types'
+import { generateInsights } from "@/lib/insight-engine"
 
 interface FeedSources {
   // Market (always available)
@@ -95,38 +96,11 @@ export function composeFeed(sources: FeedSources): ComposedFeed {
     showEmptyPortfolioCTA = true
   }
 
-  // ── 5. Portfolio insight (auth only, template-driven) ──
+  // ── 5. Portfolio insights (auth only, engine-driven) ──
   if (isAuthed && sources.portfolio && sources.regime && sources.hasHoldings !== false) {
-    const p = sources.portfolio
-    const r = sources.regime
-    if (p.allocations.length > 0) {
-      const btcAlloc = p.allocations.find(a => a.asset === 'BTC')
-      if (btcAlloc && Math.abs(btcAlloc.current - btcAlloc.target) > 3) {
-        const diff = btcAlloc.current - btcAlloc.target
-        entries.push({
-          type: 'insight',
-          data: {
-            icon: 'zap',
-            iconVariant: 'accent',
-            text: `Your BTC allocation is ${btcAlloc.current}% — ${diff > 0 ? 'above' : 'below'} the ${btcAlloc.target}% target for a ${r.current.toLowerCase()} environment.`,
-            link: true,
-          },
-        })
-      }
-
-      // ETH insight if present
-      const ethAlloc = p.allocations.find(a => a.asset === 'ETH')
-      if (ethAlloc && Math.abs(ethAlloc.current - ethAlloc.target) > 5) {
-        const diff = ethAlloc.current - ethAlloc.target
-        entries.push({
-          type: 'insight',
-          data: {
-            icon: 'shield',
-            iconVariant: 'eth',
-            text: `ETH is at ${ethAlloc.current}% — ${Math.abs(diff).toFixed(0)}% ${diff > 0 ? 'above' : 'below'} target for this regime.`,
-          },
-        })
-      }
+    const insights = generateInsights(sources.regime, sources.portfolio, 4)
+    for (const insight of insights) {
+      entries.push({ type: "insight", data: insight })
     }
   }
 
