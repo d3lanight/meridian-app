@@ -1,124 +1,44 @@
-// v1.0.0 · ca-story78 · Sprint 19
-// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
+// ━━━ Today — Journal Feed ━━━
+// v2.0.0 · ca-story83 · Sprint 20
+// Rebuild: static card layout → scrollable journal feed
+// 9 entry types assembled by feed-composer.ts
+
 'use client'
 
-import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Minus, RefreshCw, Wifi, WifiOff, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react'
-import ProgressiveDisclosure, { DisclosureGroup } from '@/components/education/ProgressiveDisclosure'
+import { useEffect, useState, useMemo } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { createClient } from '@/lib/supabase/client'
 import { useMarketData } from '@/hooks/useMarketData'
-import MeridianMark from '@/components/brand/MeridianMark'
 import DevTools from '@/components/dev/DevTools'
-import { card, regimeIconBg, regimeNarrative, postureNarrative, anim } from '@/lib/ui-helpers'
-import GradientBar from '@/components/shared/GradientBar'
-import RegimeIcon from '@/components/shared/RegimeIcon'
-
-// ── Shared Helpers ────────────────────────────
-
-
-
-// ── Signal Card (v2 dot style) ────────────────
-
-type SignalTier = 'info' | 'watch' | 'actionable'
-
-const SIGNAL_STYLES: Record<SignalTier, { bg: string; border: string; dot: string }> = {
-  info: { bg: 'rgba(42,157,143,0.05)', border: 'rgba(42,157,143,0.2)', dot: M.positive },
-  watch: { bg: 'rgba(244,162,97,0.05)', border: 'rgba(244,162,97,0.2)', dot: M.accent },
-  actionable: { bg: 'rgba(231,111,81,0.05)', border: 'rgba(231,111,81,0.2)', dot: M.accentDeep },
-}
-
-function DashSignalCard({
-  type,
-  title,
-  desc,
-  time,
-}: {
-  type: SignalTier
-  title: string
-  desc: string
-  time: string
-}) {
-  const c = SIGNAL_STYLES[type] || SIGNAL_STYLES.info
-  return (
-    <div style={{ background: c.bg, borderRadius: 20, padding: 16, border: `1px solid ${c.border}` }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: c.dot,
-            marginTop: 6,
-            flexShrink: 0,
-          }}
-        />
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 4 }}>{title}</div>
-          <p style={{ fontSize: 12, color: M.textSecondary, lineHeight: 1.5, margin: '0 0 6px' }}>{desc}</p>
-          <div style={{ fontSize: 10, color: M.textMuted }}>{time}</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Regime icon helper ────────────────────────
-
-
-
-// ── Severity mapping ──────────────────────────
-
-function severityToTier(severity: number): SignalTier {
-  if (severity >= 70) return 'actionable'
-  if (severity >= 50) return 'watch'
-  return 'info'
-}
-
-// ── Posture helpers ───────────────────────────
-
-
-
-// ── Confidence Trend (S55) ────────────────────
-
-interface ConfidenceTrend {
-  direction: 'rising' | 'declining' | 'stable'
-  streak: number
-}
-
-function ConfidenceTrendIndicator({ trend }: { trend: ConfidenceTrend | null }) {
-  if (!trend || trend.streak === -1) {
-    // No trend data or insufficient data — show nothing
-    return null
-  }
-
-  const config = {
-    rising: { Icon: ArrowUp, color: M.positive, label: `Rising for ${trend.streak} days` },
-    declining: { Icon: ArrowDown, color: M.negative, label: `Declining for ${trend.streak} days` },
-    stable: { Icon: ArrowRight, color: M.textMuted, label: 'Stable' },
-  }
-
-  const { Icon, color, label } = config[trend.direction]
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-      <Icon size={11} color={color} strokeWidth={2.5} />
-      <span style={{ fontSize: 11, color, fontWeight: 500 }}>{label}</span>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════
-// MAIN PAGE
-// ═══════════════════════════════════════════════
+import { anim } from '@/lib/ui-helpers'
+import { composeFeed } from '@/lib/feed-composer'
+import type { FeedEntry } from '@/lib/feed-types'
+import type { MarketMetrics } from '@/types'
+import {
+  EntryGreeting,
+  EntryRegime,
+  EntryPricePair,
+  EntryPosture,
+  EntryInsight,
+  EntryMarketSnippet,
+  EntrySignal,
+  EntryLearn,
+  EntryDivider,
+} from '@/components/feed'
+import type { ScenarioId } from '@/lib/demo-data'
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
   const [isAnon, setIsAnon] = useState(true)
-  const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
+  const [hidden, setHidden] = useState(false)
+  const [metrics, setMetrics] = useState<MarketMetrics | null>(null)
+  const [prices, setPrices] = useState<{
+    btcPrice: number; btcChange: number; ethPrice: number; ethChange: number
+  } | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
-  const [postureExplainer, setPostureExplainer] = useState<string>('A score reflecting how well your portfolio aligns with the current market regime.')
-  const [signalExplainer, setSignalExplainer] = useState<string>('A notification triggered by a change in regime, posture, or market condition.')
+
   const {
     scenario,
     activeScenario,
@@ -135,31 +55,65 @@ export default function DashboardPage() {
     return () => clearTimeout(t)
   }, [])
 
+  // Auth check + user name
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
       setIsAnon(!user)
+      if (user?.user_metadata?.display_name) {
+        setUserName(user.user_metadata.display_name)
+      } else if (user?.email) {
+        setUserName(user.email.split('@')[0])
+      }
     })
   }, [])
 
-  // S55: Fetch confidence trend from /api/market
+  // Fetch metrics + prices from /api/market
   useEffect(() => {
-    async function fetchTrend() {
+    async function fetchMarket() {
       try {
         const res = await fetch('/api/market')
         if (res.ok) {
           const json = await res.json()
-          if (json.confidenceTrend) {
-            setConfidenceTrend(json.confidenceTrend)
+          if (json.metrics) setMetrics(json.metrics)
+          // Extract prices from regime data
+          if (json.regime) {
+            const r = json.regime
+            // Prices come from the raw regime row — extract from trend string or use API
+            // For now, use a separate price fetch
           }
         }
       } catch {
-        // Non-critical — trend indicator just won't show
+        // Non-critical
       }
     }
-    fetchTrend()
+    fetchMarket()
   }, [])
-  
-  // S58: Fetch regime explainer from glossary
+
+  // Fetch current prices
+  useEffect(() => {
+    async function fetchPrices() {
+      try {
+        const res = await fetch('/api/market-context?days=7')
+        if (res.ok) {
+          const json = await res.json()
+          const latest = json.regimes?.[0]
+          if (latest) {
+            setPrices({
+              btcPrice: latest.price_now,
+              btcChange: (latest.r_1d ?? 0) * 100,
+              ethPrice: latest.eth_price_now,
+              ethChange: (latest.eth_r_7d ?? 0) * 100,
+            })
+          }
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+    fetchPrices()
+  }, [])
+
+  // Fetch regime explainer from glossary
   useEffect(() => {
     if (!scenario?.regime?.current) return
     const rid = scenario.regime.current.toLowerCase().replace(/\s+/g, '')
@@ -172,389 +126,163 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [scenario?.regime?.current])
 
-  // S59: Fetch posture + signal glossary entries
-  useEffect(() => {
-  Promise.all([
-    fetch('/api/glossary?slug=glossary-posture').then(r => r.ok ? r.json() : null),
-    fetch('/api/glossary?slug=glossary-signal').then(r => r.ok ? r.json() : null),
-  ]).then(([posture, signal]) => {
-    if (posture?.summary) setPostureExplainer(posture.summary)
-    if (signal?.summary) setSignalExplainer(signal.summary)
-  }).catch(() => {})
-}, [])
-
-
+  // ── Compose feed ──
   const { regime, portfolio, signals } = scenario
-  const postureScore = Math.max(0, 100 - portfolio.misalignment)
-  const postureIsAligned = portfolio.posture === 'Aligned'
-
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  const feed: FeedEntry[] = useMemo(
+    () =>
+      composeFeed({
+        regime,
+        metrics,
+        btcPrice: prices?.btcPrice,
+        btcChange: prices?.btcChange,
+        ethPrice: prices?.ethPrice,
+        ethChange: prices?.ethChange,
+        persistence: regime?.persistence,
+        portfolio: isAnon ? null : portfolio,
+        signals: isAnon ? [] : signals,
+        userName: isAnon ? null : userName,
+        regimeExplainer,
+      }),
+    [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer]
+  )
 
   return (
-    <DisclosureGroup>
-      <DevTools
-        activeScenario={activeScenario === 'live' ? 'bull' : activeScenario}
+    <>
+     <DevTools
+        activeScenario={activeScenario as ScenarioId}
         onScenarioChange={setScenario}
       />
 
-      {/* ── Header ── */}
-      <div className="px-5 pt-5 pb-1" style={anim(mounted, 0)}>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2.5">
-            <MeridianMark size={28} />
-            <span
-              className="font-display text-lg font-medium"
-              style={{ letterSpacing: '-0.02em', color: M.text }}
-            >
-              Meridian
-            </span>
-            <div
-              className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-              style={{
-                color: isLive ? M.positive : M.textMuted,
-                background: isLive ? M.positiveDim : M.neutralDim,
-              }}
-            >
-              {isLive ? <Wifi size={10} /> : <WifiOff size={10} />}
-              {isLive ? 'LIVE' : 'DEMO'}
-            </div>
-          </div>
-          <button
-            onClick={refresh}
-            disabled={isLoading}
-            className="text-[11px] font-medium rounded-xl px-2.5 py-[5px] flex items-center gap-1.5 border-none cursor-pointer"
-            style={{
-              color: M.textMuted,
-              background: 'rgba(255,255,255,0.4)',
-            }}
-          >
-            <RefreshCw size={11} className={isLoading ? 'animate-spin' : ''} />
-            {lastAnalysis}
-          </button>
-        </div>
-        {error && (
-          <div
-            className="mt-2 text-[11px] px-3 py-2 rounded-xl"
-            style={{ color: M.negative, background: M.negativeDim }}
-          >
-            Failed to load live data — showing demo. {error}
-          </div>
-        )}
-      </div>
-
-      {/* ── Page Title (matches artifact) ── */}
-      <div style={{ padding: '12px 20px 0', ...anim(mounted, 1) }}>
-        <h1
+      <div style={{ padding: '24px 20px 0' }}>
+        {/* ── Header with privacy toggle ── */}
+        <div
           style={{
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: 24,
-            fontWeight: 500,
-            color: M.text,
-            margin: '0 0 4px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 4,
+            ...anim(mounted, 0),
           }}
         >
-          Today
-        </h1>
-        <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>{today}</p>
-      </div>
-
-      {/* ── Content ── */}
-      {isLoading && !mounted ? (
-        <div className="px-5 pt-5 space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-3xl animate-pulse"
-              style={{ background: M.surfaceLight, height: i === 1 ? 200 : 140 }}
-            />
-          ))}
+          <button
+            onClick={() => setHidden(!hidden)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 4,
+              borderRadius: 8,
+            }}
+          >
+            {hidden ? (
+              <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
+            ) : (
+              <Eye size={16} color={M.textMuted} strokeWidth={2} />
+            )}
+          </button>
         </div>
-      ) : (
-        <div style={{ padding: '20px 20px 0' }}>
 
-          {/* ── Market Regime Card ── */}
-          <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 2) }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: 16,
-              }}
-            >
-              <div>
-                <ProgressiveDisclosure
-                  id="regime"
-                  summary={
-                    <span style={{ fontSize: 12, color: M.textMuted }}>Market Regime</span>
-                  }
-                  context={regimeExplainer?.summary ?? 'The current market condition based on BTC momentum and volatility.'}
-                  learnMoreHref={regimeExplainer ? `/profile/learn/glossary#${regimeExplainer.slug}` : undefined}
-                />
-                <div
-                  style={{
-                    fontFamily: "'Outfit', sans-serif",
-                    fontSize: 24,
-                    fontWeight: 600,
-                    color: M.text,
-                  }}
-                >
-                  {regime.current}
-                </div>
-              </div>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: '50%',
-                  background: regimeIconBg(regime.current),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <RegimeIcon regime={regime.current} />
-              </div>
-            </div>
-            <p
-              style={{
-                fontSize: 14,
-                color: M.textSecondary,
-                lineHeight: 1.6,
-                margin: '0 0 16px',
-              }}
-            >
-              {regimeNarrative(regime.current)}
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1, background: M.positiveDim, borderRadius: 16, padding: 12 }}>
-                <div style={{ fontSize: 10, color: M.textMuted, marginBottom: 4 }}>Strength</div>
-                <div
-                  style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: M.text,
-                  }}
-                >
-                  {regime.trend}
-                </div>
-              </div>
-              <div style={{ flex: 1, background: M.positiveDim, borderRadius: 16, padding: 12 }}>
-                <div style={{ fontSize: 10, color: M.textMuted, marginBottom: 4 }}>Confidence</div>
-                <div
-                  style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: M.text,
-                  }}
-                >
-                  {regime.confidence}%
-                </div>
-                {/* S55: Confidence trend indicator */}
-                <ConfidenceTrendIndicator trend={confidenceTrend} />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Portfolio Section (auth-gated) ── */}
-          {isAnon ? (
-            <div
-              style={{
-                ...card({
-                  background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
-                  border: `1px solid ${M.borderAccent}`,
-                }),
-                textAlign: 'center' as const,
-                padding: '32px 20px',
-                ...anim(mounted, 3),
-              }}
-            >
-              <div style={{
-                width: 56, height: 56, borderRadius: '50%',
-                background: M.accentDim,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 14px',
-              }}>
-                <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke={M.accentDeep} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
-              <h3 style={{
-                fontFamily: "'Outfit', sans-serif",
-                fontSize: 18, fontWeight: 500, color: M.text,
-                margin: '0 0 8px',
-              }}>
-                Track your portfolio
-              </h3>
-              <p style={{
-                fontSize: 13, color: M.textSecondary,
-                lineHeight: 1.6, margin: '0 auto 18px', maxWidth: 280,
-              }}>
-                See how your holdings align with the current market regime — posture scoring, signals, and allocation insights.
-              </p>
-              <a
-                href="/login"
-                style={{
-                  display: 'inline-block',
-                  padding: '12px 28px',
-                  background: M.accentGradient,
-                  color: 'white',
-                  borderRadius: 16,
-                  fontSize: 14,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  boxShadow: '0 4px 16px rgba(231,111,81,0.3)',
-                }}
-              >
-                Create free account
-              </a>
-            </div>
-          ) : (
-            <>
-              {/* ── Portfolio Posture Card ── */}
-              <div
-                style={{
-                  ...card({
-                    background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
-                    border: `1px solid ${M.borderAccent}`,
-                  }),
-                  marginBottom: 16,
-                  ...anim(mounted, 3),
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: 16,
-                  }}
-                >
-                  <div>
-                   <ProgressiveDisclosure
-                    id="posture"
-                    summary={
-                      <span style={{ fontSize: 12, color: M.textMuted }}>Portfolio Posture</span>
-                      }
-                    context={postureExplainer}
-                    learnMoreHref="/profile/learn/glossary#glossary-posture"
-                    />
-                    <div
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: 36,
-                        fontWeight: 600,
-                        color: M.text,
-                      }}
-                    >
-                      {postureScore}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: postureIsAligned ? M.positive : M.negative,
-                        fontWeight: 500,
-                        marginBottom: 4,
-                      }}
-                    >
-                      {portfolio.posture}
-                    </div>
-                    <div style={{ fontSize: 12, color: M.textSecondary }}>
-                      {portfolio.misalignment}% misaligned
-                    </div>
-                  </div>
-                </div>
-                <GradientBar pct={postureScore} />
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: M.textSecondary,
-                    lineHeight: 1.6,
-                    margin: '12px 0 0',
-                  }}
-                >
-                  {postureNarrative(portfolio.posture, regime.current)}
-                </p>
-              </div>
-
-              {/* ── Signals ── */}
-              <div style={anim(mounted,4)}>
-               <div style={{ margin: '0 0 12px' }}>
-                <ProgressiveDisclosure
-                 id="signals"
-                 summary={
-                 <h2
-                   style={{
-                    fontFamily: "'Outfit', sans-serif",
-                      fontSize: 18,
-                    fontWeight: 600,
-                  color: M.text,
-                    margin: 0,
-                  display: 'inline',
-                  }}
-                  >
-                  Signals
-                  </h2>
-                 }     
-                context={signalExplainer}
-                 learnMoreHref="/profile/learn/glossary#glossary-signal"
-                 />
-                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {signals.length === 0 ? (
-                    <div
-                      style={{
-                        ...card(),
-                        textAlign: 'center',
-                        padding: '24px 20px',
-                      }}
-                    >
-                      <div
-                        style={{ fontSize: 12, fontWeight: 500, color: M.textSecondary, marginBottom: 4 }}
-                      >
-                        No active signals
-                      </div>
-                      <div style={{ fontSize: 11, color: M.textMuted }}>Market conditions unchanged</div>
-                    </div>
-                  ) : (
-                    signals.map((signal) => (
-                      <DashSignalCard
-                        key={signal.id}
-                        type={severityToTier(signal.severity)}
-                        title={signal.asset}
-                        desc={signal.reason}
-                        time={signal.time}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── Last Updated ── */}
+        {/* ── Loading state ── */}
+        {isLoading && (
           <div
             style={{
               textAlign: 'center',
-              fontSize: 11,
+              padding: '60px 20px',
               color: M.textMuted,
-              padding: '16px 0 8px',
-              ...anim(mounted, 5),
+              fontSize: 14,
             }}
           >
-            Last analysis: {lastAnalysis}
+            Loading your feed...
           </div>
-        </div>
-      )}
-    </DisclosureGroup>
+        )}
+
+        {/* ── Error state ── */}
+        {error && !isLoading && (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '40px 20px',
+              color: M.textSecondary,
+              fontSize: 13,
+            }}
+          >
+            <p style={{ margin: '0 0 8px' }}>Couldn&apos;t load market data</p>
+            <button
+              onClick={refresh}
+              style={{
+                background: M.surface,
+                border: `1px solid ${M.border}`,
+                borderRadius: 12,
+                padding: '8px 16px',
+                fontSize: 12,
+                color: M.text,
+                cursor: 'pointer',
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* ── Feed ── */}
+        {!isLoading && !error && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              paddingBottom: 24,
+            }}
+          >
+            {feed.map((entry, i) => (
+              <div key={`${entry.type}-${i}`} style={anim(mounted, i * 0.3)}>
+                <FeedEntryRenderer entry={entry} hidden={hidden} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Timestamp ── */}
+        {lastAnalysis && !isLoading && (
+          <div
+            style={{
+              textAlign: 'center',
+              fontSize: 10,
+              color: M.textSubtle,
+              fontFamily: "'DM Mono', monospace",
+              padding: '0 0 16px',
+            }}
+          >
+            Last updated {lastAnalysis}
+          </div>
+        )}
+      </div>
+    </>
   )
+}
+
+// ── Feed Entry Renderer ──
+
+function FeedEntryRenderer({ entry, hidden }: { entry: FeedEntry; hidden: boolean }) {
+  switch (entry.type) {
+    case 'greeting':
+      return <EntryGreeting data={entry.data} />
+    case 'regime':
+      return <EntryRegime data={entry.data} />
+    case 'price_pair':
+      return <EntryPricePair data={entry.data} hidden={hidden} />
+    case 'posture':
+      return <EntryPosture data={entry.data} hidden={hidden} />
+    case 'insight':
+      return <EntryInsight data={entry.data} />
+    case 'market_snippet':
+      return <EntryMarketSnippet data={entry.data} />
+    case 'signal':
+      return <EntrySignal data={entry.data} />
+    case 'learn':
+      return <EntryLearn data={entry.data} />
+    case 'divider':
+      return <EntryDivider data={entry.data} />
+    default:
+      return null
+  }
 }
