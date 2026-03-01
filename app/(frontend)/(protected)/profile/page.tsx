@@ -20,6 +20,7 @@ import {
   Download,
   LogOut,
   Trash2,
+  Crown,
 } from 'lucide-react'
 
 import { M } from '@/lib/meridian'
@@ -49,6 +50,7 @@ interface ProfileData {
   display_name: string | null
   created_at: string
   tier: 'free' | 'pro'
+  is_admin: boolean
 }
 
 // ── Detail: Display ──────────────────────────
@@ -222,8 +224,20 @@ function NotificationDetail({ onBack }: { onBack: () => void }) {
 
       <SectionHeader label="Pro" />
       <MenuCard>
-        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro onProTap={() => window.location.href = "/pro"} />
-        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro onProTap={() => window.location.href = "/pro"} />
+        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro onProTap={async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            await supabase.from('profiles').update({ tier: 'pro' }).eq('id', user.id)
+            window.location.reload()
+          }} />
+        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro onProTap={async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            await supabase.from('profiles').update({ tier: 'pro' }).eq('id', user.id)
+            window.location.reload()
+          }} />
       </MenuCard>
     </div>
   )
@@ -383,7 +397,7 @@ export default function ProfilePage() {
 
           const { data } = await supabase
             .from('profiles')
-            .select('display_name, created_at, tier')
+            .select('display_name, created_at, tier, is_admin')
             .eq('id', user.id)
             .single()
 
@@ -459,7 +473,13 @@ export default function ProfilePage() {
       {/* Pro upgrade card (free users only) */}
       {tier === 'free' && (
         <div style={anim(mounted, 2)}>
-          <ProUpgradeCard />
+          <ProUpgradeCard onUpgrade={async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            await supabase.from('profiles').update({ tier: 'pro' }).eq('id', user.id)
+            setProfile(prev => prev ? { ...prev, tier: 'pro' } : prev)
+          }} />
         </div>
       )}
 
@@ -540,6 +560,22 @@ export default function ProfilePage() {
               /* Future: export flow */
             }}
           />
+          {profile?.is_admin && (
+            <MenuRow
+              icon={Crown}
+              label={`Tier: ${tier.toUpperCase()}`}
+              desc="Toggle Pro/Free for testing"
+              badge={tier === 'pro' ? '✓ Pro' : 'Free'}
+              onClick={async () => {
+                const newTier = tier === 'free' ? 'pro' : 'free'
+                const supabase = createClient()
+                const { data: { user } } = await supabase.auth.getUser()
+                if (!user) return
+                await supabase.from('profiles').update({ tier: newTier }).eq('id', user.id)
+                setProfile(prev => prev ? { ...prev, tier: newTier } : prev)
+              }}
+            />
+          )}
           <MenuRow icon={LogOut} label="Sign out" danger onClick={handleSignOut} />
         </MenuCard>
       </div>

@@ -1,13 +1,17 @@
 // ━━━ ProUpgradeCard ━━━
-// v1.1.0 · ca-story91 · Sprint 24
+// v1.2.0 · ca-story115 · Sprint 25
 // Tier-aware: rendered conditionally by Profile page (tier === free)
-// CTA links to /pro placeholder (Stripe integration Phase 5)
+// CTA calls onUpgrade callback (toggles tier in DB during testing phase)
 
 import { Crown } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 
-export function ProUpgradeCard() {
+interface ProUpgradeCardProps {
+  onUpgrade?: () => void
+}
+
+export function ProUpgradeCard({ onUpgrade }: ProUpgradeCardProps) {
   return (
     <div
       style={{
@@ -69,8 +73,7 @@ export function ProUpgradeCard() {
 
       {/* CTA button */}
       <button
-        onClick={() => {window.location.href = '/pro'
-        }}
+        onClick={onUpgrade}
         style={{
           width: '100%',
           padding: 12,

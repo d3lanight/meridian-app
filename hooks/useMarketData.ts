@@ -1,6 +1,6 @@
 // ━━━ Market Data Hook ━━━
-// v0.4.1 · ca-story38 · 2026-02-17
-// Fetches live data from /api/market, falls back to demo only on error.
+// v0.5.0 · ca-story117 · Sprint 25
+// Fetches live data from /api/market. Error state shown on failure (no demo fallback).
 // Changelog (from v0.4.0):
 //  - Removed demo signal fallback when live signals array is empty
 //  - Removed demo regime fallback when live regime is null (use local fallback)
@@ -66,8 +66,7 @@ export function useMarketData(): UseMarketDataReturn {
       setActiveScenario('live')
     } catch (err: any) {
       setError(err.message ?? 'Failed to fetch')
-      // Fall back to demo on error
-      setActiveScenario(defaultScenario)
+      // No demo fallback — show error state
     } finally {
       setIsLoading(false)
     }

@@ -29,7 +29,6 @@ import type { ScenarioId } from '@/lib/demo-data'
 import FeedSkeleton from '@/components/feed/FeedSkeleton'
 import EmptyPortfolioCTA from '@/components/feed/EmptyPortfolioCTA'
 import { usePrivacy } from '@/contexts/PrivacyContext'
-import { useTier } from '@/hooks/useTier'
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
@@ -55,7 +54,6 @@ export default function DashboardPage() {
   } = useMarketData()
 
   const { hidden, toggleHidden } = usePrivacy()
-  const { isPro } = useTier()
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
@@ -262,13 +260,11 @@ export default function DashboardPage() {
               paddingBottom: 24,
             }}
           >
-            {feed.map((entry, i) => {
-              const insightIndex = feed.slice(0, i).filter(e => e.type === 'insight').length
-              return (
+            {feed.map((entry, i) => (
               <div key={`${entry.type}-${i}`} style={anim(mounted, i * 0.3)}>
-                <FeedEntryRenderer entry={entry} hidden={hidden} isPro={isPro} insightIndex={insightIndex} />
+                <FeedEntryRenderer entry={entry} hidden={hidden} />
               </div>
-            )})}
+            ))}
             {showEmptyPortfolioCTA && (
               <div style={anim(mounted, feed.length * 0.3)}>
                 <EmptyPortfolioCTA />
@@ -298,7 +294,7 @@ export default function DashboardPage() {
 
 // ── Feed Entry Renderer ──
 
-function FeedEntryRenderer({ entry, hidden, isPro, insightIndex }: { entry: FeedEntry; hidden: boolean; isPro: boolean; insightIndex: number }) {
+function FeedEntryRenderer({ entry, hidden }: { entry: FeedEntry; hidden: boolean }) {
   switch (entry.type) {
     case 'greeting':
       return <EntryGreeting data={entry.data} />
@@ -309,7 +305,7 @@ function FeedEntryRenderer({ entry, hidden, isPro, insightIndex }: { entry: Feed
     case 'posture':
       return <EntryPosture data={entry.data} hidden={hidden} />
     case 'insight':
-      return <EntryInsight data={entry.data} locked={!isPro && insightIndex > 0} />
+      return <EntryInsight data={entry.data} />
     case 'market_snippet':
       return <EntryMarketSnippet data={entry.data} />
     case 'signal':
