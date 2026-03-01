@@ -33,6 +33,7 @@ import {
   Toggle,
   ProUpgradeCard,
   SectionHeader,
+  ChangePasswordSheet,
 } from '@/components/profile'
 
 // ═══════════════════════════════════════════════
@@ -42,7 +43,7 @@ import {
 // Sprint: 21 (E14 Close)
 // ═══════════════════════════════════════════════
 
-type Section = 'display' | 'notifications' | 'email' | null
+type Section = 'display' | 'notifications' | 'email' | 'password' | null
 
 interface ProfileData {
   display_name: string | null
@@ -421,6 +422,7 @@ export default function ProfilePage() {
   if (section === 'display') return <DisplayDetail onBack={() => setSection(null)} />
   if (section === 'notifications') return <NotificationDetail onBack={() => setSection(null)} />
   if (section === 'email') return <EmailDetail onBack={() => setSection(null)} />
+  if (section === 'password') return <ChangePasswordSheet onBack={() => setSection(null)} />
 
   // ── Main view ────────────────────────────
 
@@ -528,9 +530,7 @@ export default function ProfilePage() {
             icon={Lock}
             label="Change password"
             desc="Update your login credentials"
-            onClick={() => {
-              /* S88: wire to change password flow */
-            }}
+            onClick={() => setSection('password')}
           />
           <MenuRow
             icon={Download}
