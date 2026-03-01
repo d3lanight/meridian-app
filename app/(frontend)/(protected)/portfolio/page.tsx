@@ -607,10 +607,19 @@ useEffect(() => {
                     }}>
                       {hidden ? '\u2022\u2022\u2022\u2022' : qtyFmt(h.quantity)} {h.asset}
                     </span>
+                    {(h as any).asset_mapping?.subcategory && (
+                      <span style={{
+                        fontSize: 9, color: M.textMuted, background: 'rgba(139,117,101,0.08)',
+                        borderRadius: 6, padding: '1px 6px', marginLeft: 4,
+                      }}>
+                        {(h as any).asset_mapping.subcategory}
+                      </span>
+                    )}
                   </div>
                   {h.include_in_exposure ? (
-                    h.cost_basis != null && price ? (() => {
-                      const pctChange = ((price.usd_price - h.cost_basis!) / h.cost_basis!) * 100
+                    (h.price_at_add != null || h.cost_basis != null) && price ? (() => {
+                      const baseline = h.price_at_add ?? h.cost_basis!
+                      const pctChange = ((price.usd_price - baseline) / baseline) * 100
                       const up = pctChange >= 0
                       const addedDate = new Date(h.created_at)
                       const dateLbl = addedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
