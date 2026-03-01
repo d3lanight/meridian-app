@@ -1,125 +1,195 @@
-// ━━━ Portfolio Snapshot API ━━━
-// v1.3.0 · ca-story69 · 2026-02-22
-// Changelog:
-//  v1.1.0 — Enriched holdings with cost_basis + category
-//  v1.2.0 — Enriched holdings include include_in_exposure flag
-//  v1.3.0 — Fix: portfolio_exposure uses created_at, not timestamp
+// ━━━ Portfolio API ━━━
+// v2.0.0 · ca-story109 · 2026-03-01
+// GET  /api/portfolio — list holdings with asset_mapping metadata
+// POST /api/portfolio — add holding with asset_id + auto price_at_add
+//
+// Changes from v1.3:
+//   S106: price_at_add auto-captured on POST
+//   S107: asset_id FK support, bidirectional trigger handles sync
+//   S109: GET joins asset_mapping for icon_url, name, category, subcategory
 
-import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
-import type { EnrichedHolding } from '@/types';
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
-interface ExposureRow {
-  btc_weight_all: number | null;
-  eth_weight_all: number | null;
-  alt_weight_all: number | null;
-  btc_value_usd: string | number | null;
-  eth_value_usd: string | number | null;
-  alt_value_usd: string | number | null;
-  alt_count: number | null;
-  alt_unpriced: string | null;
-  alt_breakdown: string | unknown[] | null;
-  total_value_usd_all: string | number | null;
-  holdings_count: number | null;
-  holdings_json: string | unknown[] | null;
-  created_at: string | null;
+export async function GET(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Join asset_mapping for enriched metadata
+  const { data: holdings, error } = await supabase
+    .from('portfolio_holdings')
+    .select(`
+      id,
+      user_id,
+      asset,
+      asset_id,
+      quantity,
+      cost_basis,
+      price_at_add,
+      include_in_exposure,
+      created_at,
+      updated_at,
+      asset_mapping (
+        id,
+        symbol,
+        name,
+        icon_url,
+        category,
+        subcategory,
+        coingecko_id,
+        rank
+      )
+    `)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to fetch holdings' }, { status: 500 })
+  }
+
+  return NextResponse.json({ holdings: holdings ?? [] })
 }
 
-const EMPTY = {
-  isEmpty: true,
-  btc_weight_all: 0, eth_weight_all: 0, alt_weight_all: 0,
-  btc_value_usd: 0, eth_value_usd: 0, alt_value_usd: 0,
-  alt_count: 0, alt_unpriced: '[]', alt_breakdown: [],
-  total_value_usd_all: 0, holdings_count: 0, holdings_json: [],
-  enriched_holdings: [],
-  timestamp: null,
-};
-
-export async function GET() {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Parallel fetch: exposure snapshot + enriched holdings
-    const [expResult, holdingsResult] = await Promise.all([
-      supabase
-        .from('latest_exposure')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single(),
-      supabase
-        .from('portfolio_holdings')
-        .select('asset, quantity, cost_basis, include_in_exposure')
-        .eq('user_id', user.id)
-        .order('asset', { ascending: true }),
-    ]);
-
-    if (expResult.error || !expResult.data) {
-      return NextResponse.json(EMPTY);
-    }
-
-    const exposure = expResult.data as unknown as ExposureRow;
-
-    // Build category lookup from asset_mapping
-    const { data: mappings } = await supabase
-      .from('asset_mapping')
-      .select('symbol, category')
-      .eq('active', true);
-
-    const categoryMap: Record<string, string> = {};
-    if (mappings) {
-      for (const m of mappings) {
-        categoryMap[m.symbol] = m.category;
-      }
-    }
-
-    // Build enriched holdings array
-    const enrichedHoldings: EnrichedHolding[] = (holdingsResult.data ?? []).map((h: any) => ({
-      asset: h.asset,
-      quantity: Number(h.quantity) || 0,
-      cost_basis: h.cost_basis != null ? Number(h.cost_basis) : null,
-      category: (categoryMap[h.asset] as EnrichedHolding['category']) ?? null,
-      include_in_exposure: h.include_in_exposure ?? true,
-    }));
-
-    let altBreakdown = exposure.alt_breakdown;
-    if (typeof altBreakdown === 'string') {
-      try { altBreakdown = JSON.parse(altBreakdown); } catch { altBreakdown = []; }
-    }
-    let holdingsJson = exposure.holdings_json;
-    if (typeof holdingsJson === 'string') {
-      try { holdingsJson = JSON.parse(holdingsJson); } catch { holdingsJson = []; }
-    }
-
-    return NextResponse.json({
-      isEmpty: false,
-      btc_weight_all: exposure.btc_weight_all ?? 0,
-      eth_weight_all: exposure.eth_weight_all ?? 0,
-      alt_weight_all: exposure.alt_weight_all ?? 0,
-      btc_value_usd: Number(exposure.btc_value_usd) || 0,
-      eth_value_usd: Number(exposure.eth_value_usd) || 0,
-      alt_value_usd: Number(exposure.alt_value_usd) || 0,
-      alt_count: exposure.alt_count ?? 0,
-      alt_unpriced: exposure.alt_unpriced ?? '[]',
-      alt_breakdown: altBreakdown ?? [],
-      total_value_usd_all: Number(exposure.total_value_usd_all) || 0,
-      holdings_count: exposure.holdings_count ?? 0,
-      holdings_json: holdingsJson ?? [],
-      enriched_holdings: enrichedHoldings,
-      // Expose as 'timestamp' for frontend compatibility, sourced from created_at
-      timestamp: exposure.created_at,
-    });
-  } catch (err) {
-    console.error('[portfolio-snapshot] Unexpected error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const body = await request.json()
+  const { asset, asset_id, quantity, cost_basis } = body
+
+  // Validate: need at least one identifier
+  if (!asset && !asset_id) {
+    return NextResponse.json(
+      { error: 'Either asset (symbol) or asset_id (uuid) required' },
+      { status: 400 },
+    )
+  }
+
+  if (!quantity || Number(quantity) <= 0) {
+    return NextResponse.json(
+      { error: 'quantity must be a positive number' },
+      { status: 400 },
+    )
+  }
+
+  // Resolve asset_id if only symbol provided (for validation)
+  let resolvedAssetId = asset_id ?? null
+  const symbol = asset?.toUpperCase() ?? null
+
+  if (!resolvedAssetId && symbol) {
+    const { data: mapping } = await supabase
+      .from('asset_mapping')
+      .select('id')
+      .eq('symbol', symbol)
+      .eq('active', true)
+      .limit(1)
+      .single()
+
+    if (mapping) {
+      resolvedAssetId = mapping.id
+    }
+  }
+
+  // Validate asset_id exists in asset_mapping (if we have one)
+  if (resolvedAssetId) {
+    const { data: exists } = await supabase
+      .from('asset_mapping')
+      .select('id')
+      .eq('id', resolvedAssetId)
+      .single()
+
+    if (!exists) {
+      return NextResponse.json(
+        { error: 'asset_id not found in asset_mapping' },
+        { status: 400 },
+      )
+    }
+  }
+
+  // S106: Auto-capture market price at time of add
+  let priceAtAdd: number | null = null
+
+  if (resolvedAssetId) {
+    try {
+      const { data: latestPrice } = await supabase
+        .from('asset_prices')
+        .select('price_usd')
+        .eq('asset_id', resolvedAssetId)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (latestPrice) {
+        priceAtAdd = Number(latestPrice.price_usd)
+      }
+    } catch {
+      // Best-effort — don't block the add
+    }
+  }
+
+  // Check for duplicate holding (same user + same asset)
+  if (symbol) {
+    const { data: existing } = await supabase
+      .from('portfolio_holdings')
+      .select('id')
+      .eq('user_id', user.id)
+      .ilike('asset', symbol)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      return NextResponse.json(
+        { error: `You already hold ${symbol}. Edit the existing holding instead.` },
+        { status: 409 },
+      )
+    }
+  }
+
+  // Insert — bidirectional trigger fills asset↔asset_id
+  const { data: holding, error } = await supabase
+    .from('portfolio_holdings')
+    .insert({
+      user_id: user.id,
+      asset: symbol,
+      asset_id: resolvedAssetId,
+      quantity: Number(quantity),
+      cost_basis: cost_basis != null ? Number(cost_basis) : null,
+      include_in_exposure: true,
+      price_at_add: priceAtAdd,
+    })
+    .select(`
+      id,
+      user_id,
+      asset,
+      asset_id,
+      quantity,
+      cost_basis,
+      price_at_add,
+      include_in_exposure,
+      created_at,
+      updated_at,
+      asset_mapping (
+        id,
+        symbol,
+        name,
+        icon_url,
+        category,
+        subcategory,
+        coingecko_id,
+        rank
+      )
+    `)
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: 'Failed to add holding' }, { status: 500 })
+  }
+
+  return NextResponse.json({ holding }, { status: 201 })
 }

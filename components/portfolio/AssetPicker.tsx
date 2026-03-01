@@ -1,20 +1,15 @@
-// ━━━ Asset Picker — Searchable asset list ━━━
-// v1.0.0 · ca-story48 · 2026-02-21
-// Meridian v2: glassmorphic list items, warm theme
+// ━━━ Asset Picker v2 — Top 20 + API search ━━━
+// v2.0.0 · ca-story111 · 2026-03-01
+// Default: top 20 by market cap rank from /api/assets
+// On type: searches /api/asset-search (local 201 + CoinGecko fallback)
+// Uses asset_mapping.name and icon_url instead of hardcoded map
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Search, X } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import type { AssetMapping } from '@/types';
-
-// Asset display names (symbol → friendly name)
-const ASSET_NAMES: Record<string, string> = {
-  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana',
-  DOT: 'Polkadot', ADA: 'Cardano', RUNE: 'THORChain',
-  CHZ: 'Chiliz', DOGE: 'Dogecoin', THETA: 'Theta', GRT: 'The Graph',
-};
 
 // Category badge colors
 const CAT_COLORS: Record<string, { bg: string; text: string }> = {
@@ -23,8 +18,12 @@ const CAT_COLORS: Record<string, { bg: string; text: string }> = {
   stable: { bg: M.neutralDim, text: M.textMuted },
 };
 
+interface SearchResult extends AssetMapping {
+  source?: 'local' | 'remote';
+}
+
 interface AssetPickerProps {
-  assets: AssetMapping[];
+  assets: AssetMapping[];       // top 20 from /api/assets (initial list)
   heldSymbols: string[];
   onSelect: (asset: AssetMapping) => void;
   onClose: () => void;
@@ -32,15 +31,79 @@ interface AssetPickerProps {
 
 export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: AssetPickerProps) {
   const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return assets;
-    return assets.filter(a =>
-      a.symbol.toLowerCase().includes(q) ||
-      (ASSET_NAMES[a.symbol] || '').toLowerCase().includes(q)
-    );
-  }, [assets, search]);
+  // The displayed list: search results when typing, top 20 when empty
+  const displayList = searchResults ?? assets;
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.length < 1) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/asset-search?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.results ?? []);
+      }
+    } catch {
+      // Search failed — keep showing what we have
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  // Debounced search — 300ms after typing stops
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const q = search.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    debounceRef.current = setTimeout(() => doSearch(q), 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search, doSearch]);
+
+  const handleSelect = async (asset: SearchResult) => {
+    // If it's a remote result (from CoinGecko), add it to local catalog first
+    if (asset.source === 'remote' && asset.coingecko_id) {
+      try {
+        const res = await fetch('/api/asset-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coingecko_id: asset.coingecko_id,
+            symbol: asset.symbol,
+            name: asset.name,
+            icon_url: asset.icon_url,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Use the locally-created asset (has real UUID)
+          onSelect(data.asset);
+          return;
+        }
+      } catch {
+        // Fall through to select with remote data
+      }
+    }
+    onSelect(asset);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -54,7 +117,10 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
             Select asset
           </h2>
           <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>
-            {assets.length} available
+            {searchResults
+              ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`
+              : `Top ${assets.length} · type to search more`
+            }
           </p>
         </div>
         <button
@@ -78,12 +144,16 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
             border: `1px solid ${M.border}`,
           }}
         >
-          <Search size={16} color={M.textMuted} />
+          {searching ? (
+            <Loader2 size={16} color={M.textMuted} className="animate-spin" />
+          ) : (
+            <Search size={16} color={M.textMuted} />
+          )}
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search assets..."
+            placeholder="Search 200+ assets..."
             className="flex-1 bg-transparent border-none outline-none text-sm"
             style={{ color: M.text }}
             autoFocus
@@ -102,23 +172,24 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
       {/* Asset list */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
         <div className="flex flex-col gap-2">
-          {filtered.length === 0 ? (
+          {displayList.length === 0 ? (
             <div
               className="text-center py-8 text-sm"
               style={{ color: M.textMuted }}
             >
-              No assets match "{search}"
+              {searching ? 'Searching...' : `No assets match "${search}"`}
             </div>
           ) : (
-            filtered.map(asset => {
+            displayList.map(asset => {
               const isHeld = heldSymbols.includes(asset.symbol);
-              const name = ASSET_NAMES[asset.symbol] || asset.symbol;
+              const name = asset.name || asset.symbol;
               const cat = CAT_COLORS[asset.category || ''] || CAT_COLORS.alt;
+              const isRemote = (asset as SearchResult).source === 'remote';
 
               return (
                 <button
-                  key={asset.symbol}
-                  onClick={() => !isHeld && onSelect(asset)}
+                  key={`${asset.symbol}-${asset.id}`}
+                  onClick={() => !isHeld && handleSelect(asset as SearchResult)}
                   disabled={isHeld}
                   className="flex items-center justify-between rounded-3xl px-4 py-3.5 border-none cursor-pointer text-left w-full transition-opacity"
                   style={{
@@ -132,10 +203,28 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Symbol badge */}
+                    {/* Icon or symbol badge */}
+                    {asset.icon_url ? (
+                      <img
+                        src={asset.icon_url}
+                        alt={asset.symbol}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                        style={{ background: M.surfaceLight }}
+                        onError={(e) => {
+                          // Fallback to text badge on load error
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const next = target.nextElementSibling as HTMLElement;
+                          if (next) next.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
                     <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold"
+                      className="w-10 h-10 rounded-full items-center justify-center text-xs font-semibold"
                       style={{
+                        display: asset.icon_url ? 'none' : 'flex',
                         background: `linear-gradient(135deg, ${M.accentMuted}, rgba(231,111,81,0.15))`,
                         color: M.accent,
                       }}
@@ -156,6 +245,14 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                             style={{ background: cat.bg, color: cat.text, letterSpacing: '0.05em' }}
                           >
                             {asset.category}
+                          </span>
+                        )}
+                        {isRemote && (
+                          <span
+                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md"
+                            style={{ background: 'rgba(98,126,234,0.1)', color: '#627EEA' }}
+                          >
+                            NEW
                           </span>
                         )}
                       </div>

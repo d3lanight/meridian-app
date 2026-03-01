@@ -1,18 +1,27 @@
 // ━━━ usePortfolio Hook ━━━
-// v1.0.0 · ca-story48 · 2026-02-21
+// v1.1.0 · ca-story107 · 2026-03-01
 // CRUD operations with optimistic UI
+// S106: price_at_add auto-captured server-side
+// S107: asset_id FK support (bidirectional trigger handles sync)
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import type { Holding, AssetMapping } from '@/types';
 
+interface AddHoldingParams {
+  asset?: string;
+  asset_id?: string;
+  quantity: number;
+  cost_basis?: number | null;
+}
+
 interface UsePortfolioReturn {
   holdings: Holding[];
   assets: AssetMapping[];
   isLoading: boolean;
   error: string | null;
-  addHolding: (asset: string, quantity: number, costBasis?: number | null) => Promise<boolean>;
+  addHolding: (params: AddHoldingParams) => Promise<boolean>;
   updateHolding: (id: string, updates: {
     quantity?: number;
     cost_basis?: number | null;
@@ -35,8 +44,8 @@ export function usePortfolio(): UsePortfolioReturn {
       const data = await res.json();
       setHoldings(data.holdings ?? []);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     }
   }, []);
 
@@ -61,18 +70,18 @@ export function usePortfolio(): UsePortfolioReturn {
     refresh();
   }, [refresh]);
 
-  const addHolding = useCallback(async (
-    asset: string,
-    quantity: number,
-    costBasis?: number | null,
-  ): Promise<boolean> => {
+  const addHolding = useCallback(async (params: AddHoldingParams): Promise<boolean> => {
+    const { asset, asset_id, quantity, cost_basis } = params;
+    const symbol = asset?.toUpperCase() ?? '???';
+
     // Optimistic: add placeholder
     const tempId = `temp-${Date.now()}`;
     const optimistic: Holding = {
       id: tempId,
-      asset: asset.toUpperCase(),
+      asset: symbol,
+      asset_id: asset_id ?? null,
       quantity,
-      cost_basis: costBasis ?? null,
+      cost_basis: cost_basis ?? null,
       include_in_exposure: true,
       timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -85,9 +94,10 @@ export function usePortfolio(): UsePortfolioReturn {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          asset: asset.toUpperCase(),
+          asset: symbol !== '???' ? symbol : undefined,
+          asset_id,
           quantity,
-          cost_basis: costBasis,
+          cost_basis,
         }),
       });
       if (!res.ok) {
@@ -101,10 +111,10 @@ export function usePortfolio(): UsePortfolioReturn {
           .sort((a, b) => a.asset.localeCompare(b.asset))
       );
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       setHoldings(prev => prev.filter(h => h.id !== tempId));
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Unknown error');
       return false;
     }
   }, []);
@@ -138,10 +148,10 @@ export function usePortfolio(): UsePortfolioReturn {
       const data = await res.json();
       setHoldings(prev => prev.map(h => h.id === id ? data.holding : h));
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       setHoldings(prev => prev.map(h => h.id === id ? previous : h));
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Unknown error');
       return false;
     }
   }, [holdings]);
@@ -158,10 +168,10 @@ export function usePortfolio(): UsePortfolioReturn {
         throw new Error(err.error || 'Failed to remove holding');
       }
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       setHoldings(previous);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Unknown error');
       return false;
     }
   }, [holdings]);

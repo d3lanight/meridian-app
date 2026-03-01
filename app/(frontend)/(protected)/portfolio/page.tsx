@@ -40,158 +40,53 @@ function getSegKey(symbol: string): 'BTC' | 'ETH' | 'ALT' {
 
 // ── Crypto Icon (branded gradients from artifact) ──
 
-const CRYPTO_CONFIGS: Record<
-  string,
-  { bg: string; shadow: string; vb: string; path: React.ReactNode }
-> = {
-  BTC: {
-    bg: 'linear-gradient(135deg, #F7931A, #F79A1F)',
-    shadow: 'rgba(247,147,26,0.3)',
-    vb: '0 0 32 32',
-    path: (
-      <path
-        d="M23.189 14.02c.314-2.096-1.283-3.223-3.465-3.975l.708-2.84-1.728-.43-.69 2.765c-.454-.114-.92-.22-1.385-.326l.695-2.783L15.596 6l-.708 2.839c-.376-.085-.746-.17-1.104-.26l.002-.009-2.384-.595-.46 1.846s1.283.294 1.256.312c.7.175.826.638.805 1.006l-.806 3.235c.048.012.11.03.18.057l-.183-.045-1.13 4.532c-.086.212-.303.531-.793.41.018.025-1.256-.313-1.256-.313l-.858 1.978 2.25.561c.418.105.828.215 1.231.318l-.715 2.872 1.727.43.708-2.84c.472.127.93.245 1.378.357l-.706 2.828 1.728.43.715-2.866c2.948.558 5.164.333 6.097-2.333.752-2.146-.037-3.385-1.588-4.192 1.13-.26 1.98-1.003 2.207-2.538zm-3.95 5.538c-.533 2.147-4.148.986-5.32.695l.95-3.805c1.172.293 4.929.872 4.37 3.11zm.535-5.569c-.487 1.953-3.495.96-4.47.717l.86-3.45c.975.243 4.118.696 3.61 2.733z"
-        fill="white"
-      />
-    ),
-  },
-  ETH: {
-    bg: 'linear-gradient(135deg, #627EEA, #7B9FF5)',
-    shadow: 'rgba(98,126,234,0.3)',
-    vb: '0 0 24 24',
-    path: (
-      <>
-        <path
-          d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003z"
-          fill="white"
-          fillOpacity="0.6"
-        />
-        <path
-          d="M12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"
-          fill="white"
-          fillOpacity="0.6"
-        />
-        <path d="M11.943 0v11.645l7.365 4.354L11.943 0z" fill="white" />
-      </>
-    ),
-  },
-  SOL: {
-    bg: 'linear-gradient(135deg, #14F195, #9945FF)',
-    shadow: 'rgba(153,69,255,0.3)',
-    vb: '0 0 32 32',
-    path: (
-      <>
-        <path
-          d="M6.52 20.51a.83.83 0 0 1 .59-.24h18.38a.41.41 0 0 1 .3.71l-3.77 3.77a.83.83 0 0 1-.59.24H2.85a.41.41 0 0 1-.3-.71z"
-          fill="white"
-        />
-        <path
-          d="M6.52 7.01a.88.88 0 0 1 .59-.24h18.38a.41.41 0 0 1 .3.71L22 11.25a.83.83 0 0 1-.59.24H2.85a.41.41 0 0 1-.3-.71z"
-          fill="white"
-          fillOpacity="0.6"
-        />
-        <path
-          d="M25.43 13.51a.83.83 0 0 0-.59-.24H6.46a.41.41 0 0 0-.3.71l3.77 3.77a.83.83 0 0 0 .59.24h18.58a.41.41 0 0 0 .3-.71z"
-          fill="white"
-          fillOpacity="0.8"
-        />
-      </>
-    ),
-  },
-  DOT: {
-    bg: 'linear-gradient(135deg, #E6007A, #FF1E8E)',
-    shadow: 'rgba(230,0,122,0.3)',
-    vb: '0 0 32 32',
-    path: (<><ellipse cx="16" cy="5" rx="2.5" ry="2.5" fill="white"/><ellipse cx="16" cy="27" rx="2.5" ry="2.5" fill="white"/><ellipse cx="24" cy="11" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="8" cy="11" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="24" cy="21" rx="2" ry="2" fill="white" fillOpacity=".7"/><ellipse cx="8" cy="21" rx="2" ry="2" fill="white" fillOpacity=".7"/></>),
-  },
-  ADA: {
-    bg: 'linear-gradient(135deg, #0033AD, #0D47A1)',
-    shadow: 'rgba(0,51,173,0.3)',
-    vb: '0 0 32 32',
-    path: (<><circle cx="16" cy="16" r="2.5" fill="white"/><circle cx="16" cy="8" r="1.5" fill="white" fillOpacity=".8"/><circle cx="16" cy="24" r="1.5" fill="white" fillOpacity=".8"/><circle cx="10" cy="12" r="1.3" fill="white" fillOpacity=".7"/><circle cx="22" cy="12" r="1.3" fill="white" fillOpacity=".7"/></>),
-  },
-  RUNE: {
-    bg: 'linear-gradient(135deg, #33FF99, #00CCFF)',
-    shadow: 'rgba(51,255,153,0.3)',
-    vb: '0 0 32 32',
-    path: (<path d="M16 4L20 12L28 16L20 20L16 28L12 20L4 16L12 12L16 4Z" fill="white"/>),
-  },
-  CHZ: {
-    bg: 'linear-gradient(135deg, #CD0124, #E31E3B)',
-    shadow: 'rgba(205,1,36,0.3)',
-    vb: '0 0 32 32',
-    path: (<path d="M16 6C12 6 10 9 10 12C10 15 11 16 13 18C15 20 16 21 16 24C16 21 17 20 19 18C21 16 22 15 22 12C22 9 20 6 16 6Z" fill="white"/>),
-  },
-  DOGE: {
-    bg: 'linear-gradient(135deg, #C3A634, #D4AF37)',
-    shadow: 'rgba(195,166,52,0.3)',
-    vb: '0 0 32 32',
-    path: (<path d="M16 6h-4v7H9v2h3v7h4c4 0 7-2 7-8s-3-8-7-8zm0 14h-2v-5h5v-2h-5V8h2c3 0 5 1 5 6s-2 6-5 6z" fill="white"/>),
-  },
-  THETA: {
-    bg: 'linear-gradient(135deg, #2AB8E6, #29C5F6)',
-    shadow: 'rgba(42,184,230,0.3)',
-    vb: '0 0 32 32',
-    path: (<><circle cx="16" cy="16" r="9" stroke="white" strokeWidth="2" fill="none"/><path d="M16 11v10M11 16h10" stroke="white" strokeWidth="2"/></>),
-  },
-  GRT: {
-    bg: 'linear-gradient(135deg, #6F4FF2, #8B5CF6)',
-    shadow: 'rgba(111,79,242,0.3)',
-    vb: '0 0 32 32',
-    path: (<><path d="M16 8L10 14L16 20L22 14L16 8Z" fill="white"/><circle cx="8" cy="16" r="2" fill="white" fillOpacity=".7"/><circle cx="24" cy="16" r="2" fill="white" fillOpacity=".7"/></>),
-  },
-}
+function CryptoIcon({ symbol, size = 48, iconUrl }: { symbol: string; size?: number; iconUrl?: string | null }) {
+  const segColors: Record<string, string> = {
+    BTC: '#F7931A', ETH: '#627EEA', SOL: '#9945FF', ADA: '#0033AD',
+    DOT: '#E6007A', RUNE: '#33FF99', DOGE: '#C3A634',
+  }
+  const color = segColors[symbol] || '#A78BFA'
 
-function CryptoIcon({ symbol, size = 48 }: { symbol: string; size?: number }) {
-  const c = CRYPTO_CONFIGS[symbol]
-  if (!c) {
-    // Fallback: text icon in accent pill
-    const segColors: Record<string, string> = {
-      BTC: '#F7931A',
-      ETH: '#627EEA',
-    }
-    const color = segColors[symbol] || '#A78BFA'
+  if (iconUrl) {
     return (
-      <div
-        style={{
-          width: size,
-          height: size,
-          background: `${color}20`,
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <span
+      <div style={{ width: size, height: size, position: 'relative', flexShrink: 0 }}>
+        <img
+          src={iconUrl}
+          alt={symbol}
+          width={size}
+          height={size}
+          style={{ borderRadius: '50%', background: M.surfaceLight, display: 'block' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+            const fb = e.currentTarget.nextElementSibling as HTMLElement
+            if (fb) fb.style.display = 'flex'
+          }}
+        />
+        <div
           style={{
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: size * 0.28,
-            fontWeight: 700,
-            color,
+            width: size, height: size, background: `${color}20`, borderRadius: '50%',
+            display: 'none', alignItems: 'center', justifyContent: 'center',
+            position: 'absolute', top: 0, left: 0,
           }}
         >
-          {symbol.slice(0, 3)}
-        </span>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: size * 0.28, fontWeight: 700, color }}>
+            {symbol.slice(0, 3)}
+          </span>
+        </div>
       </div>
     )
   }
+
   return (
     <div
       style={{
-        width: size,
-        height: size,
-        background: c.bg,
-        boxShadow: `0 4px 12px ${c.shadow}`,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: size, height: size, background: `${color}20`, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}
     >
-      <svg width={size * 0.55} height={size * 0.55} viewBox={c.vb} fill="none">
-        {c.path}
-      </svg>
+      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: size * 0.28, fontWeight: 700, color }}>
+        {symbol.slice(0, 3)}
+      </span>
     </div>
   )
 }
@@ -203,21 +98,6 @@ const ALLOC_GRADIENTS: Record<string, string> = {
   ETH: 'linear-gradient(90deg, #627EEA, #7B9FF5)',
   ALT: 'linear-gradient(90deg, #14F195, #9945FF)',
   Stable: 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.7))',
-}
-
-// ── Asset name lookup ─────────────────────────
-
-const ASSET_NAMES: Record<string, string> = {
-  BTC: 'Bitcoin',
-  ETH: 'Ethereum',
-  SOL: 'Solana',
-  DOT: 'Polkadot',
-  ADA: 'Cardano',
-  RUNE: 'THORChain',
-  CHZ: 'Chiliz',
-  DOGE: 'Dogecoin',
-  THETA: 'Theta',
-  GRT: 'The Graph',
 }
 
 // ── Sheet state ───────────────────────────────
@@ -285,35 +165,35 @@ useEffect(() => {
   // Build price lookup from snapshot
   const priceLookup = useMemo(() => {
     const map: Record<string, { usd_price: number; value_usd: number; weight: number }> = {}
-    if (!snapshot || snapshot.isEmpty) return map
-    const btcQty = snapshot.holdings_json.find((h: any) => h.asset === 'BTC')?.quantity || 0
+    if (!snapshot || snapshot.exposure?.isEmpty) return map
+    const btcQty = snapshot.exposure?.holdings_json.find((h: any) => h.asset === 'BTC')?.quantity || 0
     if (btcQty > 0) {
       map['BTC'] = {
-        usd_price: snapshot.btc_value_usd / btcQty,
-        value_usd: snapshot.btc_value_usd,
-        weight: snapshot.btc_weight_all,
+        usd_price: snapshot.exposure?.btc_value_usd / btcQty,
+        value_usd: snapshot.exposure?.btc_value_usd,
+        weight: snapshot.exposure?.btc_weight_all,
       }
     }
-    const ethQty = snapshot.holdings_json.find((h: any) => h.asset === 'ETH')?.quantity || 0
+    const ethQty = snapshot.exposure?.holdings_json.find((h: any) => h.asset === 'ETH')?.quantity || 0
     if (ethQty > 0) {
       map['ETH'] = {
-        usd_price: snapshot.eth_value_usd / ethQty,
-        value_usd: snapshot.eth_value_usd,
-        weight: snapshot.eth_weight_all,
+        usd_price: snapshot.exposure?.eth_value_usd / ethQty,
+        value_usd: snapshot.exposure?.eth_value_usd,
+        weight: snapshot.exposure?.eth_weight_all,
       }
     }
-    for (const a of snapshot.alt_breakdown) {
+    for (const a of snapshot.exposure?.alt_breakdown ?? []) {
       map[a.asset] = {
         usd_price: a.usd_price,
         value_usd: a.value_usd,
-        weight: snapshot.total_value_usd_all > 0 ? a.value_usd / snapshot.total_value_usd_all : 0,
+        weight: snapshot.exposure?.total_value_usd_all > 0 ? a.value_usd / snapshot.exposure?.total_value_usd_all : 0,
       }
     }
     return map
   }, [snapshot])
 
   const handleAdd = async (asset: string, quantity: number, costBasis?: number | null) => {
-    const ok = await addHolding(asset, quantity, costBasis)
+    const ok = await addHolding({ asset, quantity, cost_basis: costBasis })
     if (ok) fetchSnapshot()
     return ok
   }
@@ -333,7 +213,7 @@ useEffect(() => {
 
   const loading = snapshotLoading || holdingsLoading
   const isEmpty = holdings.length === 0
-  const hasSnapshot = snapshot && !snapshot.isEmpty && snapshot.total_value_usd_all > 0
+  const hasSnapshot = snapshot && !snapshot.exposure?.isEmpty && snapshot.exposure?.total_value_usd_all > 0
   const totalValue = snapshot?.total_value_usd_all || 0
 
   // ── Loading state ──
@@ -699,7 +579,8 @@ useEffect(() => {
           const price = priceLookup[h.asset]
           const valueUsd = price ? price.usd_price * h.quantity : null
           const weight = price?.weight ?? null
-          const name = ASSET_NAMES[h.asset] || h.asset
+          const name = h.asset_mapping?.name || h.asset
+          const iconUrl = h.asset_mapping?.icon_url || null
           const weightPct = weight !== null ? Math.round(weight * 100) : null
 
           return (
@@ -712,7 +593,7 @@ useEffect(() => {
             >
               {/* Main row: icon | name+qty | value+edit — single horizontal line */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <CryptoIcon symbol={h.asset} size={36} />
+                <CryptoIcon symbol={h.asset} size={36} iconUrl={iconUrl} />
 
                 {/* Left: name + qty inline + since-added or excluded */}
                 <div style={{ flex: 1, minWidth: 0 }}>
