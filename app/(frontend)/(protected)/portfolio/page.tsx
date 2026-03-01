@@ -14,6 +14,8 @@ import ProgressiveDisclosure, { DisclosureGroup } from "@/components/education/P
 import { card, anim } from '@/lib/ui-helpers'
 import GradientBar from '@/components/shared/GradientBar'
 import { usePrivacy } from '@/contexts/PrivacyContext'
+import { createClient } from '@/lib/supabase/client'
+import { AnonPortfolioCTA } from '@/components/portfolio/AnonPortfolioCTA'
 
 // ── Helpers ───────────────────────────────────
 
@@ -109,8 +111,11 @@ type SheetState = { type: 'closed' } | { type: 'add' } | { type: 'edit'; holding
 // ═══════════════════════════════════════════════
 
 export default function PortfolioPage() {
+  const [isAnon, setIsAnon] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [snapshot, setSnapshot] = useState<PortfolioExposure | null>(null)
   const [snapshotLoading, setSnapshotLoading] = useState(true)
+  const [snapshotError, setSnapshotError] = useState(false)
   const [sheet, setSheet] = useState<SheetState>({ type: 'closed' })
   const [mounted, setMounted] = useState(false)
   const [regime, setRegime] = useState<string>('range')
@@ -127,6 +132,7 @@ export default function PortfolioPage() {
       setSnapshot(json.exposure ?? json)
     } catch (err) {
       console.error('[PortfolioPage] snapshot error:', err)
+      setSnapshotError(true)
     } finally {
       setSnapshotLoading(false)
     }
@@ -146,8 +152,9 @@ useEffect(() => {
 }, [])
 
   useEffect(() => {
-    fetchSnapshot()
-  }, [])
+    if (!isAnon) fetchSnapshot()
+    else setSnapshotLoading(false)
+  }, [isAnon])
   // S61: Fetch regime for misalignment framing
   useEffect(() => {
   fetch('/api/market')
@@ -158,6 +165,14 @@ useEffect(() => {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAnon(!user)
+      setAuthChecked(true)
+    })
   }, [])
 
   const heldSymbols = useMemo(() => holdings.map((h) => h.asset), [holdings])
@@ -218,6 +233,40 @@ useEffect(() => {
   const totalValue = snapshot?.total_value_usd_all || 0
 
   // ── Loading state ──
+
+if (authChecked && isAnon) {
+    return <AnonPortfolioCTA />
+  }
+
+if (snapshotError && !holdingsLoading) {
+    return (
+      <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+        <div style={{ padding: '48px 20px' }}>
+          <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>
+            Couldn&apos;t load portfolio data
+          </p>
+          <p style={{ fontSize: 12, color: M.textMuted, margin: '0 0 14px' }}>
+            Your holdings are safe — we just can&apos;t reach the server right now
+          </p>
+          <button
+            onClick={() => { setSnapshotError(false); setSnapshotLoading(true); fetchSnapshot() }}
+            style={{
+              background: M.surface,
+              border: `1px solid ${M.border}`,
+              borderRadius: 12,
+              padding: '8px 16px',
+              fontSize: 12,
+              color: M.text,
+              cursor: 'pointer',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

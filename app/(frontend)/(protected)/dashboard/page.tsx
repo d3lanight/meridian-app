@@ -28,6 +28,7 @@ import {
 import type { ScenarioId } from '@/lib/demo-data'
 import FeedSkeleton from '@/components/feed/FeedSkeleton'
 import EmptyPortfolioCTA from '@/components/feed/EmptyPortfolioCTA'
+import EntryAnonCta from '@/components/feed/EntryAnonCta'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 
 export default function DashboardPage() {
@@ -314,6 +315,8 @@ function FeedEntryRenderer({ entry, hidden }: { entry: FeedEntry; hidden: boolea
       return <EntryLearn data={entry.data} />
     case 'divider':
       return <EntryDivider data={entry.data} />
+    case 'anon_cta':
+      return <EntryAnonCta data={entry.data} />
     default:
       return null
   }

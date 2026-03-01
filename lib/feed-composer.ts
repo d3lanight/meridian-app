@@ -104,6 +104,17 @@ export function composeFeed(sources: FeedSources): ComposedFeed {
     }
   }
 
+  // ── 5b. Anon CTA ──
+  if (!isAuthed) {
+    entries.push({
+      type: 'anon_cta',
+      data: {
+        title: 'Your daily context awaits',
+        text: 'Sign in to see portfolio insights, posture scoring, and signals tailored to your holdings.',
+      },
+    })
+  }
+
   // ── 6. Market context divider ──
   entries.push({ type: 'divider', data: { label: 'Market context' } })
 

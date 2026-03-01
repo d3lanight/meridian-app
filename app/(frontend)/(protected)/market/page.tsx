@@ -322,9 +322,24 @@ export default function MarketPulsePage() {
             <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 4px' }}>
               No market data available
             </p>
-            <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>
+            <p style={{ fontSize: 12, color: M.textMuted, margin: '0 0 14px' }}>
               Check back when market data starts flowing
             </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: M.surface,
+                border: `1px solid ${M.border}`,
+                borderRadius: 12,
+                padding: '8px 16px',
+                fontSize: 12,
+                color: M.text,
+                cursor: 'pointer',
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              Try again
+            </button>
           </div>
         ) : (
           <>

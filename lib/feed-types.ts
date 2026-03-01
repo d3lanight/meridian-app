@@ -12,6 +12,7 @@ export type FeedEntryType =
   | 'signal'
   | 'learn'
   | 'divider'
+  | 'anon_cta'
 
 export interface EntryGreetingData {
   name: string
@@ -69,6 +70,11 @@ export interface EntryDividerData {
   label: string
 }
 
+export interface EntryAnonCtaData {
+  title: string
+  text: string
+}
+
 export type FeedEntry =
   | { type: 'greeting'; data: EntryGreetingData }
   | { type: 'regime'; data: EntryRegimeData }
@@ -79,3 +85,5 @@ export type FeedEntry =
   | { type: 'signal'; data: EntrySignalData }
   | { type: 'learn'; data: EntryLearnData }
   | { type: 'divider'; data: EntryDividerData }
+  | { type: 'anon_cta'; data: EntryAnonCtaData } 
+  

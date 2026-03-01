@@ -438,6 +438,23 @@ export default function ProfilePage() {
   if (section === 'email') return <EmailDetail onBack={() => setSection(null)} />
   if (section === 'password') return <ChangePasswordSheet onBack={() => setSection(null)} />
 
+  if (loading) {
+    return (
+      <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="rounded-3xl animate-pulse"
+            style={{
+              background: M.surfaceLight,
+              height: i === 1 ? 100 : 64,
+            }}
+          />
+        ))}
+      </div>
+    )
+  }
+  
   // ── Main view ────────────────────────────
 
   return (
