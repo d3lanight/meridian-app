@@ -1,7 +1,6 @@
 // ━━━ Feed Composer ━━━
-// v2.0.0 · ca-story84 · Sprint 20
-// Multi-source assembler: market + portfolio + sentiment → FeedEntry[]
-// v2: temporal grouping, richer snippets, empty portfolio detection
+// v2.2.0 · ca-story85 · Sprint 20
+// S85: EntryLearn integration — glossary API, tap-to-expand, regime-contextual content
 
 import type { FeedEntry } from '@/lib/feed-types'
 import type { RegimeData, PortfolioData, MarketMetrics, Signal } from '@/types'
@@ -24,6 +23,7 @@ interface FeedSources {
 
   // Educational
   regimeExplainer?: { summary: string; slug: string } | null
+  learnEntries?: { summary: string; slug: string; topic: string }[]
 }
 
 interface ComposedFeed {
@@ -201,8 +201,20 @@ export function composeFeed(sources: FeedSources): ComposedFeed {
     }
   }
 
-  // ── 9. Educational entry ──
-  if (sources.regimeExplainer) {
+ // ── 9. Educational entries ──
+  const learns = sources.learnEntries ?? []
+  if (learns.length > 0) {
+    for (const learn of learns.slice(0, 2)) {
+      entries.push({
+        type: 'learn',
+        data: {
+          text: learn.summary,
+          topic: learn.topic,
+          slug: learn.slug,
+        },
+      })
+    }
+  } else if (sources.regimeExplainer) {
     entries.push({
       type: 'learn',
       data: {

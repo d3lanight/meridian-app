@@ -39,6 +39,7 @@ export default function DashboardPage() {
     btcPrice: number; btcChange: number; ethPrice: number; ethChange: number
   } | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
+  const [learnEntries, setLearnEntries] = useState<{ summary: string; slug: string; topic: string }[]>([])
   const [hasHoldings, setHasHoldings] = useState<boolean | undefined>(undefined)
 
   const {
@@ -126,21 +127,32 @@ export default function DashboardPage() {
     fetchPrices()
   }, [])
 
-  // Fetch regime explainer from glossary
+ const { regime, portfolio, signals } = scenario
+  
+// Fetch regime-contextual glossary entries
   useEffect(() => {
-    if (!scenario?.regime?.current) return
-    const rid = scenario.regime.current.toLowerCase().replace(/\s+/g, '')
-    fetch(`/api/glossary?regime=${rid}`)
+    const regimeId = regime?.current?.toLowerCase().replace(/\s+/g, '')
+    const endpoint = regimeId ? `/api/glossary?regime=${regimeId}` : '/api/glossary?random=2'
+    fetch(endpoint)
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const e = Array.isArray(d) ? d[0] : d
-        if (e) setRegimeExplainer({ summary: e.summary, slug: e.slug })
+      .then(entries => {
+        if (Array.isArray(entries) && entries.length > 0) {
+          setRegimeExplainer({ summary: entries[0].summary, slug: entries[0].slug })
+          if (entries.length > 1) {
+            setLearnEntries(entries.slice(0, 3).map((e: any) => ({
+              summary: e.summary,
+              slug: e.slug,
+              topic: e.title,
+            })))
+          }
+        } else if (entries?.summary) {
+          setRegimeExplainer({ summary: entries.summary, slug: entries.slug })
+        }
       })
       .catch(() => {})
-  }, [scenario?.regime?.current])
+  }, [regime?.current])
 
   // ── Compose feed ──
-  const { regime, portfolio, signals } = scenario
   const { entries: feed, showEmptyPortfolioCTA } = useMemo(
     () =>
       composeFeed({
@@ -156,6 +168,7 @@ export default function DashboardPage() {
         userName: isAnon ? null : userName,
         regimeExplainer,
         hasHoldings: isAnon ? undefined : hasHoldings,
+        learnEntries,
       }),
     [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer, hasHoldings]
   )
