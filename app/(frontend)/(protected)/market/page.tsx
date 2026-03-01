@@ -1,5 +1,5 @@
-// v2.0.0 · ca-story82 · Sprint 19
-// S82: Regime history integration — TimelineStrip + AggSection replace per-day list
+// v2.1.0 · ca-story99 · Sprint 19
+// S99: Volume/volatility label cleanup — relabel + real volume display 
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -157,6 +157,7 @@ export default function MarketPulsePage() {
     fearGreedLabel: string
     btcDominance: number
     altSeason: number
+    totalVolume: number | null
   } | null>(null)
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const [confidenceTrend, setConfidenceTrend] = useState<ConfidenceTrend | null>(null)
@@ -193,11 +194,12 @@ export default function MarketPulsePage() {
         if (marketRes.ok) {
           const marketJson = await marketRes.json()
           if (marketJson.metrics) {
-            setMetrics({
+           setMetrics({
               fearGreed: marketJson.metrics.fearGreed ?? 50,
               fearGreedLabel: marketJson.metrics.fearGreedLabel ?? 'Neutral',
               btcDominance: marketJson.metrics.btcDominance ?? 50,
               altSeason: marketJson.metrics.altSeason ?? 50,
+              totalVolume: marketJson.metrics.totalVolume ?? null,
             })
           }
           if (marketJson.confidenceTrend) {
@@ -231,7 +233,7 @@ export default function MarketPulsePage() {
   const current = data?.regimes?.[0] ?? null
   const persistence = data ? computePersistence(data.regimes) : 0
   const ethAligned = current ? (current.r_7d >= 0) === (current.eth_r_7d >= 0) : false
-  const vol = current ? volumeLabel(current.vol_7d) : 'Moderate'
+  const volLabel = current ? volumeLabel(current.vol_7d) : 'Moderate'
 
   // Sentiment values from /api/market or fallback
   const fearGreed = metrics?.fearGreed ?? 50
@@ -264,7 +266,7 @@ export default function MarketPulsePage() {
         !ethAligned ? ', but ETH and BTC are diverging' : ''
       }. ${fearGreed >= 50 ? 'Greed is present' : 'Fear dominates'} but ${
         altSeason < 40 ? 'altcoins are underperforming' : 'altcoins are gaining ground'
-      } — ${vol === 'Low' ? 'volume is low, suggesting indecision' : vol === 'Moderate' ? 'volume is neutral' : 'volume is elevated, suggesting conviction'}. This is a ${fearGreed >= 60 && ethAligned ? 'moderately confident' : 'wait-and-watch'} environment.`
+      } — ${volLabel === 'Low' ? 'volatility is low, suggesting calm conditions' : volLabel === 'Moderate' ? 'volatility is neutral' : 'volatility is elevated, suggesting larger moves'}. This is a ${fearGreed >= 60 && ethAligned ? 'moderately confident' : 'wait-and-watch'} environment.`
     : 'Loading market data...'
 
   return (
@@ -580,7 +582,7 @@ export default function MarketPulsePage() {
               />
             </div>
 
-            {/* ── Volume Profile ── */}
+            {/* ── Volatility── */}
             <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 4) }}>
               <div
                 style={{
@@ -593,12 +595,12 @@ export default function MarketPulsePage() {
                 <ProgressiveDisclosure
                   id="vol"
                   summary={
-                    <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Volume Profile</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Volatility</span>
                   }
-                  context="Market activity level. High volume in bull = reinforcement. High volume in bear = panic/capitulation. Low volume in range = indecision."
+                  context="7-day price volatility. High volatility means larger daily swings. Low volatility suggests a calmer, more predictable market. Not the same as trading volume."
                 />
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
-                  {vol}
+                  {volLabel}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -606,36 +608,60 @@ export default function MarketPulsePage() {
                   style={{
                     flex: 1,
                     height: 32,
-                    background: vol === 'Low' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                    background: volLabel === 'Low' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
                     borderRadius: 4,
-                    opacity: vol === 'Low' ? 1 : 0.3,
+                    opacity: volLabel === 'Low' ? 1 : 0.3,
                   }}
                 />
                 <div
                   style={{
                     flex: 1,
                     height: 32,
-                    background: vol === 'Moderate' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
+                    background: volLabel === 'Moderate' ? 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.8))' : '#E8DED6',
                     borderRadius: 4,
-                    opacity: vol === 'Moderate' ? 1 : 0.3,
+                    opacity: volLabel === 'Moderate' ? 1 : 0.3,
                   }}
                 />
                 <div
                   style={{
                     flex: 1,
                     height: 32,
-                    background: vol === 'High' ? 'linear-gradient(90deg, #E76F51, rgba(231,111,81,0.8))' : '#E8DED6',
+                    background: volLabel === 'High' ? 'linear-gradient(90deg, #E76F51, rgba(231,111,81,0.8))' : '#E8DED6',
                     borderRadius: 4,
-                    opacity: vol === 'High' ? 1 : 0.3,
+                    opacity: volLabel === 'High' ? 1 : 0.3,
                   }}
                 />
               </div>
               <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
-                {vol === 'Low' ? 'Below average activity — suggests indecision'
-                  : vol === 'Moderate' ? 'Average activity — neither confirming nor contradicting'
+                {volLabel === 'Low' ? 'Below average activity — suggests indecision'
+                  : volLabel === 'Moderate' ? 'Average activity — neither confirming nor contradicting'
                   : 'Above average activity — conviction in the current direction'}
               </p>
             </div>
+
+            {/* ── Market Volume ── */}
+            {metrics?.totalVolume != null && (
+              <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 4.5) }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <ProgressiveDisclosure
+                    id="mkt-vol"
+                    summary={
+                      <span style={{ fontSize: 14, fontWeight: 600, color: M.text }}>Market Volume</span>
+                    }
+                    context="Total 24-hour trading volume across all crypto markets. Higher volume indicates more market participation and conviction in price moves."
+                  />
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text }}>
+                    ${(metrics.totalVolume / 1e9).toFixed(1)}B
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* ── Signal Coherence ── */}
             <div

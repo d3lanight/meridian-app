@@ -10,7 +10,7 @@ export interface RegimeData {
   confidence: number;
   persistence: number;
   trend: string;
-  volume: string;
+  dailyShift: string;  // was: volume (renamed — this is r_1d buckets, not trading volume)
   volatility: string;
 }
 
@@ -49,6 +49,7 @@ export interface MarketMetrics {
   fearGreedLabel: string;
   btcDominance: number;
   altSeason: number;
+  totalVolume: number | null;
 }
 
 export type NavTab = 'home' | 'portfolio' | 'market' | 'profile';

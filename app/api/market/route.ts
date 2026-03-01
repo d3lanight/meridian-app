@@ -83,7 +83,7 @@ export async function GET() {
     // S97: Fetch latest sentiment row
     supabase
       .from('market_sentiment')
-      .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, market_date')
+      .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, total_volume_usd, market_date')
       .order('market_date', { ascending: false })
       .limit(1)
       .single(),

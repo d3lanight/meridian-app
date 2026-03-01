@@ -28,7 +28,7 @@ export function mapRegime(row: any): RegimeData {
     confidence: Math.round((row.confidence ?? 0) * 100),
     persistence: row._persistence_days ?? row.eth_days_confirmed ?? 0,
     trend: `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
-    volume: r1d > 3 ? 'High' : r1d > -3 ? 'Medium' : 'Low',
+    dailyShift: r1d > 3 ? 'High' : r1d > -3 ? 'Moderate' : 'Low',
     volatility: `${vol.toFixed(0)}%`,
   }
 }
@@ -132,17 +132,18 @@ export function computeMetrics(regime: any, sentiment: any): MarketMetrics {
     const btcDominance = sentiment.btc_dominance ?? fallbackBtcDominance(regime)
     const altSeason = sentiment.alt_season_value ?? fallbackAltSeason(regime)
 
-    return { fearGreed, fearGreedLabel, btcDominance, altSeason }
+    return { fearGreed, fearGreedLabel, btcDominance, altSeason, totalVolume: sentiment.total_volume_usd ?? null }
   }
 
   // ── Fallback: computed approximation (pre-S97 behavior) ──
   const fearGreed = fallbackFearGreed(regime)
   return {
-    fearGreed,
-    fearGreedLabel: deriveFearGreedLabel(fearGreed),
-    btcDominance: fallbackBtcDominance(regime),
-    altSeason: fallbackAltSeason(regime),
-  }
+      fearGreed,
+      fearGreedLabel: deriveFearGreedLabel(fearGreed),
+      btcDominance: fallbackBtcDominance(regime),
+      altSeason: fallbackAltSeason(regime),
+      totalVolume: null,
+    }
 }
 
 // ── Fallback helpers (preserve pre-S97 computed values) ──
