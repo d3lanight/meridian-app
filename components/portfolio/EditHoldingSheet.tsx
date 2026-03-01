@@ -10,11 +10,7 @@ import { Check, X, Trash2 } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import type { Holding } from '@/types';
 
-const ASSET_NAMES: Record<string, string> = {
-  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana',
-  DOT: 'Polkadot', ADA: 'Cardano', RUNE: 'THORChain',
-  CHZ: 'Chiliz', DOGE: 'Dogecoin', THETA: 'Theta', GRT: 'The Graph',
-};
+
 
 interface EditHoldingSheetProps {
   holding: Holding;
@@ -41,7 +37,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const name = ASSET_NAMES[holding.asset] || holding.asset;
+  const name = (holding as any).asset_mapping?.name || holding.asset;
 
   // Clean comparison against original values
   const currentQty = parseFloat(qty) || 0;
@@ -119,14 +115,14 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
           }}
         >
           <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold"
-              style={{
-                background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`,
-                color: 'white',
-              }}
-            >
-              {holding.asset.slice(0, 3)}
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold relative" style={{ flexShrink: 0 }}>
+              {(holding as any).asset_mapping?.icon_url ? (
+                <img src={(holding as any).asset_mapping.icon_url} alt={holding.asset} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
+              ) : (
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
+                  {holding.asset.slice(0, 3)}
+                </div>
+              )}
             </div>
             <div>
               <div className="text-base font-medium" style={{ color: M.text }}>{name}</div>

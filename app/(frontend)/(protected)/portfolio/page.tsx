@@ -123,8 +123,8 @@ export default function PortfolioPage() {
     try {
       const res = await fetch('/api/portfolio-snapshot')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: PortfolioExposure = await res.json()
-      setSnapshot(json)
+      const json = await res.json()
+      setSnapshot(json.exposure ?? json)
     } catch (err) {
       console.error('[PortfolioPage] snapshot error:', err)
     } finally {
@@ -165,28 +165,29 @@ useEffect(() => {
   // Build price lookup from snapshot
   const priceLookup = useMemo(() => {
     const map: Record<string, { usd_price: number; value_usd: number; weight: number }> = {}
-    if (!snapshot || snapshot.exposure?.isEmpty) return map
-    const btcQty = snapshot.exposure?.holdings_json.find((h: any) => h.asset === 'BTC')?.quantity || 0
+    if (!snapshot || snapshot.isEmpty) return map
+    const exp = snapshot
+    const btcQty = exp.holdings_json?.find((h: any) => h.asset === 'BTC')?.quantity || 0
     if (btcQty > 0) {
       map['BTC'] = {
-        usd_price: snapshot.exposure?.btc_value_usd / btcQty,
-        value_usd: snapshot.exposure?.btc_value_usd,
-        weight: snapshot.exposure?.btc_weight_all,
+        usd_price: exp.btc_value_usd / btcQty,
+        value_usd: exp.btc_value_usd,
+        weight: exp.btc_weight_all,
       }
     }
-    const ethQty = snapshot.exposure?.holdings_json.find((h: any) => h.asset === 'ETH')?.quantity || 0
+    const ethQty = exp.holdings_json?.find((h: any) => h.asset === 'ETH')?.quantity || 0
     if (ethQty > 0) {
       map['ETH'] = {
-        usd_price: snapshot.exposure?.eth_value_usd / ethQty,
-        value_usd: snapshot.exposure?.eth_value_usd,
-        weight: snapshot.exposure?.eth_weight_all,
+        usd_price: exp.eth_value_usd / ethQty,
+        value_usd: exp.eth_value_usd,
+        weight: exp.eth_weight_all,
       }
     }
-    for (const a of snapshot.exposure?.alt_breakdown ?? []) {
+    for (const a of exp.alt_breakdown ?? []) {
       map[a.asset] = {
         usd_price: a.usd_price,
         value_usd: a.value_usd,
-        weight: snapshot.exposure?.total_value_usd_all > 0 ? a.value_usd / snapshot.exposure?.total_value_usd_all : 0,
+        weight: exp.total_value_usd_all > 0 ? a.value_usd / exp.total_value_usd_all : 0,
       }
     }
     return map
@@ -213,7 +214,7 @@ useEffect(() => {
 
   const loading = snapshotLoading || holdingsLoading
   const isEmpty = holdings.length === 0
-  const hasSnapshot = snapshot && !snapshot.exposure?.isEmpty && snapshot.exposure?.total_value_usd_all > 0
+  const hasSnapshot = snapshot && !snapshot.isEmpty && (snapshot.total_value_usd_all ?? 0) > 0
   const totalValue = snapshot?.total_value_usd_all || 0
 
   // ── Loading state ──

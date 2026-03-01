@@ -17,11 +17,7 @@ interface AddHoldingSheetProps {
   onClose: () => void;
 }
 
-const ASSET_NAMES: Record<string, string> = {
-  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana',
-  DOT: 'Polkadot', ADA: 'Cardano', RUNE: 'THORChain',
-  CHZ: 'Chiliz', DOGE: 'Dogecoin', THETA: 'Theta', GRT: 'The Graph',
-};
+
 
 export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }: AddHoldingSheetProps) {
   const [step, setStep] = useState<'select' | 'quantity'>('select');
@@ -65,7 +61,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
     );
   }
 
-  const name = ASSET_NAMES[selected?.symbol || ''] || selected?.symbol || '';
+  const name = selected?.name || selected?.symbol || '';
 
   return (
     <div className="flex flex-col h-full">
@@ -110,14 +106,14 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           }}
         >
           <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold"
-              style={{
-                background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`,
-                color: 'white',
-              }}
-            >
-              {selected?.symbol.slice(0, 3)}
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold relative" style={{ flexShrink: 0 }}>
+              {selected?.icon_url ? (
+                <img src={selected.icon_url} alt={selected.symbol} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
+              ) : (
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `linear-gradient(135deg, ${M.accent}, ${M.negative})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
+                  {selected?.symbol?.slice(0, 3)}
+                </div>
+              )}
             </div>
             <div>
               <div className="text-base font-medium" style={{ color: M.text }}>{name}</div>
