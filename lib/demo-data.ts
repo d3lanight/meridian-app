@@ -28,7 +28,7 @@ const bullScenario: Scenario = {
     confidence: 87,
     persistence: 14,
     trend: '+12.5%',
-    volume: 'High',
+    dailyShift: 'High',
     volatility: '42%',
   },
   portfolio: {
@@ -72,6 +72,7 @@ const bullScenario: Scenario = {
     fearGreedLabel: 'Greed',
     btcDominance: 52.3,
     altSeason: 72,
+    totalVolume: 98500000000,
   },
 };
 
@@ -85,7 +86,7 @@ const bearScenario: Scenario = {
     confidence: 72,
     persistence: 21,
     trend: '-18.3%',
-    volume: 'Low',
+    dailyShift: 'Low',
     volatility: '68%',
   },
   portfolio: {
@@ -129,6 +130,7 @@ const bearScenario: Scenario = {
     fearGreedLabel: 'Extreme Fear',
     btcDominance: 58.7,
     altSeason: 28,
+    totalVolume: 98500000000,
   },
 };
 
@@ -142,7 +144,7 @@ const sidewaysScenario: Scenario = {
     confidence: 65,
     persistence: 8,
     trend: '+1.2%',
-    volume: 'Medium',
+    dailyShift: 'Medium',
     volatility: '31%',
   },
   portfolio: {
@@ -186,6 +188,7 @@ const sidewaysScenario: Scenario = {
     fearGreedLabel: 'Neutral',
     btcDominance: 54.1,
     altSeason: 48,
+    totalVolume: 98500000000,
   },
 };
 
@@ -227,7 +230,7 @@ export function getMarketPulseCards(metrics: MarketMetrics = bullScenario.metric
       color: metrics.altSeason > 60 ? M.accent : metrics.altSeason > 40 ? M.textSecondary : M.negative,
     },
     {
-      label: 'Volume Profile',
+      label: 'dailyShift Profile',
       value: metrics.fearGreed > 50 ? 'High' : metrics.fearGreed > 30 ? 'Medium' : 'Low',
       sub: metrics.fearGreed > 50 ? 'Above avg' : metrics.fearGreed > 30 ? 'Average' : 'Below avg',
       color: metrics.fearGreed > 50 ? M.positive : metrics.fearGreed > 30 ? M.textSecondary : M.negative,

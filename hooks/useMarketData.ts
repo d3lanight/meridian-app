@@ -45,7 +45,7 @@ const fallbackRegime: RegimeData = {
   confidence: 0,
   persistence: 0,
   trend: '—',
-  volume: '—',
+  dailyShift: '—',
   volatility: '—',
 }
 
