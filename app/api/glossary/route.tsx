@@ -1,8 +1,6 @@
 // ━━━ Glossary API ━━━
-// v1.0.0 · ca-story60 · 2026-02-25
-// GET /api/glossary — returns all glossary entries
-// GET /api/glossary?slug=glossary-posture — single entry lookup
-// Source: payload_knowledge_entries WHERE category = 'glossary'
+// v2.2.0 · ca-story85 · Sprint 20
+// S85: EntryLearn integration — glossary API, tap-to-expand, regime-contextual content
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -35,6 +33,20 @@ export async function GET(request: Request) {
   const regime = searchParams.get('regime')
   if (regime) {
     query = query.eq('related_regime_id', regime)
+  }
+
+  // Random selection (e.g. ?random=2)
+  const random = searchParams.get('random')
+  if (random) {
+    const { data: allData } = await supabase
+      .from('payload_knowledge_entries')
+      .select('slug, title, summary, related_regime_id')
+      .eq('category', 'glossary')
+      .eq('status', 'published')
+
+    const count = Math.min(parseInt(random) || 2, 5)
+    const shuffled = (allData ?? []).sort(() => Math.random() - 0.5).slice(0, count)
+    return NextResponse.json(shuffled)
   }
 
   const { data, error } = await query

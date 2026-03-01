@@ -1,412 +1,593 @@
 // ━━━ Profile Screen ━━━
-// v1.0.0 · design-unification · 2026-02-22
-// New user-facing settings page matching meridian-settings-v2.jsx artifact
-// Replaces admin config editor (previously at /settings)
-// Note: Toggles/selects are UI-only for now — backend persistence is future scope
+// ═══════════════════════════════════════════════
+// Profile v3.0.0 — Identity hub with preferences,
+// pro CTA, detail sub-views, sign out
+// Story: ca-story87-profile-page-v3 | Sprint 21
+// Target: app/(frontend)/(protected)/profile/page.tsx
+// Replaces: SettingsPage (flat toggle list)
+// ═══════════════════════════════════════════════
 'use client'
 
-import { useState } from 'react'
-import { Mail, Bell, Globe, DollarSign, ChevronRight, BookOpen } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import {
+  Globe,
+  Bell,
+  Mail,
+  DollarSign,
+  Shield,
+  BookOpen,
+  Lock,
+  Download,
+  LogOut,
+  Trash2,
+} from 'lucide-react'
+
 import { M } from '@/lib/meridian'
-import Link from 'next/link'
+import { card, anim } from '@/lib/ui-helpers'
+import { createClient } from '@/lib/supabase/client'
 
-// ── Shared Helpers ────────────────────────────
+import {
+  IdentityCard,
+  MenuCard,
+  MenuRow,
+  Toggle,
+  ProUpgradeCard,
+  SectionHeader,
+} from '@/components/profile'
 
-const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
-  background: M.surface,
-  backdropFilter: M.surfaceBlur,
-  WebkitBackdropFilter: M.surfaceBlur,
-  borderRadius: '24px',
-  padding: '20px',
-  border: `1px solid ${M.border}`,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-  ...extra,
-})
+// ═══════════════════════════════════════════════
+// Profile v3.0.0 — Profile hub with identity,
+// preferences, pro CTA, detail sub-views, sign out
+// Story: ca-story87-profile-page-v3
+// Sprint: 21 (E14 Close)
+// ═══════════════════════════════════════════════
 
-// ── Toggle ────────────────────────────────────
+type Section = 'display' | 'notifications' | 'email' | null
 
-function Toggle({
-  label,
-  desc,
-  defaultValue = true,
-  disabled = false,
-}: {
-  label: string
-  desc?: string
-  defaultValue?: boolean
-  disabled?: boolean
-}) {
-  const [on, setOn] = useState(defaultValue)
-  return (
-    <div
-      style={{
-        ...card({ padding: '16px' }),
-        marginBottom: 12,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>{label}</div>
-        {desc && <div style={{ fontSize: 12, color: M.textMuted }}>{desc}</div>}
-      </div>
-      <button
-        onClick={() => !disabled && setOn(!on)}
-        style={{
-          width: 48,
-          height: 28,
-          borderRadius: 28,
-          background: on ? M.accentGradient : '#E8DED6',
-          border: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          position: 'relative',
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: '50%',
-            background: 'white',
-            position: 'absolute',
-            top: 4,
-            left: on ? 24 : 4,
-            transition: 'left 0.2s ease',
-          }}
-        />
-      </button>
-    </div>
-  )
+interface ProfileData {
+  display_name: string | null
+  created_at: string
+  tier: 'free' | 'pro'
 }
 
-// ── Select ────────────────────────────────────
+// ── Detail: Display ──────────────────────────
 
-function SelectField({
-  label,
-  options,
-  defaultValue,
-  disabled = false,
-}: {
-  label: string
-  options: string[]
-  defaultValue: string
-  disabled?: boolean
-}) {
+function DisplayDetail({ onBack }: { onBack: () => void }) {
   return (
-    <div style={{ ...card({ padding: '16px' }), marginBottom: 12, opacity: disabled ? 0.5 : 1 }}>
-      <label style={{ fontSize: 12, color: M.textMuted, display: 'block', marginBottom: 8 }}>
-        {label}
-      </label>
-      <select
-        defaultValue={defaultValue}
-        disabled={disabled}
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
         style={{
-          width: '100%',
-          background: 'transparent',
+          background: 'none',
           border: 'none',
           fontSize: 14,
+          color: M.accentDeep,
           fontWeight: 500,
-          color: M.text,
-          outline: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
-// ── Section Detail Views ──────────────────────
-
-function EmailSettings({ onBack }: { onBack: () => void }) {
-  const [emailOn, setEmailOn] = useState(true)
-  return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: 14,
-          color: M.accentDeep,
-          fontWeight: 500,
-          cursor: 'pointer',
-          marginBottom: 24,
-          padding: 0,
-        }}
-      >
         ← Back
       </button>
       <h2
         style={{
           fontFamily: "'Outfit', sans-serif",
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 500,
           color: M.text,
-          margin: '0 0 4px',
-        }}
-      >
-        Email
-      </h2>
-      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
-        Control when and how you receive emails
-      </p>
-      <Toggle label="Email notifications" desc="Master switch for all email" defaultValue={emailOn} />
-      <SelectField
-        label="Delivery frequency"
-        options={['Immediately', 'Daily digest', 'Weekly digest']}
-        defaultValue="Daily digest"
-        disabled={!emailOn}
-      />
-      <SelectField
-        label="Minimum severity"
-        options={['Info (all)', 'Watch (notable)', 'Actionable (high)']}
-        defaultValue="Watch (notable)"
-        disabled={!emailOn}
-      />
-    </div>
-  )
-}
-
-function NotificationSettings({ onBack }: { onBack: () => void }) {
-  return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: 14,
-          color: M.accentDeep,
-          fontWeight: 500,
-          cursor: 'pointer',
-          marginBottom: 24,
-          padding: 0,
-        }}
-      >
-        ← Back
-      </button>
-      <h2
-        style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 22,
-          fontWeight: 500,
-          color: M.text,
-          margin: '0 0 4px',
-        }}
-      >
-        Notifications
-      </h2>
-      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
-        Choose which signals trigger alerts
-      </p>
-      <Toggle label="Posture mismatch" desc="When portfolio diverges from regime" />
-      <Toggle label="Regime change" desc="When market regime shifts" />
-      <Toggle label="ALT concentration" desc="When altcoin allocation is flagged" />
-      <Toggle label="Band breach" desc="When weights move outside targets" />
-    </div>
-  )
-}
-
-function DisplaySettings({ onBack }: { onBack: () => void }) {
-  return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: 14,
-          color: M.accentDeep,
-          fontWeight: 500,
-          cursor: 'pointer',
-          marginBottom: 24,
-          padding: 0,
-        }}
-      >
-        ← Back
-      </button>
-      <h2
-        style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 22,
-          fontWeight: 500,
-          color: M.text,
-          margin: '0 0 4px',
+          marginBottom: 4,
         }}
       >
         Display
       </h2>
-      <p style={{ fontSize: 14, color: M.textSecondary, margin: '0 0 24px' }}>
+      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>
         Customize how information appears
       </p>
-      <SelectField
-        label="Timezone"
-        options={['Europe/Brussels', 'America/New_York', 'Asia/Tokyo', 'UTC']}
-        defaultValue="Europe/Brussels"
-      />
-      <SelectField
-        label="Date format"
-        options={['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY']}
-        defaultValue="YYYY-MM-DD"
-      />
-      <SelectField
-        label="Currency"
-        options={['USD', 'EUR', 'BTC']}
-        defaultValue="USD"
-      />
+
+      <MenuCard>
+        {[
+          {
+            label: 'Timezone',
+            options: ['Europe/Brussels', 'America/New_York', 'Asia/Tokyo', 'UTC'],
+            def: 'Europe/Brussels',
+          },
+          {
+            label: 'Date format',
+            options: ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY'],
+            def: 'YYYY-MM-DD',
+          },
+          {
+            label: 'Currency',
+            options: ['USD', 'EUR', 'GBP', 'BTC'],
+            def: 'USD',
+          },
+        ].map((item, i) => (
+          <div key={i} style={{ padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, color: M.textMuted, marginBottom: 6 }}>
+              {item.label}
+            </div>
+            <select
+              defaultValue={item.def}
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 500,
+                color: M.text,
+                outline: 'none',
+                cursor: 'pointer',
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              {item.options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </MenuCard>
     </div>
   )
 }
 
-// ── Settings Item Config ──────────────────────
+// ── Detail: Notifications ────────────────────
 
-interface SettingsItem {
-  id: string
-  Icon: typeof Mail
-  title: string
-  desc: string
-  disabled?: boolean
-}
-
-const SETTINGS_ITEMS: SettingsItem[] = [
-  { id: 'email', Icon: Mail, title: 'Email', desc: 'Delivery and digest settings' },
-  { id: 'notifications', Icon: Bell, title: 'Notifications', desc: 'Signal triggers and alerts' },
-  { id: 'display', Icon: Globe, title: 'Display', desc: 'Timezone, format, currency' },
-  { id: 'portfolio', Icon: DollarSign, title: 'Portfolio', desc: 'Target bands and benchmarks', disabled: true },
-]
-
-// ═══════════════════════════════════════════════
-// MAIN PAGE
-// ═══════════════════════════════════════════════
-
-export default function SettingsPage() {
-  const [section, setSection] = useState<string | null>(null)
-
-  if (section === 'email') return <EmailSettings onBack={() => setSection(null)} />
-  if (section === 'notifications') return <NotificationSettings onBack={() => setSection(null)} />
-  if (section === 'display') return <DisplaySettings onBack={() => setSection(null)} />
+function NotificationDetail({ onBack }: { onBack: () => void }) {
+  const [posture, setPosture] = useState(true)
+  const [regime, setRegime] = useState(true)
+  const [alt, setAlt] = useState(true)
+  const [band, setBand] = useState(false)
 
   return (
     <div style={{ padding: '24px 20px' }}>
-      {/* ── Page Header ── */}
-      <div style={{ marginBottom: 28 }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 14,
+          color: M.accentDeep,
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        ← Back
+      </button>
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 20,
+          fontWeight: 500,
+          color: M.text,
+          marginBottom: 4,
+        }}
+      >
+        Notifications
+      </h2>
+      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>
+        Choose which signals trigger alerts
+      </p>
+
+      <MenuCard>
+        {[
+          {
+            label: 'Posture mismatch',
+            desc: 'When portfolio diverges from regime',
+            on: posture,
+            set: setPosture,
+          },
+          {
+            label: 'Regime change',
+            desc: 'When market regime shifts',
+            on: regime,
+            set: setRegime,
+          },
+          {
+            label: 'ALT concentration',
+            desc: 'When altcoin allocation is flagged',
+            on: alt,
+            set: setAlt,
+          },
+          {
+            label: 'Band breach',
+            desc: 'When weights move outside targets',
+            on: band,
+            set: setBand,
+          },
+        ].map((item, i) => (
+          <div
+            key={i}
+            style={{
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>{item.desc}</div>
+            </div>
+            <Toggle on={item.on} onToggle={item.set} />
+          </div>
+        ))}
+      </MenuCard>
+
+      <SectionHeader label="Pro" />
+      <MenuCard>
+        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro />
+        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro />
+      </MenuCard>
+    </div>
+  )
+}
+
+// ── Detail: Email ────────────────────────────
+
+function EmailDetail({ onBack }: { onBack: () => void }) {
+  const [emailOn, setEmailOn] = useState(true)
+
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 14,
+          color: M.accentDeep,
+          fontWeight: 500,
+          cursor: 'pointer',
+          marginBottom: 24,
+          padding: 0,
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        ← Back
+      </button>
+      <h2
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 20,
+          fontWeight: 500,
+          color: M.text,
+          marginBottom: 4,
+        }}
+      >
+        Email
+      </h2>
+      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>
+        Control when and how you receive emails
+      </p>
+
+      <MenuCard>
+        <div
+          style={{
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>Email notifications</div>
+            <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>
+              Master switch for all email
+            </div>
+          </div>
+          <Toggle on={emailOn} onToggle={setEmailOn} />
+        </div>
+      </MenuCard>
+
+      <MenuCard>
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: M.textMuted, marginBottom: 6 }}>
+            Delivery frequency
+          </div>
+          <select
+            defaultValue="Daily digest"
+            disabled={!emailOn}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              color: emailOn ? M.text : M.textMuted,
+              outline: 'none',
+              cursor: emailOn ? 'pointer' : 'not-allowed',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {['Immediately', 'Daily digest', 'Weekly digest'].map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: M.textMuted, marginBottom: 6 }}>
+            Minimum severity
+          </div>
+          <select
+            defaultValue="Watch (notable)"
+            disabled={!emailOn}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              color: emailOn ? M.text : M.textMuted,
+              outline: 'none',
+              cursor: emailOn ? 'pointer' : 'not-allowed',
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {['Info (all)', 'Watch (notable)', 'Actionable (high)'].map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        </div>
+      </MenuCard>
+    </div>
+  )
+}
+
+// ── Meridian Logo SVG ────────────────────────
+
+function MeridianLogoSvg() {
+  return (
+    <svg width={36} height={36} viewBox="0 0 48 48" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="24" cy="24" r="20" stroke={M.accent} strokeWidth="1.5" opacity="0.25" />
+      <circle cx="24" cy="24" r="13" stroke={M.accent} strokeWidth="1.5" opacity="0.5" />
+      <line x1="24" y1="2" x2="24" y2="46" stroke={M.accent} strokeWidth="1.5" />
+      <line x1="12" y1="6" x2="36" y2="42" stroke={M.accent} strokeWidth="1" opacity="0.35" />
+      <circle cx="24" cy="24" r="3" fill={M.accent} />
+      <circle cx="24" cy="10" r="1.5" fill={M.accent} opacity="0.5" />
+      <circle cx="24" cy="38" r="1.5" fill={M.accent} opacity="0.5" />
+    </svg>
+  )
+}
+
+// ── Main Page ────────────────────────────────
+
+export default function ProfilePage() {
+  const [section, setSection] = useState<Section>(null)
+  const [mounted, setMounted] = useState(false)
+  const [email, setEmail] = useState('')
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Tier from profiles table (default 'free')
+  const tier: 'free' | 'pro' = profile?.tier ?? 'free'
+
+  useEffect(() => {
+    setMounted(true)
+
+    async function loadProfile() {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (user) {
+          setEmail(user.email ?? '')
+
+          const { data } = await supabase
+            .from('profiles')
+            .select('display_name, created_at, tier')
+            .eq('id', user.id)
+            .single()
+
+          if (data) {
+            setProfile(data)
+          }
+        }
+      } catch {
+        // Silently fail — page renders with fallback data
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [])
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
+  // Format member since date
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+      })
+    : ''
+
+  const displayName = profile?.display_name || ''
+
+  // ── Detail sub-views ─────────────────────
+
+  if (section === 'display') return <DisplayDetail onBack={() => setSection(null)} />
+  if (section === 'notifications') return <NotificationDetail onBack={() => setSection(null)} />
+  if (section === 'email') return <EmailDetail onBack={() => setSection(null)} />
+
+  // ── Main view ────────────────────────────
+
+  return (
+    <div style={{ padding: '24px 20px', paddingBottom: 24 }}>
+      {/* Page header */}
+      <div style={{ marginBottom: 20, ...anim(mounted, 0) }}>
         <h1
           style={{
             fontFamily: "'Outfit', sans-serif",
             fontSize: 24,
             fontWeight: 500,
             color: M.text,
-            margin: '0 0 4px',
+            marginBottom: 4,
           }}
         >
-          Settings
+          Profile
         </h1>
-        <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>
-          Preferences and notifications
-        </p>
+        <p style={{ fontSize: 14, color: M.textSecondary }}>Account and preferences</p>
       </div>
 
-      {/* ── Settings Cards ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {SETTINGS_ITEMS.map((item) => {
-          const { Icon } = item
-          return (
-            <button
-              key={item.id}
-              onClick={() => !item.disabled && setSection(item.id)}
-              style={{
-                ...card({ padding: '16px' }),
-                cursor: item.disabled ? 'not-allowed' : 'pointer',
-                opacity: item.disabled ? 0.5 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 16,
-                width: '100%',
-                textAlign: 'left' as const,
-              }}
-            >
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Icon size={24} color={M.accentDeep} strokeWidth={2} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>
-                  {item.title}
-                </div>
-                <div style={{ fontSize: 12, color: M.textMuted }}>{item.desc}</div>
-              </div>
-              <ChevronRight size={20} color={M.textMuted} strokeWidth={2} />
-            </button>
-          )
-        })}
-</div>
+      {/* Identity card */}
+      {!loading && (
+        <div style={anim(mounted, 1)}>
+          <IdentityCard
+            name={displayName}
+            email={email}
+            tier={tier}
+            memberSince={memberSince}
+          />
+        </div>
+      )}
 
-      {/* ── Learn Section (S60) ── */}
-      <h2
+      {/* Pro upgrade card (free users only) */}
+      {tier === 'free' && (
+        <div style={anim(mounted, 2)}>
+          <ProUpgradeCard />
+        </div>
+      )}
+
+      {/* Preferences */}
+      <div style={anim(mounted, 3)}>
+        <SectionHeader label="Preferences" />
+        <MenuCard>
+          <MenuRow
+            icon={Globe}
+            label="Display"
+            desc="Timezone, format, currency"
+            onClick={() => setSection('display')}
+          />
+          <MenuRow
+            icon={Bell}
+            label="Notifications"
+            desc="Signal triggers and alerts"
+            onClick={() => setSection('notifications')}
+          />
+          <MenuRow
+            icon={Mail}
+            label="Email"
+            desc="Delivery and digest settings"
+            onClick={() => setSection('email')}
+          />
+        </MenuCard>
+      </div>
+
+      {/* Portfolio settings */}
+      <div style={anim(mounted, 4)}>
+        <SectionHeader label="Portfolio" />
+        <MenuCard>
+          <MenuRow
+            icon={DollarSign}
+            label="Target bands"
+            desc="Allocation targets per regime"
+            pro
+          />
+          <MenuRow
+            icon={Shield}
+            label="Risk profile"
+            desc="Conservative, moderate, aggressive"
+            pro
+          />
+        </MenuCard>
+      </div>
+
+      {/* Learn */}
+      <div style={anim(mounted, 5)}>
+        <SectionHeader label="Learn" />
+        <MenuCard>
+          <MenuRow
+            icon={BookOpen}
+            label="Glossary"
+            desc="Key terms explained"
+            onClick={() => {
+              /* Future: navigate to glossary view */
+            }}
+          />
+        </MenuCard>
+      </div>
+
+      {/* Account */}
+      <div style={anim(mounted, 6)}>
+        <SectionHeader label="Account" />
+        <MenuCard>
+          <MenuRow
+            icon={Lock}
+            label="Change password"
+            desc="Update your login credentials"
+            onClick={() => {
+              /* S88: wire to change password flow */
+            }}
+          />
+          <MenuRow
+            icon={Download}
+            label="Export data"
+            desc="Download your portfolio history"
+            onClick={() => {
+              /* Future: export flow */
+            }}
+          />
+          <MenuRow icon={LogOut} label="Sign out" danger onClick={handleSignOut} />
+        </MenuCard>
+      </div>
+
+      {/* Danger zone */}
+      <div style={{ marginTop: 8, ...anim(mounted, 7) }}>
+        <MenuCard>
+          <MenuRow
+            icon={Trash2}
+            label="Delete account"
+            desc="Permanently remove all data"
+            danger
+            onClick={() => {
+              /* Future: delete confirmation flow */
+            }}
+          />
+        </MenuCard>
+      </div>
+
+      {/* About card */}
+      <div
         style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 18,
-          fontWeight: 600,
-          color: M.text,
-          margin: '28px 0 12px',
+          ...card({ padding: 18 }),
+          marginTop: 20,
+          marginBottom: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          ...anim(mounted, 8),
         }}
       >
-        Learn
-      </h2>
-      <Link href="/profile/learn/glossary" style={{ textDecoration: 'none' }}>
-        <div
-          style={{
-            ...card({ padding: '16px' }),
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            width: '100%',
-          }}
-        >
+        <MeridianLogoSvg />
+        <div>
           <div
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(244,162,97,0.1), rgba(231,111,81,0.1))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: M.text,
+              fontFamily: "'Outfit', sans-serif",
             }}
           >
-            <BookOpen size={24} color={M.accentDeep} strokeWidth={2} />
+            Meridian
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: M.text, marginBottom: 2 }}>
-              Glossary
-            </div>
-            <div style={{ fontSize: 12, color: M.textMuted }}>18 terms explained</div>
+          <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>
+            v0.9 · De La Night
           </div>
-          <ChevronRight size={20} color={M.textMuted} strokeWidth={2} />
         </div>
-      </Link>
+      </div>
     </div>
   )
 }
