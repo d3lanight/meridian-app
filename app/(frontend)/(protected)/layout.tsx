@@ -10,7 +10,7 @@ import { PrivacyProvider } from '@/contexts/PrivacyContext';
 import { M } from '@/lib/meridian';
 
 function getTabFromPath(pathname: string): NavTab {
-  if (pathname.startsWith('/portfolio')) return 'portfolio';
+  if (pathname.startsWith('/exposure')) return 'portfolio';
   if (pathname.startsWith('/market')) return 'market';
   if (pathname.startsWith('/profile')) return 'profile';
   return 'home';
@@ -27,7 +27,7 @@ export default function ProtectedLayout({
   const handleTabChange = (tab: NavTab) => {
     const routes: Record<NavTab, string> = {
       home: '/dashboard',
-      portfolio: '/portfolio',
+      portfolio: '/exposure',
       market: '/market',
       profile: '/profile',
     };
