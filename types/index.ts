@@ -55,7 +55,7 @@ export interface MarketMetrics {
   totalVolume: number | null;
 }
 
-export type NavTab = 'home' | 'portfolio' | 'market' | 'profile';
+export type NavTab = 'home' | 'exposure' | 'market' | 'profile';
 
 // ━━━ Portfolio Snapshot (ca-story39, updated ca-story47, ca-story48) ━━━
 
