@@ -3,14 +3,14 @@
 // Label updates: Home→Today, Market→Pulse (matches v2 design artifacts)
 'use client';
 
-import { Home, Target, Activity, User } from 'lucide-react';
+import { Home, Shield, Activity, User } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import type { NavTab } from '@/types';
 
 const tabs: { id: NavTab; icon: typeof Home; label: string }[] = [
   { id: 'home', icon: Home, label: 'Today' },
   { id: 'market', icon: Activity, label: 'Pulse' },
-  { id: 'portfolio', icon: Target, label: 'Portfolio' },
+  { id: 'exposure', icon: Shield, label: 'Exposure' },
   { id: 'profile', icon: User, label: 'Profile' },
 ];
 
