@@ -83,7 +83,7 @@ const templates: InsightTemplate[] = [
     build: (ctx) => {
       const altPct = Math.round(bucketWeight(ctx, 'ALT'))
       return {
-        icon: 'activity',
+        icon: 'zap',
         iconVariant: 'accent',
         text: `ALT concentration at ${altPct}% — higher altcoin exposure typically amplifies volatility in a ${regimeLabel(ctx)} regime.`,
         subtext: 'Consider whether this matches your risk tolerance.',
@@ -96,7 +96,7 @@ const templates: InsightTemplate[] = [
     id: 'posture-aligned',
     match: (ctx) => ctx.portfolio.misalignment < 0.1 && ctx.portfolio.allocations.length > 0,
     build: (ctx) => ({
-      icon: 'shield',
+      icon: 'zap',
       iconVariant: 'positive',
       text: `Your portfolio is well-aligned with the current ${regimeLabel(ctx)} regime. Allocations are within target bands.`,
       subtext: 'No adjustments suggested by the current model.',
@@ -135,7 +135,7 @@ const templates: InsightTemplate[] = [
     id: 'low-confidence',
     match: (ctx) => ctx.regime.confidence < 50 && ctx.regime.confidence > 0,
     build: (ctx) => ({
-      icon: 'activity',
+      icon: 'trending',
       iconVariant: 'neutral',
       text: `Regime confidence is ${ctx.regime.confidence}% — the model is uncertain about current conditions.`,
       subtext: 'Low confidence periods often precede regime transitions.',
