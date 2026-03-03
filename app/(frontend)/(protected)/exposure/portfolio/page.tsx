@@ -181,32 +181,22 @@ useEffect(() => {
   const priceLookup = useMemo(() => {
     const map: Record<string, { usd_price: number; value_usd: number; weight: number }> = {}
     if (!snapshot || snapshot.isEmpty) return map
-    const exp = snapshot
-    const btcQty = exp.holdings_json?.find((h: any) => h.asset === 'BTC')?.quantity || 0
-    if (btcQty > 0) {
-      map['BTC'] = {
-        usd_price: exp.btc_value_usd / btcQty,
-        value_usd: exp.btc_value_usd,
-        weight: exp.btc_weight_all,
-      }
-    }
-    const ethQty = exp.holdings_json?.find((h: any) => h.asset === 'ETH')?.quantity || 0
-    if (ethQty > 0) {
-      map['ETH'] = {
-        usd_price: exp.eth_value_usd / ethQty,
-        value_usd: exp.eth_value_usd,
-        weight: exp.eth_weight_all,
-      }
-    }
-    for (const a of exp.alt_breakdown ?? []) {
-      map[a.asset] = {
-        usd_price: a.usd_price,
-        value_usd: a.value_usd,
-        weight: exp.total_value_usd_all > 0 ? a.value_usd / exp.total_value_usd_all : 0,
+    const cp = (snapshot as any).current_prices as Record<string, number> ?? {}
+
+    // Use current_prices from asset_prices cache (S141)
+    const totalValue = snapshot.total_value_usd_all ?? 0
+    for (const h of holdings) {
+      const price = cp[h.asset]
+      if (price == null) continue
+      const valueUsd = price * h.quantity
+      map[h.asset] = {
+        usd_price: price,
+        value_usd: valueUsd,
+        weight: totalValue > 0 ? valueUsd / totalValue : 0,
       }
     }
     return map
-  }, [snapshot])
+  }, [snapshot, holdings])
 
   const handleAdd = async (asset: string, quantity: number, costBasis?: number | null) => {
     const ok = await addHolding({ asset, quantity, cost_basis: costBasis })
@@ -678,7 +668,7 @@ if (snapshotError && !holdingsLoading) {
                           <span style={{ fontSize: 9, color: M.textMuted }}>since \u2022\u2022\u2022</span>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                           <span style={{
                             fontSize: 11, fontWeight: 600,
                             fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1",
@@ -687,6 +677,14 @@ if (snapshotError && !holdingsLoading) {
                             {up ? '+' : ''}{pctChange.toFixed(1)}%
                           </span>
                           <span style={{ fontSize: 9, color: M.textMuted }}>since {dateLbl}</span>
+                          <span style={{
+                            fontSize: 10, color: up ? M.positive : M.negative,
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+                            opacity: 0.75,
+                          }}>
+                            {hidden ? '' : `${up ? '+' : '-'}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs((price.usd_price - baseline) * h.quantity))}`}
+                          </span>
                         </div>
                       )
                     })() : null
@@ -697,6 +695,7 @@ if (snapshotError && !holdingsLoading) {
                     </div>
                   )}
                 </div>
+
 
                 {/* Right: value + edit */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

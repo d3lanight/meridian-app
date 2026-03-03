@@ -1,11 +1,12 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v2.1.0 · ca-story132 · Sprint 28
+// v2.2.0 · ca-story141 · Sprint 29
 // Changelog:
 //  v1.1.0 — Enriched holdings with cost_basis + category
 //  v1.2.0 — Enriched holdings include include_in_exposure flag
 //  v1.3.0 — Fix: portfolio_exposure uses created_at, not timestamp
 //  v2.0.0 — S142: restore clobbered file, add risk_profile + target_bands (4-bucket)
 //  v2.1.0 — S132: enrich alt_breakdown with icon_url, add btc/eth icon_urls to response
+//  v2.2.0 — S141: enrich holdings with current price + PnL (price_at_add vs asset_prices)
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -40,6 +41,7 @@ const EMPTY = {
   timestamp: null,
   risk_profile: null,
   target_bands: null,
+  current_prices: {},
 }
 
 // Resolve regime string from latest_regime to RegimeKey
@@ -60,7 +62,7 @@ export async function GET() {
     }
 
     // Parallel fetch: exposure + holdings + user preferences + current regime
-    const [expResult, holdingsResult, prefResult, regimeResult] = await Promise.all([
+    const [expResult, holdingsResult, prefResult, regimeResult, assetPricesResult] = await Promise.all([
       supabase
         .from('latest_exposure')
         .select('*')
@@ -70,7 +72,7 @@ export async function GET() {
         .single(),
       supabase
         .from('portfolio_holdings')
-        .select('asset, quantity, cost_basis, include_in_exposure')
+        .select('asset, quantity, cost_basis, include_in_exposure, price_at_add, created_at')
         .eq('user_id', user.id)
         .order('asset', { ascending: true }),
       supabase
@@ -83,10 +85,23 @@ export async function GET() {
         .select('regime_type')
         .limit(1)
         .single(),
+      supabase
+        .from('asset_prices')
+        .select('asset_id, price_usd, asset_mapping(symbol)')
+        .order('fetched_at', { ascending: false }),
     ])
 
     if (expResult.error || !expResult.data) {
       return NextResponse.json(EMPTY)
+    }
+
+    // Build symbol → current price map from asset_prices (first/latest row per symbol)
+    const currentPrices: Record<string, number> = {}
+    for (const row of (assetPricesResult.data ?? []) as any[]) {
+      const symbol = row.asset_mapping?.symbol
+      if (symbol && row.price_usd != null && !(symbol in currentPrices)) {
+        currentPrices[symbol] = Number(row.price_usd)
+      }
     }
 
     const exposure = expResult.data as unknown as ExposureRow
@@ -113,13 +128,35 @@ export async function GET() {
     }
 
     // Build enriched holdings array
-    const enrichedHoldings: EnrichedHolding[] = (holdingsResult.data ?? []).map((h: any) => ({
-      asset: h.asset,
-      quantity: Number(h.quantity) || 0,
-      cost_basis: h.cost_basis != null ? Number(h.cost_basis) : null,
-      category: (categoryMap[h.asset] as EnrichedHolding['category']) ?? null,
-      include_in_exposure: h.include_in_exposure ?? true,
-    }))
+    const enrichedHoldings = (holdingsResult.data ?? []).map((h: any) => {
+      const quantity     = Number(h.quantity) || 0
+      const priceAtAdd   = h.price_at_add != null ? Number(h.price_at_add) : null
+      const currentPrice = currentPrices[h.asset] ?? null
+      const valueUsd     = currentPrice != null ? currentPrice * quantity : null
+      const sinceAddedPct =
+        priceAtAdd != null && priceAtAdd > 0 && currentPrice != null
+          ? ((currentPrice - priceAtAdd) / priceAtAdd) * 100
+          : null
+      const usdDelta =
+        priceAtAdd != null && currentPrice != null
+          ? (currentPrice - priceAtAdd) * quantity
+          : null
+
+      return {
+        asset:               h.asset,
+        quantity,
+        cost_basis:          h.cost_basis != null ? Number(h.cost_basis) : null,
+        category:            (categoryMap[h.asset] as EnrichedHolding['category']) ?? null,
+        include_in_exposure: h.include_in_exposure ?? true,
+        price_at_add:        priceAtAdd,
+        price_usd:           currentPrice,
+        value_usd:           valueUsd,
+        since_added_pct:     sinceAddedPct,
+        usd_delta:           usdDelta,
+        created_at:          h.created_at ?? null,
+        icon_url:            iconMap[h.asset] ?? null,
+      }
+    })
 
     let altBreakdown = exposure.alt_breakdown
     if (typeof altBreakdown === 'string') {
@@ -161,6 +198,8 @@ export async function GET() {
       // S142: risk profile + target bands for current regime
       risk_profile: resolvedProfile,
       target_bands: targetBands,
+      // S141: get current prices
+      current_prices: currentPrices,
     })
   } catch (err) {
     console.error('[portfolio-snapshot] Unexpected error:', err)

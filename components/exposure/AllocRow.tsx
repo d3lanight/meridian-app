@@ -14,6 +14,7 @@ interface AllocRowProps {
   targetMin: number         // 0–100 (percentage points)
   targetMax: number         // 0–100 (percentage points)
   hidden?: boolean
+  preview?: boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ export default function AllocRow({
   targetMin,
   targetMax,
   hidden = false,
+  preview = false,
 }: AllocRowProps) {
   const currentPct = Math.round(current * 100)
   const targetMid  = Math.round((targetMin + targetMax) / 2)
@@ -54,7 +56,7 @@ export default function AllocRow({
           }}>
             {category}
           </span>
-          {warning && (
+          {warning && !preview &&(
             <span style={{ fontSize: 12, color: '#F59E0B' }} aria-label="Outside target zone">
               ⚠
             </span>
@@ -71,7 +73,16 @@ export default function AllocRow({
             minWidth: 32,
             textAlign: 'right',
           }}>
-            {hidden ? '—' : `${currentPct}%`}
+            <span style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: warning && !preview ? '#F59E0B' : M.text,
+              fontFamily: "'Outfit', sans-serif",
+              minWidth: 32,
+              textAlign: 'right',
+            }}>
+            {preview || hidden ? '—' : `${currentPct}%`}
+            </span>
           </span>
           <span style={{
             fontSize: 11,
@@ -101,6 +112,19 @@ export default function AllocRow({
           background: 'rgba(99, 102, 241, 0.15)',
           borderRadius: 4,
         }} />
+
+        {/* Current fill — hidden in preview mode */}
+        {!preview && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0,
+            width: `${barCurrentPct}%`, height: '100%',
+            borderRadius: 4,
+            background: warning
+              ? 'linear-gradient(90deg, #F59E0B, #FBBF24)'
+              : M.accentGradient,
+            transition: 'width 0.4s ease',
+          }} />
+        )}
 
         {/* Current fill */}
         <div style={{

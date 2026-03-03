@@ -1,6 +1,6 @@
 // ━━━ Profile Screen ━━━
 // ═══════════════════════════════════════════════
-// Profile v3.0.0 — Identity hub with preferences,
+// Profile v3.1.0 — Identity hub with preferences, risk profile picker
 // pro CTA, detail sub-views, sign out
 // Story: ca-story87-profile-page-v3 | Sprint 21
 // Target: app/(frontend)/(protected)/profile/page.tsx
@@ -44,7 +44,7 @@ import {
 // Sprint: 21 (E14 Close)
 // ═══════════════════════════════════════════════
 
-type Section = 'display' | 'notifications' | 'email' | 'password' | null
+type Section = 'display' | 'notifications' | 'email' | 'password' | 'risk-profile' | null
 
 interface ProfileData {
   display_name: string | null
@@ -372,12 +372,133 @@ function MeridianLogoSvg() {
 
 // ── Main Page ────────────────────────────────
 
+// ── Detail: Risk Profile ─────────────────────
+
+const RISK_OPTIONS: { value: 'aggressive' | 'neutral' | 'conservative'; label: string; desc: string }[] = [
+  { value: 'aggressive', label: 'Aggressive', desc: 'Growth-weighted — higher crypto exposure targets' },
+  { value: 'neutral',    label: 'Neutral',    desc: 'Balanced default — moderate exposure across buckets' },
+  { value: 'conservative', label: 'Conservative', desc: 'Stability-weighted — lower risk, higher stable targets' },
+]
+
+function RiskProfileDetail({
+  current,
+  saving,
+  onSelect,
+  onBack,
+}: {
+  current: 'aggressive' | 'neutral' | 'conservative' | null
+  saving: boolean
+  onSelect: (p: 'aggressive' | 'neutral' | 'conservative') => void
+  onBack: () => void
+}) {
+  const effective = current ?? 'neutral'
+
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none', border: 'none',
+          fontSize: 14, color: M.accentDeep, fontWeight: 500,
+          cursor: 'pointer', marginBottom: 24, padding: 0,
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        ← Back
+      </button>
+
+      <h2 style={{
+        fontFamily: "'Outfit', sans-serif",
+        fontSize: 20, fontWeight: 500, color: M.text, marginBottom: 4,
+      }}>
+        Risk Profile
+      </h2>
+      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>
+        Sets your target allocation bands on the Exposure page. Free for all users.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {RISK_OPTIONS.map(opt => {
+          const isSelected = effective === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => !saving && onSelect(opt.value)}
+              style={{
+                ...card({ padding: 16 }),
+                display: 'flex', alignItems: 'center', gap: 14,
+                border: isSelected
+                  ? `1.5px solid ${M.accentDeep}`
+                  : '1px solid rgba(255,255,255,0.8)',
+                background: isSelected
+                  ? 'linear-gradient(135deg, rgba(123,111,168,0.12), rgba(90,77,138,0.08))'
+                  : 'rgba(255,255,255,0.6)',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+                textAlign: 'left',
+                width: '100%',
+                transition: 'border 0.15s, background 0.15s',
+              }}
+            >
+              {/* Selection indicator */}
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                border: `2px solid ${isSelected ? M.accentDeep : M.border.replace('1px solid ', '')}`,
+                background: isSelected
+                  ? 'linear-gradient(135deg, #7B6FA8, #5A4D8A)'
+                  : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {isSelected && (
+                  <div style={{
+                    width: 6, height: 6, borderRadius: '50%', background: 'white',
+                  }} />
+                )}
+              </div>
+
+              {/* Label + description */}
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: 14, fontWeight: isSelected ? 600 : 500,
+                  color: isSelected ? M.accentDeep : M.text,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}>
+                  {opt.label}
+                  {opt.value === 'neutral' && current === null && (
+                    <span style={{ fontSize: 10, color: M.textMuted, marginLeft: 6, fontWeight: 400 }}>
+                      default
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: M.textMuted, marginTop: 2 }}>
+                  {opt.desc}
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {current === null && (
+        <p style={{
+          fontSize: 11, color: M.textMuted, textAlign: 'center',
+          marginTop: 16, lineHeight: 1.5,
+        }}>
+          Neutral is active until you make a selection.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   const [section, setSection] = useState<Section>(null)
   const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState('')
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [riskProfile, setRiskProfile] = useState<'aggressive' | 'neutral' | 'conservative' | null>(null)
+  const [savingRisk, setSavingRisk] = useState(false)
 
   // Tier from profiles table (default 'free')
   const tier: 'free' | 'pro' = profile?.tier ?? 'free'
@@ -403,6 +524,14 @@ export default function ProfilePage() {
 
           if (data) {
             setProfile(data)
+
+            // Load risk profile from user_preferences
+          const { data: prefs } = await supabase
+            .from('user_preferences')
+            .select('risk_profile')
+            .eq('user_id', user.id)
+            .single()
+          if (prefs) setRiskProfile(prefs.risk_profile ?? null)
           }
         }
       } catch {
@@ -414,6 +543,24 @@ export default function ProfilePage() {
 
     loadProfile()
   }, [])
+
+  const handleRiskSelect = async (profile: 'aggressive' | 'neutral' | 'conservative') => {
+    setSavingRisk(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase
+        .from('user_preferences')
+        .update({ risk_profile: profile })
+        .eq('user_id', user.id)
+      setRiskProfile(profile)
+    } catch {
+      // Silently fail — UI optimistic
+    } finally {
+      setSavingRisk(false)
+    }
+  }
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -437,6 +584,14 @@ export default function ProfilePage() {
   if (section === 'notifications') return <NotificationDetail onBack={() => setSection(null)} />
   if (section === 'email') return <EmailDetail onBack={() => setSection(null)} />
   if (section === 'password') return <ChangePasswordSheet onBack={() => setSection(null)} />
+  if (section === 'risk-profile') return (
+    <RiskProfileDetail
+      current={riskProfile}
+      saving={savingRisk}
+      onSelect={handleRiskSelect}
+      onBack={() => setSection(null)}
+    />
+  )
 
   if (loading) {
     return (
@@ -538,8 +693,8 @@ export default function ProfilePage() {
           <MenuRow
             icon={Shield}
             label="Risk profile"
-            desc="Conservative, moderate, aggressive"
-            pro
+            desc={riskProfile ? riskProfile.charAt(0).toUpperCase() + riskProfile.slice(1) : 'Neutral (default)'}
+            onClick={() => setSection('risk-profile')}
           />
         </MenuCard>
       </div>
