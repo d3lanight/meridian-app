@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-// v0.4.0 · ca-story131 · Sprint 28
+// v0.5.0 · ca-story132 · Sprint 28
 // Changelog:
+//   v0.5.0 — S132: HoldingsSection wired with flagged state + ETH-fold
 //   v0.4.0 — S131: AllocationSection wired with 4-bucket weights + target_bands
 //   v0.3.1 — Fix: M.display replaced with string literal
 //   v0.3.0 — S130: PostureHero wired with snapshot + market data
@@ -13,9 +14,10 @@ import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
 import PostureHero from '@/components/exposure/PostureHero'
 import AllocationSection from '@/components/exposure/AllocationSection'
+import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import ManageBar from '@/components/exposure/ManageBar'
-import type { PortfolioSnapshot } from '@/types'
+import type { PortfolioSnapshot, AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -29,12 +31,19 @@ interface MarketContextData {
  * not yet in the base type. Extended locally until types/index.ts is updated.
  */
 interface SnapshotWithPosture extends PortfolioSnapshot {
-  isEmpty?:         boolean
-  risk_score?:      number
-  btc_weight_all?:  number
-  eth_weight_all?:  number
-  alt_weight_all?:  number
-  target_bands?:    TargetBands | null
+  isEmpty?:             boolean
+  risk_score?:          number
+  btc_weight_all?:      number
+  eth_weight_all?:      number
+  alt_weight_all?:      number
+  btc_value_usd?:       number
+  eth_value_usd?:       number
+  alt_value_usd?:       number
+  btc_icon_url?:        string | null
+  eth_icon_url?:        string | null
+  total_value_usd_all?: number
+  alt_breakdown?:       AltHolding[]
+  target_bands?:        TargetBands | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -83,6 +92,13 @@ export default function ExposurePage() {
   const altWeight    = snapshot?.alt_weight_all ?? 0
   const stableWeight = Math.max(0, 1 - btcWeight - ethWeight - altWeight)
   const targetBands  = snapshot?.target_bands ?? null
+  const btcValueUsd    = snapshot?.btc_value_usd ?? 0
+  const ethValueUsd    = snapshot?.eth_value_usd ?? 0
+  const altValueUsd    = snapshot?.alt_value_usd ?? 0
+  const btcIconUrl     = snapshot?.btc_icon_url ?? null
+  const ethIconUrl     = snapshot?.eth_icon_url ?? null
+  const totalValueAll  = snapshot?.total_value_usd_all ?? 0
+  const altBreakdown   = snapshot?.alt_breakdown ?? []
 
   return (
     <div style={{
@@ -149,6 +165,36 @@ export default function ExposurePage() {
             <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '40%' }} />
             {[0, 1, 2, 3].map(i => (
               <div key={i} style={{ height: 24, borderRadius: 6, background: M.surfaceLight }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Holdings ── */}
+      {snapshot && !snapshot.isEmpty ? (
+        <HoldingsSection
+          btcWeight={btcWeight}
+          ethWeight={ethWeight}
+          altWeight={altWeight}
+          stableWeight={stableWeight}
+          btcValueUsd={btcValueUsd}
+          ethValueUsd={ethValueUsd}
+          altValueUsd={altValueUsd}
+          btcIconUrl={btcIconUrl}
+          ethIconUrl={ethIconUrl}
+          altBreakdown={altBreakdown}
+          totalValue={totalValueAll}
+          targetBands={targetBands}
+          score={score}
+          mounted={mounted}
+          hidden={hidden}
+        />
+      ) : (
+        <div style={{ ...card(), ...anim(mounted, 2), marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '30%' }} />
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ height: 44, borderRadius: 8, background: M.surfaceLight }} />
             ))}
           </div>
         </div>

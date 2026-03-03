@@ -1,10 +1,11 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v2.0.0 · ca-story142 · 2026-03-02
+// v2.1.0 · ca-story132 · Sprint 28
 // Changelog:
 //  v1.1.0 — Enriched holdings with cost_basis + category
 //  v1.2.0 — Enriched holdings include include_in_exposure flag
 //  v1.3.0 — Fix: portfolio_exposure uses created_at, not timestamp
 //  v2.0.0 — S142: restore clobbered file, add risk_profile + target_bands (4-bucket)
+//  v2.1.0 — S132: enrich alt_breakdown with icon_url, add btc/eth icon_urls to response
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -32,6 +33,7 @@ const EMPTY = {
   isEmpty: true,
   btc_weight_all: 0, eth_weight_all: 0, alt_weight_all: 0,
   btc_value_usd: 0, eth_value_usd: 0, alt_value_usd: 0,
+  btc_icon_url: null, eth_icon_url: null,
   alt_count: 0, alt_unpriced: '[]', alt_breakdown: [],
   total_value_usd_all: 0, holdings_count: 0, holdings_json: [],
   enriched_holdings: [],
@@ -95,16 +97,18 @@ export async function GET() {
     const regimeKey = toRegimeKey(regimeResult.data?.regime_type ?? null)
     const targetBands = getTargetBands(rawProfile, regimeKey)
 
-    // Build category lookup from asset_mapping
+    // Build category + icon lookup from asset_mapping
     const { data: mappings } = await supabase
       .from('asset_mapping')
-      .select('symbol, category')
+      .select('symbol, category, icon_url')
       .eq('active', true)
 
     const categoryMap: Record<string, string> = {}
+    const iconMap: Record<string, string | null> = {}
     if (mappings) {
       for (const m of mappings) {
         categoryMap[m.symbol] = m.category
+        iconMap[m.symbol] = m.icon_url ?? null
       }
     }
 
@@ -121,6 +125,15 @@ export async function GET() {
     if (typeof altBreakdown === 'string') {
       try { altBreakdown = JSON.parse(altBreakdown) } catch { altBreakdown = [] }
     }
+
+    // S132: enrich alt_breakdown entries with icon_url from iconMap
+    const enrichedAltBreakdown = Array.isArray(altBreakdown)
+      ? (altBreakdown as any[]).map(entry => ({
+          ...entry,
+          icon_url: iconMap[entry.asset] ?? null,
+        }))
+      : []
+
     let holdingsJson = exposure.holdings_json
     if (typeof holdingsJson === 'string') {
       try { holdingsJson = JSON.parse(holdingsJson) } catch { holdingsJson = [] }
@@ -134,9 +147,12 @@ export async function GET() {
       btc_value_usd: Number(exposure.btc_value_usd) || 0,
       eth_value_usd: Number(exposure.eth_value_usd) || 0,
       alt_value_usd: Number(exposure.alt_value_usd) || 0,
+      // S132: icon_urls for BTC + ETH (direct fields, not in alt_breakdown)
+      btc_icon_url: iconMap['BTC'] ?? null,
+      eth_icon_url: iconMap['ETH'] ?? null,
       alt_count: exposure.alt_count ?? 0,
       alt_unpriced: exposure.alt_unpriced ?? '[]',
-      alt_breakdown: altBreakdown ?? [],
+      alt_breakdown: enrichedAltBreakdown,
       total_value_usd_all: Number(exposure.total_value_usd_all) || 0,
       holdings_count: exposure.holdings_count ?? 0,
       holdings_json: holdingsJson ?? [],
