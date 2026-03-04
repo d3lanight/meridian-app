@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Check, Activity } from 'lucide-react'
+import { Check, X, Activity } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import ProgressiveDisclosure, { DisclosureGroup,} from '@/components/education/ProgressiveDisclosure'
 import GradientBar from '@/components/shared/GradientBar'
@@ -497,11 +497,9 @@ export default function MarketPulsePage() {
                     marginLeft: 16,
                   }}
                 >
-                  <Check
-                    size={20}
-                    color={ethAligned ? M.positive : M.negative}
-                    strokeWidth={2.5}
-                  />
+                  {ethAligned
+                     ? <Check size={20} color={M.positive} strokeWidth={2.5} />
+                     : <X size={20} color={M.negative} strokeWidth={2.5} />}
                 </div>
               </div>
             </div>
