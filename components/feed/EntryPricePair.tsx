@@ -83,7 +83,7 @@ function CoinCard({ sym, price, change, bg, shadow, icon, hidden }: CoinCardProp
             fontFeatureSettings: "'tnum' 1, 'lnum' 1",
           }}
         >
-          {hidden ? '••%' : `${positive ? '+' : ''}${change.toFixed(2)}%`}
+          {hidden ? '••%' : <>{positive ? '+' : ''}{change.toFixed(2)}% <span style={{ color: '#8B7565', fontWeight: 400 }}>24h</span></>}
         </div>
       </div>
     </div>
