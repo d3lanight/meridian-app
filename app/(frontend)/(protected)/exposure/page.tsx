@@ -59,6 +59,8 @@ interface SnapshotWithPosture extends PortfolioSnapshot {
   alt_breakdown?:       AltHolding[]
   target_bands?:        TargetBands | null
   risk_profile?:        string | null
+  enriched_holdings?:  any[]
+  holdings_count?:     number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -186,7 +188,7 @@ function ExposureEmptyState({
 
       {/* CTA */}
       <div style={{ ...anim(mounted, 3) }}>
-        <Link href="/portfolio" style={{
+        <Link href="/exposure/portfolio" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           background: 'linear-gradient(90deg, #7B6FA8, #5A4D8A)',
           color: 'white', padding: 16, borderRadius: 20,
@@ -231,7 +233,7 @@ export default function ExposurePage() {
       .catch(() => {})
   }, [])
 
-  const holdingCount  = snapshot?.holdings?.length ?? snapshot?.holding_count ?? 0
+  const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
   const totalValue    = snapshot?.total_value_usd ?? 0
   const score         = snapshot?.risk_score ?? 0
   const label         = scoreToLabel(score)
@@ -468,7 +470,7 @@ export default function ExposurePage() {
           {/* ── Pro CTA (S134) ── */}
           <ProFeaturesCta />
 
-          <ManageBar count={holdingCount} total={totalValue} />
+          <ManageBar count={holdingCount} total={totalValueAll} />
         </>
       )}
     </div>
