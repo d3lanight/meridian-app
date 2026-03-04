@@ -66,10 +66,10 @@ export interface RegimeConfig {
 }
 
 export const REGIMES: Record<string, RegimeConfig> = {
-  bull:     { bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)', s: '#2A9D8F', d: 'rgba(42,157,143,0.12)',  l: 'Bull',     icon: '↗uFE0E' },
-  bear:     { bg: 'linear-gradient(135deg,#E76F51,#F08C70)', s: '#E76F51', d: 'rgba(231,111,81,0.12)',  l: 'Bear',     icon: '↘uFE0E' },
-  range:    { bg: 'linear-gradient(135deg,#8B7565,#A08979)', s: '#8B7565', d: 'rgba(139,117,101,0.12)', l: 'Range',    icon: '→uFE0E' },
-  volatile: { bg: 'linear-gradient(135deg,#D4A017,#E8B84B)', s: '#D4A017', d: 'rgba(212,160,23,0.12)', l: 'Volatile', icon: '↕uFE0E' },
+  bull:     { bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)', s: '#2A9D8F', d: 'rgba(42,157,143,0.12)',  l: 'Bull',     icon: '↗︎' },
+  bear:     { bg: 'linear-gradient(135deg,#E76F51,#F08C70)', s: '#E76F51', d: 'rgba(231,111,81,0.12)',  l: 'Bear',     icon: '↘︎' },
+  range:    { bg: 'linear-gradient(135deg,#8B7565,#A08979)', s: '#8B7565', d: 'rgba(139,117,101,0.12)', l: 'Range',    icon: '→︎' },
+  volatile: { bg: 'linear-gradient(135deg,#D4A017,#E8B84B)', s: '#D4A017', d: 'rgba(212,160,23,0.12)', l: 'Volatile', icon: '↕︎' },
 }
 
 /** Reverse-lookup: display label → regime key */
