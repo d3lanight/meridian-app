@@ -1,6 +1,8 @@
 // ━━━ Exposure Page ━━━
-//   v0.6.0 — S135: Empty state with regime preview + educational allocation bands
+//   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
 // Changelog:
+//   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
+//   v0.6.0 — S135: Empty state with regime preview + educational allocation bands
 //   v0.5.0 — S132: HoldingsSection wired with flagged state + ETH-fold
 //   v0.4.0 — S131: AllocationSection wired with 4-bucket weights + target_bands
 //   v0.3.1 — Fix: M.display replaced with string literal
@@ -10,7 +12,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield } from 'lucide-react'
+import { Shield, Zap, TrendingUp } from 'lucide-react'
 import { BookOpen } from 'lucide-react'
 import { getTargetBands } from '@/lib/risk-profiles'
 import AllocRow from '@/components/exposure/AllocRow'
@@ -21,6 +23,8 @@ import AllocationSection from '@/components/exposure/AllocationSection'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import ManageBar from '@/components/exposure/ManageBar'
+import InsightCard from '@/components/exposure/InsightCard'
+import ProFeaturesCta from '@/components/exposure/ProFeaturesCta'
 import type { PortfolioSnapshot, AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
 import Link from 'next/link'
@@ -377,6 +381,75 @@ export default function ExposurePage() {
               </div>
             </div>
           )}
+
+          {/* ── Analysis (S134) ── */}
+          {snapshot && (
+            <div style={{ marginTop: 8 }}>
+              {score >= 60 ? (
+                <InsightCard
+                  icon={Shield}
+                  variant="positive"
+                  text={`All categories within target bands. Your portfolio is well-positioned for the current regime.`}
+                />
+              ) : score < 40 ? (
+                <>
+                  <InsightCard
+                    icon={Zap}
+                    variant="warning"
+                    text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
+                    subtext="Analytical context, not a rebalancing signal."
+                  />
+                  <InsightCard
+                    icon={TrendingUp}
+                    variant="warning"
+                    text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
+                  />
+                </>
+              ) : (
+                <InsightCard
+                  icon={Shield}
+                  variant="neutral"
+                  text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
+                />
+              )}
+            </div>
+          )}
+
+          {/* ── Analysis (S134) ── */}
+          {snapshot && (
+            <div style={{ marginTop: 8 }}>
+              {score >= 60 ? (
+                <InsightCard
+                  icon={Shield}
+                  variant="positive"
+                  text={`All categories within target bands. Your portfolio is well-positioned for the current regime.`}
+                />
+              ) : score < 40 ? (
+                <>
+                  <InsightCard
+                    icon={Zap}
+                    variant="warning"
+                    text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
+                    subtext="Analytical context, not a rebalancing signal."
+                  />
+                  <InsightCard
+                    icon={TrendingUp}
+                    variant="warning"
+                    text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
+                  />
+                </>
+              ) : (
+                <InsightCard
+                  icon={Shield}
+                  variant="neutral"
+                  text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
+                />
+              )}
+            </div>
+          )}
+
+          {/* ── Pro CTA (S134) ── */}
+          <ProFeaturesCta />
 
           <ManageBar count={holdingCount} total={totalValue} />
         </>
