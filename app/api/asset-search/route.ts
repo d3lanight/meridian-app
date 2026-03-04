@@ -1,7 +1,9 @@
 // ━━━ Asset Search API ━━━
-// v1.0.0 · ca-story108 · 2026-03-01
-// GET /api/asset-search?q=term
-// Local-first search with CoinGecko fallback
+// v1.1.0 · ca-story139 · 2026-03-04
+// Changelog:
+//   v1.1.0 — S139: Seed first asset_prices row on dynamic registration (CoinGecko price fetch)
+//   v1.0.0 — S108: Initial — local-first search + CoinGecko fallback + POST registration
+
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -140,6 +142,37 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: 'Failed to add asset' }, { status: 500 })
+  }
+
+  // ── Seed first asset_prices row (S139) ──
+  // Best-effort: fetch current price from CoinGecko, upsert into asset_prices cache
+  if (data?.id) {
+    try {
+      const priceRes = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coingecko_id)}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
+      )
+      if (priceRes.ok) {
+        const priceData = await priceRes.json()
+        const coin = priceData[coingecko_id]
+        if (coin?.usd) {
+          await supabase
+            .from('asset_prices')
+            .upsert(
+              {
+                asset_id: data.id,
+                price_usd: coin.usd,
+                change_24h: coin.usd_24h_change ?? null,
+                market_cap: coin.usd_market_cap ?? null,
+                volume_24h: coin.usd_24h_vol ?? null,
+                recorded_at: new Date().toISOString(),
+              },
+              { onConflict: 'asset_id' },
+            )
+        }
+      }
+    } catch {
+      // Price seeding is best-effort — don't fail the registration
+    }
   }
 
   return NextResponse.json({ asset: data })
