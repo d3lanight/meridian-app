@@ -1,6 +1,7 @@
-// v1.2.0 · S144
+// v1.3.0 · S144
 // Changelog:
 //   v1.2.0 — S144: Added profile prop, passed to postureNarrative for profile-aware text
+//   v1.3.0 — S154: Add visible border to match other hero cards
 //   v1.1.0 — Rebuilt to match Figma design (node 40:1074):
 //             label as large heading, score top-right, icon left of label,
 //             "Posture" micro-label above, score color matches threshold
@@ -104,6 +105,7 @@ export default function PostureHero({ score, label, regime, hidden, profile }: P
     <div
       style={{
         ...card(),
+        border: '1px solid rgba(255,255,255,0.9)',
         background: tint !== 'transparent'
           ? `linear-gradient(135deg, ${tint}, ${tint}), ${M.surface}`
           : M.surface,
