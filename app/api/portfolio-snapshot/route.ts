@@ -1,5 +1,5 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v2.3.0 · S144
+// v2.4.0 · S151
 // Changelog:
 //  v1.1.0 — Enriched holdings with cost_basis + category
 //  v1.2.0 — Enriched holdings include include_in_exposure flag
@@ -8,6 +8,7 @@
 //  v2.1.0 — S132: enrich alt_breakdown with icon_url, add btc/eth icon_urls to response
 //  v2.2.0 — S141: enrich holdings with current price + PnL (price_at_add vs asset_prices)
 //  v2.3.0 — S144: Compute and return risk_score (0–100) from weights vs target bands
+//  v2.4.0 — S151: Band-relative alignment score (replaces maxOver formula)
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -114,6 +115,10 @@ export async function GET() {
     const targetBands = getTargetBands(rawProfile, regimeKey)
 
     // S144: compute risk_score (0–100) from actual weights vs target bands
+    // S151: Band-relative alignment score (0-100)
+    // Deviation measured relative to band width — narrow bands penalize harder.
+    // Clamped at 1.0 per bucket, averaged across 4. No single-bucket cap.
+    // Examples (conservative/bull): 80% ETH → ~14, balanced → 100, slight drift → ~77
     function computeRiskScore(
       weights: { btc: number; eth: number; alt: number; stable: number },
       bands: typeof targetBands
@@ -125,19 +130,20 @@ export async function GET() {
         { actual: weights.stable * 100, min: bands.stable[0], max: bands.stable[1] },
       ]
 
-      let totalDev = 0
+      let totalRelDev = 0
       for (const b of buckets) {
         const overshoot = b.actual < b.min
           ? b.min - b.actual
           : b.actual > b.max
             ? b.actual - b.max
             : 0
-        const halfRange = (b.max - b.min) / 2
-        const maxOver = Math.max(50, 100 - halfRange)
-        totalDev += Math.min(1, overshoot / maxOver)
+        const bandWidth = b.max - b.min
+        // Band-relative: 2x band width = max penalty per bucket
+        const relDev = bandWidth > 0 ? Math.min(1, overshoot / (bandWidth * 2)) : 0
+        totalRelDev += relDev
       }
 
-      const avgDev = totalDev / buckets.length
+      const avgDev = totalRelDev / buckets.length
       return Math.round(Math.max(0, Math.min(100, (1 - avgDev) * 100)))
     }
 
