@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
+//   v0.8.0 — S134
 // Changelog:
+//   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
 //   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
 //   v0.6.0 — S135: Empty state with regime preview + educational allocation bands
 //   v0.5.0 — S132: HoldingsSection wired with flagged state + ETH-fold
@@ -22,6 +23,7 @@ import PostureHero from '@/components/exposure/PostureHero'
 import AllocationSection from '@/components/exposure/AllocationSection'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
+import { Eye, EyeOff } from 'lucide-react'
 import ManageBar from '@/components/exposure/ManageBar'
 import InsightCard from '@/components/exposure/InsightCard'
 import ProFeaturesCta from '@/components/exposure/ProFeaturesCta'
@@ -205,7 +207,7 @@ export default function ExposurePage() {
   const [snapshot, setSnapshot] = useState<SnapshotWithPosture | null>(null)
   const [regime, setRegime]     = useState<string>('range')
   const [regimeConfidence, setRegimeConfidence] = useState<number | null>(null)
-  const { hidden } = usePrivacy()
+  const { hidden, toggleHidden } = usePrivacy()
   
 
   useEffect(() => {
@@ -271,6 +273,19 @@ export default function ExposurePage() {
         }}>
           Exposure
         </h1>
+        <div
+          onClick={toggleHidden}
+          style={{
+            width: 38, height: 38, borderRadius: '50%', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.5)',
+            border: '1px solid rgba(255,255,255,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {hidden
+            ? <EyeOff size={16} color={M.textSecondary} />
+            : <Eye size={16} color={M.textSecondary} />}
+        </div>
       </div>
 
       {/* ── Risk profile null banner (S143) ── */}
