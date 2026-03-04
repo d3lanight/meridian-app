@@ -1,5 +1,6 @@
-// v1.1.0 · ca-story130 · Sprint 28
+// v1.2.0 · S144
 // Changelog:
+//   v1.2.0 — S144: Added profile prop, passed to postureNarrative for profile-aware text
 //   v1.1.0 — Rebuilt to match Figma design (node 40:1074):
 //             label as large heading, score top-right, icon left of label,
 //             "Posture" micro-label above, score color matches threshold
@@ -23,6 +24,7 @@ interface PostureHeroProps {
   label: string    // 'Aligned' | 'Neutral' | 'Misaligned'
   regime: string   // e.g. 'bull', 'bear', 'range', 'volatility'
   hidden: boolean  // privacy mode — from usePrivacy() in parent
+  profile?: string // S144: risk profile label for narrative context
 }
 
 // ─── Font constants (M has no typography tokens) ──────────────────────────
@@ -68,7 +70,7 @@ function toPostureKey(label: string): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function PostureHero({ score, label, regime, hidden }: PostureHeroProps) {
+export default function PostureHero({ score, label, regime, hidden, profile }: PostureHeroProps) {
   const [mounted, setMounted] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
   const [barWidth, setBarWidth] = useState(0)
@@ -90,7 +92,7 @@ export default function PostureHero({ score, label, regime, hidden }: PostureHer
   }, [])
 
   const { tint, scoreColor, iconBg, dotBorder } = getScoreThreshold(score)
-  const narrative  = postureNarrative(toPostureKey(label), regime)
+  const narrative  = postureNarrative(toPostureKey(label), regime, profile)
   const clampedScore = Math.min(100, Math.max(0, score))
 
   const DOT_SIZE = 16

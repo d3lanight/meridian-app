@@ -1,8 +1,7 @@
 // ━━━ AllocationSection Component ━━━
 // v1.0.0 · ca-story131 · Sprint 28
 // Allocation vs Targets section — 4-bucket view (BTC / ETH / ALT / STABLE)
-// Target bands sourced from portfolio-snapshot (lib/risk-profiles.ts, Neutral hardcoded)
-// TODO S144: wire user risk_profile from snapshot when selector is live
+// Target bands sourced from portfolio-snapshot (lib/risk-profiles.ts, profile-aware)
 
 'use client'
 

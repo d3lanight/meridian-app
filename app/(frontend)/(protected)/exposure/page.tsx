@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v0.8.0 — S134
+//   v0.9.0 — S144
 // Changelog:
+//   v0.9.0 — S144: Pass risk profile to PostureHero for narrative context
 //   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
 //   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
 //   v0.6.0 — S135: Empty state with regime preview + educational allocation bands
@@ -329,6 +330,7 @@ export default function ExposurePage() {
                 label={label}
                 regime={regime}
                 hidden={hidden}
+                profile={riskProfile ?? undefined}
               />
             </div>
           ) : (

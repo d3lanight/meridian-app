@@ -1,5 +1,5 @@
 // ━━━ Today — Journal Feed ━━━
-// v2.1.0 · ca-story84 · Sprint 20
+// v2.2.0 · S144: Fetch posture from portfolio-snapshot, pass risk_score + risk_profile to feed
 // S84: Data wiring — skeleton, temporal grouping, empty CTA, richer snippets
 
 'use client'
@@ -42,6 +42,8 @@ export default function DashboardPage() {
   const [regimeExplainer, setRegimeExplainer] = useState<{ summary: string; slug: string } | null>(null)
   const [learnEntries, setLearnEntries] = useState<{ summary: string; slug: string; topic: string }[]>([])
   const [hasHoldings, setHasHoldings] = useState<boolean | undefined>(undefined)
+  const [postureScore, setPostureScore] = useState<number | null>(null)
+  const [riskProfile, setRiskProfile] = useState<string | null>(null)
 
   const {
     scenario,
@@ -83,6 +85,20 @@ export default function DashboardPage() {
       }
     })
   }, [])
+
+  // S144: fetch posture score from portfolio-snapshot (single source of truth)
+  useEffect(() => {
+    async function fetchPosture() {
+      try {
+        const res = await fetch('/api/portfolio-snapshot')
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.risk_score != null) setPostureScore(data.risk_score)
+        if (data.risk_profile) setRiskProfile(data.risk_profile)
+      } catch {}
+    }
+    if (hasHoldings) fetchPosture()
+  }, [hasHoldings])
 
   // Fetch metrics + prices from /api/market
   useEffect(() => {
@@ -172,8 +188,10 @@ export default function DashboardPage() {
         regimeExplainer,
         hasHoldings: isAnon ? undefined : hasHoldings,
         learnEntries,
+        postureScore: isAnon ? null : postureScore,
+        riskProfile: isAnon ? null : riskProfile,
       }),
-    [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer, hasHoldings]
+    [regime, metrics, prices, portfolio, signals, isAnon, userName, regimeExplainer, hasHoldings, postureScore, riskProfile]
   )
 
   return (

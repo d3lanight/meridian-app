@@ -1,5 +1,5 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v2.2.0 · ca-story141 · Sprint 29
+// v2.3.0 · S144
 // Changelog:
 //  v1.1.0 — Enriched holdings with cost_basis + category
 //  v1.2.0 — Enriched holdings include include_in_exposure flag
@@ -7,6 +7,7 @@
 //  v2.0.0 — S142: restore clobbered file, add risk_profile + target_bands (4-bucket)
 //  v2.1.0 — S132: enrich alt_breakdown with icon_url, add btc/eth icon_urls to response
 //  v2.2.0 — S141: enrich holdings with current price + PnL (price_at_add vs asset_prices)
+//  v2.3.0 — S144: Compute and return risk_score (0–100) from weights vs target bands
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
@@ -112,6 +113,34 @@ export async function GET() {
     const regimeKey = toRegimeKey(regimeResult.data?.regime_type ?? null)
     const targetBands = getTargetBands(rawProfile, regimeKey)
 
+    // S144: compute risk_score (0–100) from actual weights vs target bands
+    function computeRiskScore(
+      weights: { btc: number; eth: number; alt: number; stable: number },
+      bands: typeof targetBands
+    ): number {
+      const buckets: Array<{ actual: number; min: number; max: number }> = [
+        { actual: weights.btc * 100,    min: bands.btc[0],    max: bands.btc[1] },
+        { actual: weights.eth * 100,    min: bands.eth[0],    max: bands.eth[1] },
+        { actual: weights.alt * 100,    min: bands.alt[0],    max: bands.alt[1] },
+        { actual: weights.stable * 100, min: bands.stable[0], max: bands.stable[1] },
+      ]
+
+      let totalDev = 0
+      for (const b of buckets) {
+        const overshoot = b.actual < b.min
+          ? b.min - b.actual
+          : b.actual > b.max
+            ? b.actual - b.max
+            : 0
+        const halfRange = (b.max - b.min) / 2
+        const maxOver = Math.max(50, 100 - halfRange)
+        totalDev += Math.min(1, overshoot / maxOver)
+      }
+
+      const avgDev = totalDev / buckets.length
+      return Math.round(Math.max(0, Math.min(100, (1 - avgDev) * 100)))
+    }
+
     // Build category + icon lookup from asset_mapping
     const { data: mappings } = await supabase
       .from('asset_mapping')
@@ -195,6 +224,15 @@ export async function GET() {
       holdings_json: holdingsJson ?? [],
       enriched_holdings: enrichedHoldings,
       timestamp: exposure.created_at,
+      risk_score: computeRiskScore(
+        {
+          btc: exposure.btc_weight_all ?? 0,
+          eth: exposure.eth_weight_all ?? 0,
+          alt: exposure.alt_weight_all ?? 0,
+          stable: Math.max(0, 1 - (exposure.btc_weight_all ?? 0) - (exposure.eth_weight_all ?? 0) - (exposure.alt_weight_all ?? 0)),
+        },
+        targetBands
+      ),
       // S142: risk profile + target bands for current regime
       risk_profile: resolvedProfile,
       target_bands: targetBands,

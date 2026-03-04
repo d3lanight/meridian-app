@@ -42,13 +42,14 @@ export function regimeNarrative(regime: string): string {
 
 // ── Posture Narrative ─────────────────────────
 
-export function postureNarrative(posture: string, regime: string): string {
+export function postureNarrative(posture: string, regime: string, profile?: string): string {
+  const p = profile ? ` for a ${profile.toLowerCase()} profile` : ''
   if (posture === 'Aligned')
-    return `Your holdings show moderate alignment with the current ${regime.toLowerCase()} regime. Portfolio exposure is within expected range.`
+    return `Your holdings are well-aligned with the current ${regime.toLowerCase()} regime${p}. Portfolio exposure is within target bands.`
   if (posture === 'Watch' || posture === 'Moderate')
-    return 'Your holdings are drifting from regime targets. Monitor allocation for potential rebalancing.'
+    return `Your holdings are drifting from target bands${p}. Some buckets are near the edge of their range.`
   if (posture === 'Misaligned')
-    return "Your holdings diverge significantly from the current regime's recommended allocation."
+    return `Your holdings diverge significantly from target allocations${p} in the current ${regime.toLowerCase()} regime.`
   return 'Add holdings to see portfolio posture analysis.'
 }
 

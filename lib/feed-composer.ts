@@ -1,5 +1,6 @@
 // ━━━ Feed Composer ━━━
-// v2.1.0 · ca-story86 · Sprint 20
+// v2.2.0 · ca-story144 · Sprint 30
+// v2.2: S144 — posture uses risk_score from portfolio-snapshot (single source of truth)
 // v2.1: stub signals with live data, severity mapping fix
 
 import type { FeedEntry } from '@/lib/feed-types'
@@ -21,6 +22,8 @@ interface FeedSources {
   signals: Signal[]
   userName: string | null
   hasHoldings?: boolean
+  postureScore?: number | null  // S144: from portfolio-snapshot risk_score (0–100)
+  riskProfile?: string | null   // S144: for narrative context
 
   // Educational
   regimeExplainer?: { summary: string; slug: string } | null
@@ -76,21 +79,20 @@ export function composeFeed(sources: FeedSources): ComposedFeed {
     })
   }
 
-  // ── 4. Posture (auth only) ──
-  if (isAuthed && sources.portfolio && sources.hasHoldings !== false) {
-    const p = sources.portfolio
-    const postureScore = Math.round((1 - p.misalignment) * 100)
-    const label = postureScore >= 70 ? 'Aligned' : postureScore >= 40 ? 'Moderate' : 'Misaligned'
+  // ── 4. Posture (auth only, S144: uses risk_score from portfolio-snapshot) ──
+  if (isAuthed && sources.postureScore != null && sources.hasHoldings !== false) {
+    const score = sources.postureScore
+    const label = score >= 60 ? 'Aligned' : score >= 40 ? 'Moderate' : 'Misaligned'
+    const profileLabel = sources.riskProfile ?? 'neutral'
+    const regimeLabel = sources.regime?.current?.toLowerCase() ?? 'current'
 
-    let narrative = `Your portfolio posture score is ${postureScore}.`
-    if (p.allocations.length > 0) {
-      const topAlloc = p.allocations[0]
-      narrative += ` ${topAlloc.asset} is at ${topAlloc.current}% (target: ${topAlloc.target}%).`
-    }
+    let narrative = `Your posture score is ${score}`
+    if (profileLabel) narrative += ` for a ${profileLabel} profile`
+    narrative += ` in the ${regimeLabel} regime.`
 
     entries.push({
       type: 'posture',
-      data: { score: postureScore, label, narrative },
+      data: { score, label, narrative },
     })
   } else if (isAuthed && sources.hasHoldings === false) {
     showEmptyPortfolioCTA = true
