@@ -130,14 +130,15 @@ export default function DashboardPage() {
         if (res.ok) {
           const json = await res.json()
           const latest = json.regimes?.[0]
-          if (latest) {
-            setPrices({
-              btcPrice: latest.price_now,
-              btcChange: (latest.r_1d ?? 0) * 100,
-              ethPrice: latest.eth_price_now,
-              ethChange: (latest.eth_r_7d ?? 0) * 100,
-            })
-          }
+          const cp = json.current_prices
+           if (cp?.BTC || latest) {
+             setPrices({
+               btcPrice: cp?.BTC?.price ?? latest?.price_now ?? 0,
+               btcChange: cp?.BTC?.change_24h ?? ((latest?.r_1d ?? 0) * 100),
+               ethPrice: cp?.ETH?.price ?? latest?.eth_price_now ?? 0,
+               ethChange: cp?.ETH?.change_24h ?? ((latest?.eth_r_7d ?? 0) * 100),
+             })
+           }
         }
       } catch {
         // Non-critical

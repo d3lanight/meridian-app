@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     const cutoffISO = cutoff.toISOString();
 
     // Parallel fetch: regime history (date-range) + price history + duration stats
-    const [regimeResult, priceResult, durationResult] = await Promise.all([
+    const [regimeResult, priceResult, durationResult, livePriceResult] = await Promise.all([
       supabase
         .from('market_regimes')
         .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
@@ -88,7 +88,25 @@ export async function GET(request: NextRequest) {
         .order('timestamp', { ascending: false })
         .limit(14),
       supabase.rpc('regime_duration_stats'),
+      // Add to the parallel fetch (after durationResult):
+      supabase
+        .from('asset_prices')
+        .select('price_usd, change_24h, recorded_at, asset_mapping!inner(symbol)')
+        .in('asset_mapping.symbol', ['BTC', 'ETH']),
     ]);
+
+    // Build current_prices from asset_prices (hourly freshness)
+const currentPrices: Record<string, { price: number; change_24h: number; recorded_at: string }> = {}
+for (const row of (livePriceResult.data ?? []) as any[]) {
+  const symbol = row.asset_mapping?.symbol
+  if (symbol) {
+    currentPrices[symbol] = {
+      price: Number(row.price_usd),
+      change_24h: Number(row.change_24h),
+      recorded_at: row.recorded_at,
+    }
+  }
+}
 
     if (regimeResult.error) {
       console.error('market_regimes fetch error:', regimeResult.error);
@@ -134,6 +152,7 @@ export async function GET(request: NextRequest) {
       row_count: regimes.length,
       days_requested: days,
       generated_at: new Date().toISOString(),
+      current_prices: currentPrices,
     });
   } catch (err) {
     console.error('Market context API error:', err);

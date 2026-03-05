@@ -507,8 +507,8 @@ export default function MarketPulsePage() {
             {/* ── BTC + ETH Price Row (design v2.1) ── */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 16, ...anim(mounted, 2.2) }}>
               {([
-                { symbol: 'BTC', name: 'Bitcoin', price: current.price_now, change: current.r_1d * 100, bg: 'linear-gradient(135deg, #F7931A, #FF9D2E)', shadow: 'rgba(247,147,26,0.3)' },
-                { symbol: 'ETH', name: 'Ethereum', price: current.eth_price_now, change: current.eth_r_7d * 100, bg: 'linear-gradient(135deg, #627EEA, #8299EF)', shadow: 'rgba(98,126,234,0.3)' },
+                { symbol: 'BTC', name: 'Bitcoin', price: (data as any)?.current_prices?.BTC?.price ?? current.price_now, change: (data as any)?.current_prices?.BTC?.change_24h ?? current.r_1d * 100, bg: 'linear-gradient(135deg, #F7931A, #FF9D2E)', shadow: 'rgba(247,147,26,0.3)' },
+                { symbol: 'ETH', name: 'Ethereum', price: (data as any)?.current_prices?.ETH?.price ?? current.eth_price_now, change: (data as any)?.current_prices?.ETH?.change_24h ?? current.eth_r_7d * 100, bg: 'linear-gradient(135deg, #627EEA, #8299EF)', shadow: 'rgba(98,126,234,0.3)' },
               ] as const).map(coin => {
                 const isPos = coin.change >= 0
                 return (
