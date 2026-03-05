@@ -1,7 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v0.9.2 — S125
+//   v1.0.0 — S159
 // Changelog:
-//   v0.9.2 — S125: Cross-screen consistency (h1 24px, padding 20px, privacy icons, skeleton pulse, mounted delay)
+//   v1.0.0 — S159: Cross-screen consistency (h1 24px, padding 20px, privacy icons, skeleton pulse, mounted delay)
 //   v0.9.1 — S123: Remove duplicate Analysis section, privacy div→button (a11y), toggle 38→44px
 //   v0.9.0 — S144: Pass risk profile to PostureHero for narrative context
 //   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
@@ -16,7 +16,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, Zap, TrendingUp } from 'lucide-react'
+import { Shield, Zap, TrendingUp, Wallet } from 'lucide-react'
 import { BookOpen } from 'lucide-react'
 import { getTargetBands } from '@/lib/risk-profiles'
 import AllocRow from '@/components/exposure/AllocRow'
@@ -280,20 +280,31 @@ export default function ExposurePage() {
         }}>
           Exposure
         </h1>
-        <button
-          onClick={toggleHidden}
-          aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
-          style={{
-            width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
-            background: 'rgba(255,255,255,0.5)',
-            border: `1px solid ${M.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {hidden
-            ? <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
-            : <Eye size={16} color={M.textSecondary} strokeWidth={2} />}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={toggleHidden}
+            aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
+            style={{
+              width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.5)',
+              border: `1px solid ${M.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {hidden
+              ? <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
+              : <Eye size={16} color={M.textSecondary} strokeWidth={2} />}
+          </button>
+          <Link href="/portfolio" style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: M.accentGradient, border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 4px 12px ${M.accentGlow}`,
+            textDecoration: 'none',
+          }} aria-label="Manage holdings">
+            <Wallet size={18} color="white" strokeWidth={2} />
+          </Link>
+        </div>
       </div>
 
       {/* ── Risk profile null banner (S143) ── */}
