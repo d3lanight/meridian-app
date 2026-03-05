@@ -146,7 +146,9 @@ export function usePortfolio(): UsePortfolioReturn {
         throw new Error(err.error || 'Failed to update holding');
       }
       const data = await res.json();
-      setHoldings(prev => prev.map(h => h.id === id ? data.holding : h));
+      // Merge server response with existing local holding to preserve
+      // client-side enrichment (icon_url, etc.) not in portfolio_holdings table
+      setHoldings(prev => prev.map(h => h.id === id ? { ...h, ...data.holding } : h));
       return true;
     } catch (err: unknown) {
       // Rollback
