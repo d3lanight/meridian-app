@@ -126,19 +126,6 @@ export default function AllocRow({
           }} />
         )}
 
-        {/* Current fill */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: `${barCurrentPct}%`,
-          height: '100%',
-          borderRadius: 4,
-          background: warning
-            ? 'linear-gradient(90deg, #F59E0B, #FBBF24)'
-            : M.accentGradient,
-          transition: 'width 0.4s ease',
-        }} />
 
         {/* Target mid marker */}
         <div style={{

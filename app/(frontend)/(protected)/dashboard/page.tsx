@@ -216,8 +216,8 @@ export default function DashboardPage() {
             onClick={toggleHidden}
             aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
             style={{
-              width: 38,
-              height: 38,
+              width: 44,
+              height: 44,
               borderRadius: '50%',
               background: 'rgba(255,255,255,0.5)',
               border: `1px solid ${M.border}`,

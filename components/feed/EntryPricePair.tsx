@@ -98,7 +98,7 @@ export default function EntryPricePair({
   hidden?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
       <CoinCard
         sym="BTC"
         price={data.btcPrice}

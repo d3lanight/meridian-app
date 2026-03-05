@@ -103,17 +103,20 @@ function Indicator({
             onClick={() => setShowInfo(!showInfo)}
             aria-label={`Info about ${label}`}
             style={{
+              width: 44, height: 44, padding: 0,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, position: 'relative', margin: '-13px 0',
+            }}
+          >
+            <span style={{
               width: 18, height: 18, borderRadius: '50%',
               background: showInfo ? M.accentDim : 'rgba(139,117,101,0.1)',
-              border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, fontWeight: 700,
               color: showInfo ? M.accent : M.textMuted,
               transition: 'all 0.15s ease',
-              flexShrink: 0,
-            }}
-          >
-            i
+            }}>i</span>
           </button>
         </div>
         <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 600, color: M.text, flexShrink: 0, marginLeft: 12 }}>
@@ -123,7 +126,7 @@ function Indicator({
       {showInfo && (
         <div style={{
           marginBottom: 12, padding: '10px 12px', borderRadius: 12,
-          background: M.accentGlow, border: `1px solid ${M.borderAccent}`,
+          background: M.accentMuted, border: `1px solid ${M.borderAccent}`,
         }}>
           <p style={{ fontSize: 11, color: M.textSecondary, lineHeight: 1.6, margin: 0 }}>{infoText}</p>
         </div>

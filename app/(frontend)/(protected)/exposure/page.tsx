@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v0.9.0 — S144
+//   v0.9.1 — S123
 // Changelog:
+//   v0.9.1 — S123: Remove duplicate Analysis section, privacy div→button (a11y), toggle 38→44px
 //   v0.9.0 — S144: Pass risk profile to PostureHero for narrative context
 //   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
 //   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
@@ -276,10 +277,11 @@ export default function ExposurePage() {
         }}>
           Exposure
         </h1>
-        <div
+        <button
           onClick={toggleHidden}
+          aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
           style={{
-            width: 38, height: 38, borderRadius: '50%', cursor: 'pointer',
+            width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
             background: 'rgba(255,255,255,0.5)',
             border: '1px solid rgba(255,255,255,0.8)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -288,7 +290,7 @@ export default function ExposurePage() {
           {hidden
             ? <EyeOff size={16} color={M.textSecondary} />
             : <Eye size={16} color={M.textSecondary} />}
-        </div>
+        </button>
       </div>
 
       {/* ── Risk profile null banner (S143) ── */}
@@ -434,38 +436,6 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Analysis (S134) ── */}
-          {snapshot && (
-            <div style={{ marginTop: 8 }}>
-              {score >= 60 ? (
-                <InsightCard
-                  icon={Shield}
-                  variant="positive"
-                  text={`All categories within target bands. Your portfolio is well-positioned for the current regime.`}
-                />
-              ) : score < 40 ? (
-                <>
-                  <InsightCard
-                    icon={Zap}
-                    variant="warning"
-                    text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
-                    subtext="Analytical context, not a rebalancing signal."
-                  />
-                  <InsightCard
-                    icon={TrendingUp}
-                    variant="warning"
-                    text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
-                  />
-                </>
-              ) : (
-                <InsightCard
-                  icon={Shield}
-                  variant="neutral"
-                  text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
-                />
-              )}
-            </div>
-          )}
 
           {/* ── Pro CTA (S134) ── */}
           <ProFeaturesCta />
