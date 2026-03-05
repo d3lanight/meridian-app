@@ -504,8 +504,11 @@ export default function ProfilePage() {
   const tier: 'free' | 'pro' = profile?.tier ?? 'free'
 
   useEffect(() => {
-    setMounted(true)
+    const t = setTimeout(() => setMounted(true), 100)
+    return () => clearTimeout(t)
+  }, [])
 
+  useEffect(() => {
     async function loadProfile() {
       try {
         const supabase = createClient()

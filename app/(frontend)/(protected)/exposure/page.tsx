@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v0.9.1 — S123
+//   v0.9.2 — S125
 // Changelog:
+//   v0.9.2 — S125: Cross-screen consistency (h1 24px, padding 20px, privacy icons, skeleton pulse, mounted delay)
 //   v0.9.1 — S123: Remove duplicate Analysis section, privacy div→button (a11y), toggle 38→44px
 //   v0.9.0 — S144: Pass risk profile to PostureHero for narrative context
 //   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
@@ -215,7 +216,7 @@ export default function ExposurePage() {
   
 
   useEffect(() => {
-    setMounted(true)
+    const t = setTimeout(() => setMounted(true), 100)
 
     fetch('/api/portfolio-snapshot')
       .then(r => r.ok ? r.json() : null)
@@ -232,6 +233,8 @@ export default function ExposurePage() {
         if (conf !== undefined) setRegimeConfidence(conf)
       })
       .catch(() => {})
+
+    return () => clearTimeout(t)
   }, [])
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
@@ -259,7 +262,7 @@ export default function ExposurePage() {
     <div style={{
       minHeight: '100vh',
       background: M.bg,
-      padding: '20px 16px 100px',
+      padding: '24px 20px 100px',
     }}>
 
       {/* ── Header ── */}
@@ -270,7 +273,7 @@ export default function ExposurePage() {
         marginBottom: 24,
       }}>
         <h1 style={{
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 500,
           color: M.text,
           fontFamily: "'Outfit', sans-serif",
@@ -283,13 +286,13 @@ export default function ExposurePage() {
           style={{
             width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
             background: 'rgba(255,255,255,0.5)',
-            border: '1px solid rgba(255,255,255,0.8)',
+            border: `1px solid ${M.border}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           {hidden
-            ? <EyeOff size={16} color={M.textSecondary} />
-            : <Eye size={16} color={M.textSecondary} />}
+            ? <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
+            : <Eye size={16} color={M.textSecondary} strokeWidth={2} />}
         </button>
       </div>
 
@@ -338,7 +341,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div style={{ ...card(), marginBottom: 16, ...anim(mounted, 0) }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16, ...anim(mounted, 0) }}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ width: 72, height: 52, borderRadius: 8, background: M.surfaceLight, marginBottom: 8 }} />
                 <div style={{ width: 56, height: 12, borderRadius: 6, background: M.surfaceLight }} />
@@ -363,7 +366,7 @@ export default function ExposurePage() {
               hidden={hidden}
             />
           ) : (
-            <div style={{ ...card(), ...anim(mounted, 1), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 1), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '40%' }} />
                 {[0, 1, 2, 3].map(i => (
@@ -393,7 +396,7 @@ export default function ExposurePage() {
               hidden={hidden}
             />
           ) : (
-            <div style={{ ...card(), ...anim(mounted, 2), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 2), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '30%' }} />
                 {[0, 1, 2].map(i => (
