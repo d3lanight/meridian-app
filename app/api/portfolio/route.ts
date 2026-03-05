@@ -1,8 +1,10 @@
 // ━━━ Portfolio API ━━━
-// v2.0.0 · ca-story109 · 2026-03-01
+// v2.1.0 · S158 · 2026-03-05
 // GET  /api/portfolio — list holdings with asset_mapping metadata
 // POST /api/portfolio — add holding with asset_id + auto price_at_add
 //
+// Changes from v2.0:
+//   S158: Seed asset_prices from CoinGecko when no price row exists on add
 // Changes from v1.3:
 //   S106: price_at_add auto-captured on POST
 //   S107: asset_id FK support, bidirectional trigger handles sync
@@ -81,11 +83,12 @@ export async function POST(request: Request) {
   // Resolve asset_id if only symbol provided (for validation)
   let resolvedAssetId = asset_id ?? null
   const symbol = asset?.toUpperCase() ?? null
+  let coingeckoId: string | null = null
 
   if (!resolvedAssetId && symbol) {
     const { data: mapping } = await supabase
       .from('asset_mapping')
-      .select('id')
+      .select('id, coingecko_id')
       .eq('symbol', symbol)
       .eq('active', true)
       .limit(1)
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
 
     if (mapping) {
       resolvedAssetId = mapping.id
+      coingeckoId = mapping.coingecko_id ?? null
     }
   }
 
@@ -100,7 +104,7 @@ export async function POST(request: Request) {
   if (resolvedAssetId) {
     const { data: exists } = await supabase
       .from('asset_mapping')
-      .select('id')
+      .select('id, coingecko_id')
       .eq('id', resolvedAssetId)
       .single()
 
@@ -109,6 +113,9 @@ export async function POST(request: Request) {
         { error: 'asset_id not found in asset_mapping' },
         { status: 400 },
       )
+    }
+    if (!coingeckoId && exists.coingecko_id) {
+      coingeckoId = exists.coingecko_id
     }
   }
 
@@ -129,7 +136,38 @@ export async function POST(request: Request) {
         priceAtAdd = Number(latestPrice.price_usd)
       }
     } catch {
-      // Best-effort — don't block the add
+      // No price row exists — try to seed from CoinGecko
+    }
+
+    // S158: Seed asset_prices if no row exists (same pattern as asset-search POST S139)
+    if (priceAtAdd === null && coingeckoId && resolvedAssetId) {
+      try {
+        const priceRes = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coingeckoId)}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true&include_24hr_vol=true`
+        )
+        if (priceRes.ok) {
+          const priceData = await priceRes.json()
+          const coin = priceData[coingeckoId]
+          if (coin?.usd) {
+            priceAtAdd = coin.usd
+            await supabase
+              .from('asset_prices')
+              .upsert(
+                {
+                  asset_id: resolvedAssetId,
+                  price_usd: coin.usd,
+                  change_24h: coin.usd_24h_change ?? null,
+                  market_cap: coin.usd_market_cap ?? null,
+                  volume_24h: coin.usd_24h_vol ?? null,
+                  recorded_at: new Date().toISOString(),
+                },
+                { onConflict: 'asset_id' },
+              )
+          }
+        }
+      } catch {
+        // Best-effort — don't block the add
+      }
     }
   }
 
