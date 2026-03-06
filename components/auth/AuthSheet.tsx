@@ -68,7 +68,7 @@ const inputStyle: React.CSSProperties = {
   border: `1px solid ${M.borderSubtle}`,
   borderRadius: 12,
   color: M.text,
-  fontSize: 14,
+  fontSize: 16,
   fontFamily: FONT_BODY,
   outline: 'none',
   boxSizing: 'border-box',

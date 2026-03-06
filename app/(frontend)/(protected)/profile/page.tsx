@@ -568,7 +568,7 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    window.location.href = '/dashboard'
   }
 
   // Format member since date
