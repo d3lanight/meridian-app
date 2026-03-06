@@ -183,7 +183,7 @@ export default function TodayPage() {
           if (mc.regimes?.length > 0) {
             const latest = mc.regimes[0]
             setRegime(latest.regime || 'range')
-            setConfidence(Math.round(latest.confidence || 0))
+            setConfidence(Math.round((latest.confidence || 0) * 100))
           }
           if (mc.regimes?.length > 1) {
             const current = mc.regimes[0]?.regime

@@ -169,8 +169,8 @@ export default function PulsePage() {
           if (mc.current_prices) {
             const btc = mc.current_prices['BTC']
             const eth = mc.current_prices['ETH']
-            if (btc) { setBtcPrice(btc.price); setBtcChange(btc.change_24h); setBtcIcon('https://assets.coingecko.com/coins/images/1/small/bitcoin.png') }
-            if (eth) { setEthPrice(eth.price); setEthChange(eth.change_24h); setEthIcon('https://assets.coingecko.com/coins/images/279/small/ethereum.png') }
+            if (btc) { setBtcPrice(btc.price); setBtcChange(btc.change_24h); setBtcIcon('https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400') }
+            if (eth) { setEthPrice(eth.price); setEthChange(eth.change_24h); setEthIcon('https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628') }
           }
         }
 

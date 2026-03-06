@@ -1,48 +1,72 @@
-// ━━━ MoversCard ━━━ v1.1.0 · S162
-// Uses shared CryptoIcon with iconUrl (dynamic, same as portfolio)
-// Mock data with CoinGecko CDN URLs — real API will provide these
+// ━━━ MoversCard ━━━ v2.0.0 · S162
+// Live data from /api/top-movers (asset_prices table)
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 import CryptoIcon from '@/components/shared/CryptoIcon'
 
 const NUM_STYLE = { fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }
 
-interface Mover { symbol: string; name: string; price: number; change: number; iconUrl?: string }
+interface Mover { symbol: string; name: string; price: number; change_24h: number; icon_url?: string | null }
 
-function MoverRow({ symbol, name, price, change, iconUrl }: Mover) {
-  const up = change >= 0
+function MoverRow({ symbol, name, price, change_24h, icon_url }: Mover) {
+  const up = change_24h >= 0
   const cc = up ? M.positive : M.negative
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${M.borderSubtle}` }}>
-      <CryptoIcon symbol={symbol} iconUrl={iconUrl} size={32} />
+      <CryptoIcon symbol={symbol} iconUrl={icon_url} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: M.text }}>{name}</div>
         <div style={{ fontSize: 10, color: M.textMuted }}>{symbol}</div>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: M.text, ...NUM_STYLE }}>${price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: cc, ...NUM_STYLE }}>{up ? '+' : ''}{change.toFixed(1)}%</span>
+        <div style={{ fontSize: 13, fontWeight: 600, color: M.text, ...NUM_STYLE }}>${price.toLocaleString('en-US', { maximumFractionDigits: price < 1 ? 4 : 2 })}</div>
+        <span style={{ fontSize: 11, fontWeight: 600, color: cc, ...NUM_STYLE }}>{up ? '+' : ''}{change_24h.toFixed(1)}%</span>
       </div>
     </div>
   )
 }
 
-// Mock data — CoinGecko CDN icon URLs. Real API will provide these dynamically.
-const GAINERS: Mover[] = [
-  { symbol: 'SOL', name: 'Solana', price: 198.40, change: 8.1, iconUrl: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
-  { symbol: 'BTC', name: 'Bitcoin', price: 96420, change: 5.0, iconUrl: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
-  { symbol: 'DOT', name: 'Polkadot', price: 8.45, change: 3.2, iconUrl: 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png' },
-]
-const LOSERS: Mover[] = [
-  { symbol: 'ETH', name: 'Ethereum', price: 3580, change: -1.8, iconUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
-  { symbol: 'DOGE', name: 'Dogecoin', price: 0.38, change: -3.4, iconUrl: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
-]
+function MoversSkeleton() {
+  return (
+    <div style={{ ...card({ padding: 16 }), marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        <div style={{ flex: 1, height: 32, background: M.surfaceLight, borderRadius: 12 }} className="animate-pulse" />
+        <div style={{ flex: 1, height: 32, background: M.surfaceLight, borderRadius: 12 }} className="animate-pulse" />
+      </div>
+      {[1, 2, 3].map(i => (
+        <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: `1px solid ${M.borderSubtle}` }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: M.surfaceLight }} className="animate-pulse" />
+          <div style={{ flex: 1, height: 16, background: M.surfaceLight, borderRadius: 8 }} className="animate-pulse" />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function MoversCard() {
   const [tab, setTab] = useState<'gainers' | 'losers'>('gainers')
-  const list = tab === 'gainers' ? GAINERS : LOSERS
+  const [gainers, setGainers] = useState<Mover[]>([])
+  const [losers, setLosers] = useState<Mover[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/top-movers')
+      .then(r => r.json())
+      .then(d => {
+        setGainers(d.gainers ?? [])
+        setLosers(d.losers ?? [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  if (loading) return <MoversSkeleton />
+
+  const list = tab === 'gainers' ? gainers : losers
+  const empty = list.length === 0
+
   return (
     <div style={{ ...card({ padding: 16 }), marginBottom: 12 }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
@@ -57,7 +81,13 @@ export default function MoversCard() {
           </button>
         ))}
       </div>
-      <div>{list.map(m => <MoverRow key={m.symbol} {...m} />)}</div>
+      {empty ? (
+        <p style={{ fontSize: 12, color: M.textMuted, textAlign: 'center', padding: '12px 0' }}>
+          No {tab} in the last 24h
+        </p>
+      ) : (
+        <div>{list.map(m => <MoverRow key={m.symbol} {...m} />)}</div>
+      )}
     </div>
   )
 }
