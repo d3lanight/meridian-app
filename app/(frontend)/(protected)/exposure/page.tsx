@@ -1,33 +1,31 @@
 // ━━━ Exposure Page ━━━
-//   v1.0.0 — S159
+//   v3.0.0 — S163/S164 · Sprint 34
 // Changelog:
-//   v1.0.0 — S159: Cross-screen consistency (h1 24px, padding 20px, privacy icons, skeleton pulse, mounted delay)
-//   v0.9.1 — S123: Remove duplicate Analysis section, privacy div→button (a11y), toggle 38→44px
-//   v0.9.0 — S144: Pass risk profile to PostureHero for narrative context
-//   v0.8.0 — S136: Privacy toggle in header (Eye/EyeOff), consistent with Portfolio pattern
-//   v0.7.0 — S134: Analysis cards (posture-driven) + Pro CTA
-//   v0.6.0 — S135: Empty state with regime preview + educational allocation bands
-//   v0.5.0 — S132: HoldingsSection wired with flagged state + ETH-fold
-//   v0.4.0 — S131: AllocationSection wired with 4-bucket weights + target_bands
-//   v0.3.1 — Fix: M.display replaced with string literal
-//   v0.3.0 — S130: PostureHero wired with snapshot + market data
-//   v0.2.0 — S133: ManageBar wired with snapshot data
-//   v0.1.0 — S128: Stub
+//   v3.0.0 — S163/S164: Full v4 redesign.
+//            - RegimeTimeline: collapsible, period tabs (7d/30d/90d), 90d pro-locked, rich blocks
+//            - AllocationCard: teal-tinted, regime badge, target zone bars, warning text
+//            - Empty state: regime-aware CTA with target preview
+//            - Header: subtitle with holdings/total/regime
+//            - HoldingCard: v4 style (card per holding, 24h change, flagText)
+//            - isPro from profiles.tier (not hardcoded)
+//            - ManageBar removed
+//            - Divider component between sections
+//   v2.0.0 — S163/S164: Initial v4 attempt (TimelineStrip + AggSection reuse — replaced)
+//   v1.0.0 — S159: Cross-screen consistency
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, Zap, TrendingUp, Wallet } from 'lucide-react'
-import { BookOpen } from 'lucide-react'
+import { Shield, Zap, TrendingUp, Wallet, BookOpen, Eye, EyeOff } from 'lucide-react'
 import { getTargetBands } from '@/lib/risk-profiles'
-import AllocRow from '@/components/exposure/AllocRow'
+import { getRegimeConfig } from '@/lib/regime-utils'
+import type { RegimeRow } from '@/lib/regime-utils'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
 import PostureHero from '@/components/exposure/PostureHero'
-import AllocationSection from '@/components/exposure/AllocationSection'
+import RegimeTimeline from '@/components/exposure/RegimeTimeline'
+import AllocationCard, { buildAllocations } from '@/components/exposure/AllocationCard'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
-import { Eye, EyeOff } from 'lucide-react'
-import ManageBar from '@/components/exposure/ManageBar'
 import InsightCard from '@/components/exposure/InsightCard'
 import ProFeaturesCta from '@/components/exposure/ProFeaturesCta'
 import type { PortfolioSnapshot, AltHolding } from '@/types'
@@ -35,17 +33,14 @@ import type { TargetBands } from '@/lib/risk-profiles'
 import Link from 'next/link'
 
 
+// ─── Fonts ────────────────────────────────────────────────────────────────────
+const FONT_DISPLAY = "'Outfit', sans-serif"
+const FONT_BODY = "'DM Sans', sans-serif"
+const FONT_MONO = "'DM Mono', monospace"
+
+
 // ─── Local types ──────────────────────────────────────────────────────────────
 
-interface MarketContextData {
-  regime_type: string
-  confidence?: number
-}
-
-/**
- * /api/portfolio-snapshot returns PortfolioSnapshot plus computed posture fields
- * not yet in the base type. Extended locally until types/index.ts is updated.
- */
 interface SnapshotWithPosture extends PortfolioSnapshot {
   isEmpty?:             boolean
   risk_score?:          number
@@ -65,145 +60,144 @@ interface SnapshotWithPosture extends PortfolioSnapshot {
   holdings_count?:     number
 }
 
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Map risk_score (0–100) → posture label */
 function scoreToLabel(score: number): string {
   if (score >= 60) return 'Aligned'
   if (score < 40)  return 'Misaligned'
   return 'Neutral'
 }
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
+function formatUsd(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`
+  return `$${Math.round(value).toLocaleString()}`
+}
 
 const REGIME_LABELS: Record<string, string> = {
-  bull: 'Bull Market', bear: 'Bear Market',
-  range: 'Range', volatility: 'High Volatility', insufficient_data: 'Insufficient Data',
+  bull: 'Bull', bear: 'Bear',
+  range: 'Range', volatility: 'Volatile', insufficient_data: 'Insufficient Data',
 }
+
+/** Map market-context API response → RegimeRow[] for regime-utils */
+function toRegimeRows(raw: any[]): RegimeRow[] {
+  return raw.map(r => ({
+    timestamp: r.timestamp || r.market_timestamp || r.created_at || '',
+    regime: r.regime || r.regime_type || 'range',
+    confidence: r.confidence ?? 0,
+    price_now: r.price_now ?? 0,
+  }))
+}
+
+
+// ─── Divider ──────────────────────────────────────────────────────────────────
+
+function Divider({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0', margin: '16px 0 12px' }}>
+      <div style={{ flex: 1, height: 1, background: M.borderSubtle }} />
+      <span style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: M.borderSubtle }} />
+    </div>
+  )
+}
+
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
 
 function ExposureEmptyState({
   regime,
   confidence,
+  persistence,
   mounted,
 }: {
   regime: string
-  confidence: number | null
+  confidence: number
+  persistence: number
   mounted: boolean
 }) {
+  const rc = getRegimeConfig(regime)
   const regimeKey = regime as import('@/lib/risk-profiles').RegimeKey
-  const bands = getTargetBands(null, regimeKey)   // null → neutral default
-  const regimeLabel = REGIME_LABELS[regime] ?? regime
+  const bands = getTargetBands(null, regimeKey)
 
-  const rows = [
-    { category: 'BTC', min: bands.btc[0],    max: bands.btc[1] },
-    { category: 'ETH', min: bands.eth[0],    max: bands.eth[1] },
-    { category: 'ALT', min: bands.alt[0],    max: bands.alt[1] },
-    { category: 'STABLE', min: bands.stable[0], max: bands.stable[1] },
+  const targets = [
+    { label: 'BTC', color: M.btcOrange, pct: Math.round((bands.btc[0] + bands.btc[1]) / 2), target: `${bands.btc[0]}–${bands.btc[1]}%` },
+    { label: 'ETH', color: M.ethBlue, pct: Math.round((bands.eth[0] + bands.eth[1]) / 2), target: `${bands.eth[0]}–${bands.eth[1]}%` },
+    { label: 'ALT', color: '#9945FF', pct: Math.round((bands.alt[0] + bands.alt[1]) / 2), target: `${bands.alt[0]}–${bands.alt[1]}%` },
+    { label: 'Stable', color: M.positive, pct: Math.round((bands.stable[0] + bands.stable[1]) / 2), target: `${bands.stable[0]}–${bands.stable[1]}%` },
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-      {/* Regime context pill */}
-      <div style={{ ...anim(mounted, 0), ...card({ padding: '14px 16px' }) }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
-              textTransform: 'uppercase', color: M.textMuted,
-              fontFamily: "'DM Sans', sans-serif", marginBottom: 4,
-            }}>
-              Current Regime
-            </div>
-            <div style={{
-              fontSize: 18, fontWeight: 500, color: M.text,
-              fontFamily: "'Outfit', sans-serif",
-            }}>
-              {regimeLabel}
-            </div>
-          </div>
-          {confidence !== null && (
-            <div style={{
-              background: M.accentDim,
-              borderRadius: 20, padding: '6px 12px',
-            }}>
-              <span style={{
-                fontSize: 13, fontWeight: 600, color: M.accentDeep,
-                fontFamily: "'DM Mono', monospace",
-              }}>
-                {Math.round(confidence * 100)}%
-              </span>
-              <span style={{
-                fontSize: 10, color: M.textMuted,
-                fontFamily: "'DM Sans', sans-serif", marginLeft: 4,
-              }}>
-                confidence
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Target allocation preview */}
-      <div style={{ ...anim(mounted, 1), ...card() }}>
-        <div style={{
-          fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
-          textTransform: 'uppercase', color: M.accent,
-          fontFamily: "'DM Sans', sans-serif", marginBottom: 16,
-        }}>
-          Target Allocations · Neutral Profile
-        </div>
-        {rows.map(row => (
-          <AllocRow
-            key={row.category}
-            category={row.category}
-            current={0}
-            targetMin={row.min}
-            targetMax={row.max}
-            preview
-          />
-        ))}
-        <p style={{
-          fontSize: 11, color: M.textMuted, lineHeight: 1.6,
-          marginTop: 8, marginBottom: 0,
-        }}>
-          Target bands shift with the market regime. Add holdings to see your actual posture.
-        </p>
-      </div>
-
-      {/* Educational insight card */}
+    <div style={{ padding: '28px 0 0' }}>
+      {/* Regime context card */}
       <div style={{
-        ...anim(mounted, 2),
-        ...card({ padding: '14px 16px' }),
-        display: 'flex', gap: 12, alignItems: 'flex-start',
-        background: 'linear-gradient(135deg, rgba(123,111,168,0.08), rgba(90,77,138,0.05))',
-        border: `1px solid ${M.borderAccent}`,
+        ...anim(mounted, 1),
+        ...card({ padding: 20 }),
+        background: `linear-gradient(135deg, ${rc.d}, rgba(42,157,143,0.02))`,
+        border: `1px solid ${rc.s}33`, marginBottom: 12,
       }}>
-        <BookOpen size={16} color={M.accent} style={{ flexShrink: 0, marginTop: 2 }} />
-        <p style={{
-          fontSize: 13, color: M.textSecondary, lineHeight: 1.6,
-          margin: 0, fontFamily: "'DM Sans', sans-serif",
-        }}>
-          Target allocations shift with the market regime — add holdings to see your posture and alignment score.
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, background: rc.d,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 18, color: rc.s }}>{rc.icon}</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: M.text }}>{rc.l} regime detected</div>
+            <div style={{ fontSize: 11, color: M.textMuted }}>{confidence}% confidence · Day {persistence}</div>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 13, color: M.textSecondary, lineHeight: 1.55, marginBottom: 16 }}>
+          Here&apos;s what a regime-aligned portfolio looks like right now:
         </p>
+
+        <div style={{ background: 'rgba(255,255,255,0.5)', borderRadius: 16, padding: 14 }}>
+          <div style={{ fontSize: 10, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+            {rc.l} target allocation
+          </div>
+          {targets.map(({ label, color, pct, target }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 3, background: color }} />
+              <span style={{ fontSize: 12, color: M.text, flex: 1 }}>{label}</span>
+              <div style={{ width: 100, height: 5, borderRadius: 5, background: M.borderSubtle, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 5 }} />
+              </div>
+              <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: M.textSecondary, width: 50, textAlign: 'right' }}>{target}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Educational insight */}
+      <div style={anim(mounted, 2)}>
+        <InsightCard
+          icon={BookOpen}
+          variant="neutral"
+          text="Target allocations shift with the market regime. Add your holdings to see how your portfolio aligns."
+          subtext="These are model suggestions, not financial advice."
+        />
       </div>
 
       {/* CTA */}
-      <div style={{ ...anim(mounted, 3) }}>
-        <Link href="/exposure/portfolio" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          background: 'linear-gradient(90deg, #7B6FA8, #5A4D8A)',
-          color: 'white', padding: 16, borderRadius: 20,
-          textDecoration: 'none', fontSize: 15, fontWeight: 500,
-          fontFamily: "'DM Sans', sans-serif",
-          boxShadow: '0 4px 16px rgba(90,77,138,0.3)',
+      <div style={{ ...anim(mounted, 3), marginTop: 24, textAlign: 'center' }}>
+        <Link href="/portfolio" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px',
+          background: M.accentGradient, borderRadius: 20, boxShadow: `0 4px 16px ${M.accentGlow}`,
+          textDecoration: 'none', fontSize: 14, fontWeight: 600, color: 'white', fontFamily: FONT_BODY,
         }}>
-          Add your first holding →
+          Add your first holding
         </Link>
+        <p style={{ fontSize: 11, color: M.textMuted, marginTop: 10 }}>
+          No wallet connection needed — just enter what you hold.
+        </p>
       </div>
     </div>
   )
 }
+
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -211,37 +205,67 @@ export default function ExposurePage() {
   const [mounted, setMounted]   = useState(false)
   const [snapshot, setSnapshot] = useState<SnapshotWithPosture | null>(null)
   const [regime, setRegime]     = useState<string>('range')
-  const [regimeConfidence, setRegimeConfidence] = useState<number | null>(null)
+  const [regimeConfidence, setRegimeConfidence] = useState<number>(0)
+  const [regimePersistence, setRegimePersistence] = useState(1)
+  const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
+  const [isPro, setIsPro]       = useState(false)
   const { hidden, toggleHidden } = usePrivacy()
-  
+
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
 
+    // Portfolio snapshot (auth required — will 401 for anon, that's fine)
     fetch('/api/portfolio-snapshot')
       .then(r => r.ok ? r.json() : null)
       .then((data: SnapshotWithPosture | null) => { if (data) setSnapshot(data) })
       .catch(() => {})
 
-    // market-context is public — no auth required
-    fetch('/api/market-context')
+    // Market context (public)
+    fetch('/api/market-context?days=90')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { regime_history?: MarketContextData[] } | null) => {
-        const current = data?.regime_history?.[0]?.regime_type
-        if (current) setRegime(current)
-        const conf = data?.regime_history?.[0]?.confidence
-        if (conf !== undefined) setRegimeConfidence(conf)
+      .then((data: any) => {
+        const regimes = data?.regimes || []
+        if (regimes.length > 0) {
+          setRegime(regimes[0].regime || 'range')
+          setRegimeConfidence(Math.round((regimes[0].confidence || 0) * 100))
+
+          // Persistence: count consecutive matching regime rows
+          let days = 1
+          for (let i = 1; i < regimes.length; i++) {
+            if (regimes[i].regime === regimes[0].regime) days++
+            else break
+          }
+          setRegimePersistence(days)
+        }
+        setRegimeHistory(toRegimeRows(regimes))
       })
       .catch(() => {})
+
+    // Auth + tier check
+    ;(async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tier')
+            .eq('id', user.id)
+            .maybeSingle()
+          setIsPro(profile?.tier === 'pro')
+        }
+      } catch {}
+    })()
 
     return () => clearTimeout(t)
   }, [])
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
-  const totalValue    = snapshot?.total_value_usd ?? 0
   const score         = snapshot?.risk_score ?? 0
   const label         = scoreToLabel(score)
-  const isEmpty = snapshot?.isEmpty === true
+  const isEmpty       = snapshot?.isEmpty === true
 
   // 4-bucket weights
   const btcWeight    = snapshot?.btc_weight_all ?? 0
@@ -258,6 +282,12 @@ export default function ExposurePage() {
   const altBreakdown   = snapshot?.alt_breakdown ?? []
   const riskProfile    = snapshot?.risk_profile ?? null
 
+  const regimeLabel  = REGIME_LABELS[regime] ?? regime
+  const isMisaligned = score < 40
+
+  // Build allocation rows for AllocationCard
+  const allocations = buildAllocations(btcWeight, ethWeight, altWeight, stableWeight)
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -265,21 +295,28 @@ export default function ExposurePage() {
       padding: '24px 20px 100px',
     }}>
 
-      {/* ── Header ── */}
+      {/* ── Header (v4) ── */}
       <div style={{
+        ...anim(mounted, 0),
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
+        alignItems: 'flex-start',
+        marginBottom: 16,
       }}>
-        <h1 style={{
-          fontSize: 24,
-          fontWeight: 500,
-          color: M.text,
-          fontFamily: "'Outfit', sans-serif",
-        }}>
-          Exposure
-        </h1>
+        <div>
+          <h1 style={{
+            fontSize: 22, fontWeight: 500, color: M.text,
+            fontFamily: FONT_DISPLAY, margin: '0 0 2px',
+          }}>
+            Your Exposure
+          </h1>
+          <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
+            {snapshot && !isEmpty
+              ? `${holdingCount} holding${holdingCount !== 1 ? 's' : ''} · ${hidden ? '$••••' : formatUsd(totalValueAll)} · ${regimeLabel} regime`
+              : `${regimeLabel} regime`
+            }
+          </p>
+        </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={toggleHidden}
@@ -307,7 +344,7 @@ export default function ExposurePage() {
         </div>
       </div>
 
-      {/* ── Risk profile null banner (S143) ── */}
+      {/* ── Risk profile null banner ── */}
       {snapshot && riskProfile === null && !isEmpty && (
         <div style={{
           ...card({ padding: '12px 16px' }),
@@ -318,7 +355,7 @@ export default function ExposurePage() {
         }}>
           <Shield size={16} color={M.accent} style={{ flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: M.text, fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: M.text, fontFamily: FONT_BODY }}>
               Set your risk profile
             </div>
             <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>
@@ -327,8 +364,7 @@ export default function ExposurePage() {
           </div>
           <Link href="/profile" style={{
             fontSize: 12, fontWeight: 600, color: M.accentDeep,
-            textDecoration: 'none', flexShrink: 0,
-            fontFamily: "'DM Sans', sans-serif",
+            textDecoration: 'none', flexShrink: 0, fontFamily: FONT_BODY,
           }}>
             Set up →
           </Link>
@@ -337,12 +373,17 @@ export default function ExposurePage() {
 
       {/* ── Empty state ── */}
       {snapshot && isEmpty ? (
-        <ExposureEmptyState regime={regime} confidence={regimeConfidence} mounted={mounted} />
+        <ExposureEmptyState
+          regime={regime}
+          confidence={regimeConfidence}
+          persistence={regimePersistence}
+          mounted={mounted}
+        />
       ) : (
         <>
           {/* ── PostureHero or skeleton ── */}
           {snapshot ? (
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ ...anim(mounted, 1), marginBottom: 12 }}>
               <PostureHero
                 score={score}
                 label={label}
@@ -352,7 +393,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), marginBottom: 16, ...anim(mounted, 0) }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16, ...anim(mounted, 1) }}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ width: 72, height: 52, borderRadius: 8, background: M.surfaceLight, marginBottom: 8 }} />
                 <div style={{ width: 56, height: 12, borderRadius: 6, background: M.surfaceLight }} />
@@ -365,19 +406,30 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Allocation vs Targets ── */}
+          {/* ── Regime Timeline (S163) ── */}
+          {regimeHistory.length > 0 && (
+            <div style={anim(mounted, 2)}>
+              <RegimeTimeline
+                regimeHistory={regimeHistory}
+                currentRegime={regime}
+                confidence={regimeConfidence}
+                persistence={regimePersistence}
+                isPro={isPro}
+              />
+            </div>
+          )}
+
+          {/* ── Allocation vs Target (S164) ── */}
           {snapshot ? (
-            <AllocationSection
-              btcWeight={btcWeight}
-              ethWeight={ethWeight}
-              altWeight={altWeight}
-              stableWeight={stableWeight}
-              targetBands={targetBands}
-              mounted={mounted}
-              hidden={hidden}
-            />
+            <div style={anim(mounted, 3)}>
+              <AllocationCard
+                allocations={allocations}
+                regime={regime}
+                hidden={hidden}
+              />
+            </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 1), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 3), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '40%' }} />
                 {[0, 1, 2, 3].map(i => (
@@ -388,26 +440,33 @@ export default function ExposurePage() {
           )}
 
           {/* ── Holdings ── */}
+          {snapshot && (
+            <div style={anim(mounted, 4)}>
+              <Divider label={isMisaligned ? 'Most Exposed' : 'Holdings'} />
+            </div>
+          )}
           {snapshot ? (
-            <HoldingsSection
-              btcWeight={btcWeight}
-              ethWeight={ethWeight}
-              altWeight={altWeight}
-              stableWeight={stableWeight}
-              btcValueUsd={btcValueUsd}
-              ethValueUsd={ethValueUsd}
-              altValueUsd={altValueUsd}
-              btcIconUrl={btcIconUrl}
-              ethIconUrl={ethIconUrl}
-              altBreakdown={altBreakdown}
-              totalValue={totalValueAll}
-              targetBands={targetBands}
-              score={score}
-              mounted={mounted}
-              hidden={hidden}
-            />
+            <div style={anim(mounted, 5)}>
+              <HoldingsSection
+                btcWeight={btcWeight}
+                ethWeight={ethWeight}
+                altWeight={altWeight}
+                stableWeight={stableWeight}
+                btcValueUsd={btcValueUsd}
+                ethValueUsd={ethValueUsd}
+                altValueUsd={altValueUsd}
+                btcIconUrl={btcIconUrl}
+                ethIconUrl={ethIconUrl}
+                altBreakdown={altBreakdown}
+                totalValue={totalValueAll}
+                targetBands={targetBands}
+                score={score}
+                mounted={mounted}
+                hidden={hidden}
+              />
+            </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 2), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 5), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '30%' }} />
                 {[0, 1, 2].map(i => (
@@ -417,44 +476,56 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Analysis (S134) ── */}
+          {/* ── Analysis ── */}
           {snapshot && (
-            <div style={{ marginTop: 8 }}>
-              {score >= 60 ? (
-                <InsightCard
-                  icon={Shield}
-                  variant="positive"
-                  text={`All categories within target bands. Your portfolio is well-positioned for the current regime.`}
-                />
-              ) : score < 40 ? (
-                <>
+            <>
+              <div style={anim(mounted, 6)}>
+                <Divider label="Analysis" />
+              </div>
+              <div style={anim(mounted, 7)}>
+                {isMisaligned ? (
+                  <>
+                    <InsightCard
+                      icon={Zap}
+                      variant="warning"
+                      text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
+                      subtext="Analytical context, not a rebalancing signal."
+                    />
+                    <InsightCard
+                      icon={TrendingUp}
+                      variant="warning"
+                      text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
+                    />
+                  </>
+                ) : score >= 60 ? (
                   <InsightCard
-                    icon={Zap}
-                    variant="warning"
-                    text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
-                    subtext="Analytical context, not a rebalancing signal."
+                    icon={Shield}
+                    variant="positive"
+                    text={`All categories within target bands. BTC at ${allocations[0]?.current}% anchors the portfolio with room to increase if confidence holds above 70%.`}
                   />
+                ) : (
                   <InsightCard
-                    icon={TrendingUp}
-                    variant="warning"
-                    text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
+                    icon={Shield}
+                    variant="neutral"
+                    text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
                   />
-                </>
-              ) : (
-                <InsightCard
-                  icon={Shield}
-                  variant="neutral"
-                  text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
-                />
-              )}
-            </div>
+                )}
+              </div>
+            </>
           )}
 
+          {/* ── Pro CTA ── */}
+          <div style={anim(mounted, 8)}>
+            <ProFeaturesCta />
+          </div>
 
-          {/* ── Pro CTA (S134) ── */}
-          <ProFeaturesCta />
-
-          <ManageBar count={holdingCount} total={totalValueAll} />
+          {/* Footer */}
+          <div style={{
+            ...anim(mounted, 9),
+            textAlign: 'center', padding: '12px 0 4px', fontSize: 10, color: M.textMuted, lineHeight: 1.5,
+          }}>
+            Exposure data reflects current holdings, not recommendations.
+          </div>
         </>
       )}
     </div>

@@ -1,7 +1,10 @@
 // ━━━ Market Pulse Page ━━━
-// v4.0.0 · S162 · Sprint 34
+// v4.1.0 · S147/S162 · Sprint 34
 // "The market now, alive" — prices, movers, volume, intraday signals, sentiment
 // Regime history removed (moved to Exposure)
+// Changelog:
+//   v4.1.0 — S147: Wire IntradaySignals to live API data (intraday_signals from market-context). Read profiles.tier for Pro gate.
+//   v4.0.0 — S162: Full page rewrite, 8 components
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -20,6 +23,8 @@ import {
   Indicator,
   CoherenceCard,
 } from '@/components/pulse'
+
+import type { IntradaySignal } from '@/components/pulse/IntradaySignals'
 
 // ── Fonts ──────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
@@ -68,6 +73,28 @@ function buildCoherence(regime: string, fearGreed: number, altSeason: number): s
     return `${regimeLabel} regime. ${fgDesc} with ${altDesc}. Risk management is key — watch for regime transitions.`
   }
   return `${regimeLabel} regime. ${fgDesc} with ${altDesc}. Mixed signals suggest patience.`
+}
+
+/** Map API intraday_signals → component props. Reverse so oldest→newest, last = "now". */
+function mapIntradaySignals(raw: any[] | undefined): IntradaySignal[] {
+  if (!raw || raw.length === 0) return []
+  return [...raw].reverse().map((s) => ({
+    time: formatIntradayTime(s.time),
+    regime: s.regime,
+    confidence: Math.round((s.confidence ?? 0) * 100),
+    eth_confirming: s.eth_confirming,
+  }))
+}
+
+/** Format ISO timestamp to "HH:00" display */
+function formatIntradayTime(isoString: string): string {
+  try {
+    const d = new Date(isoString)
+    const hh = d.getUTCHours().toString().padStart(2, '0')
+    return `${hh}:00`
+  } catch {
+    return isoString
+  }
 }
 
 // ── Skeleton ────────────────────────────────────
@@ -135,6 +162,8 @@ export default function PulsePage() {
   const [btcIcon, setBtcIcon] = useState<string | null>(null)
   const [ethIcon, setEthIcon] = useState<string | null>(null)
   const [isAnon, setIsAnon] = useState(true)
+  const [isPro, setIsPro] = useState(false)
+  const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([])
   const { openAuth } = useAuthSheet()
 
   useEffect(() => {
@@ -172,6 +201,9 @@ export default function PulsePage() {
             if (btc) { setBtcPrice(btc.price); setBtcChange(btc.change_24h); setBtcIcon('https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400') }
             if (eth) { setEthPrice(eth.price); setEthChange(eth.change_24h); setEthIcon('https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628') }
           }
+
+          // S147: Wire intraday signals from API
+          setIntradaySignals(mapIntradaySignals(mc.intraday_signals))
         }
 
         if (mRes.ok) {
@@ -181,18 +213,22 @@ export default function PulsePage() {
             setAltSeason(m.metrics.altSeason ?? 30)
             setBtcDom(m.metrics.btcDominance ?? 50)
             setTotalVolume(m.metrics.totalVolume ?? null)
-            // Derive market cap from BTC price + dominance
-            if (btcPrice && m.metrics.btcDominance) {
-              // Rough estimate — not exact
-            }
           }
         }
 
-        // Check auth
+        // Check auth + tier
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         setIsAnon(!user)
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tier')
+            .eq('id', user.id)
+            .maybeSingle()
+          setIsPro(profile?.tier === 'pro')
+        }
       } catch {}
 
       setLoading(false)
@@ -248,10 +284,12 @@ export default function PulsePage() {
             <MoversCard />
           </div>
 
-          {/* Intraday Signals */}
-          <div style={anim(mounted, 6)}>
-            <IntradaySignals isPro={false} />
-          </div>
+          {/* Intraday Signals — S147: live data, hidden when empty */}
+          {intradaySignals.length > 0 && (
+            <div style={anim(mounted, 6)}>
+              <IntradaySignals signals={intradaySignals} isPro={isPro} />
+            </div>
+          )}
 
           {/* Sentiment */}
           <div style={{ ...anim(mounted, 7), marginBottom: 4 }}>
