@@ -1,9 +1,10 @@
 // ━━━ Market Context API ━━━
-// v3.2.0 · ca-story56 · 2026-02-25
-// Fetches regime history + price history + duration patterns + transitions
-// Changelog (from v3.1.0):
-//  - Aggregates regime transitions from rows where regime_changed = true
-//  - Response includes transitions array + transition_count
+// v3.3.1 · S147 · 2026-03-06
+// Fetches regime history + price history + duration patterns + transitions + intraday signals
+// Changelog:
+//  v3.3.1 — S147: Added intraday_signals to response (last 6 snapshots from intraday_regimes)
+//  v3.2.0 — S56: Aggregates regime transitions from rows where regime_changed = true
+//  v3.1.0 — S145: current_prices from asset_prices cache
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -17,8 +18,6 @@ function parseDays(param: string | null): ValidDays {
   return 7;
 }
 
-// ── Transition Aggregation ────────────────────
-
 interface Transition {
   from: string;
   to: string;
@@ -27,10 +26,8 @@ interface Transition {
 }
 
 function aggregateTransitions(regimes: any[]): Transition[] {
-  // Filter for regime-change rows only
   const changes = regimes.filter(r => r.regime_changed && r.previous_regime);
 
-  // Aggregate by from→to pair
   const map = new Map<string, { count: number; last_seen: string }>();
 
   for (const r of changes) {
@@ -40,43 +37,35 @@ function aggregateTransitions(regimes: any[]): Transition[] {
       map.set(key, { count: 1, last_seen: r.market_timestamp });
     } else {
       existing.count++;
-      // Keep the most recent (changes are sorted DESC, so first seen = most recent)
       if (!existing.last_seen || r.market_timestamp > existing.last_seen) {
         existing.last_seen = r.market_timestamp;
       }
     }
   }
 
-  // Convert to array
   const transitions: Transition[] = [];
   for (const [key, val] of map) {
     const [from, to] = key.split('→');
     transitions.push({ from, to, count: val.count, last_seen: val.last_seen });
   }
 
-  // Sort by count DESC, then by last_seen DESC
   transitions.sort((a, b) => b.count - a.count || b.last_seen.localeCompare(a.last_seen));
 
   return transitions;
 }
 
-// ═══════════════════════════════════════════════
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Parse ?days param
     const { searchParams } = new URL(request.url);
     const days = parseDays(searchParams.get('days'));
 
-    // Calculate date cutoff
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffISO = cutoff.toISOString();
 
-    // Parallel fetch: regime history (date-range) + price history + duration stats
-    const [regimeResult, priceResult, durationResult, livePriceResult] = await Promise.all([
+    const [regimeResult, priceResult, durationResult, livePriceResult, intradayResult] = await Promise.all([
       supabase
         .from('market_regimes')
         .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
@@ -88,25 +77,28 @@ export async function GET(request: NextRequest) {
         .order('timestamp', { ascending: false })
         .limit(14),
       supabase.rpc('regime_duration_stats'),
-      // Add to the parallel fetch (after durationResult):
       supabase
         .from('asset_prices')
         .select('price_usd, change_24h, recorded_at, asset_mapping!inner(symbol)')
         .in('asset_mapping.symbol', ['BTC', 'ETH']),
+      supabase
+        .from('intraday_regimes')
+        .select('regime, confidence, btc_r_short, eth_r_short, eth_confirming, created_at')
+        .order('created_at', { ascending: false })
+        .limit(6),
     ]);
 
-    // Build current_prices from asset_prices (hourly freshness)
-const currentPrices: Record<string, { price: number; change_24h: number; recorded_at: string }> = {}
-for (const row of (livePriceResult.data ?? []) as any[]) {
-  const symbol = row.asset_mapping?.symbol
-  if (symbol) {
-    currentPrices[symbol] = {
-      price: Number(row.price_usd),
-      change_24h: Number(row.change_24h),
-      recorded_at: row.recorded_at,
+    const currentPrices: Record<string, { price: number; change_24h: number; recorded_at: string }> = {}
+    for (const row of (livePriceResult.data ?? []) as any[]) {
+      const symbol = row.asset_mapping?.symbol
+      if (symbol) {
+        currentPrices[symbol] = {
+          price: Number(row.price_usd),
+          change_24h: Number(row.change_24h),
+          recorded_at: row.recorded_at,
+        }
+      }
     }
-  }
-}
 
     if (regimeResult.error) {
       console.error('market_regimes fetch error:', regimeResult.error);
@@ -120,10 +112,8 @@ for (const row of (livePriceResult.data ?? []) as any[]) {
 
     if (durationResult.error) {
       console.error('regime_duration_stats error:', durationResult.error);
-      // Non-fatal — continue without duration patterns
     }
 
-    // Normalize: rename market_timestamp → timestamp for frontend compatibility
     const regimes = (regimeResult.data ?? []).map((r: any) => ({
       timestamp: r.market_timestamp,
       regime: r.regime,
@@ -139,9 +129,16 @@ for (const row of (livePriceResult.data ?? []) as any[]) {
       eth_vol_7d: r.eth_vol_7d,
     }));
 
-    // S56: Aggregate transitions from the full dataset (not just current timeframe)
-    // Use raw regimeResult.data which has all rows in the date range
     const transitions = aggregateTransitions(regimeResult.data ?? []);
+
+    const intradaySignals = (intradayResult?.data ?? []).map((r: any) => ({
+      time: r.created_at,
+      regime: r.regime,
+      confidence: r.confidence,
+      btc_r_short: r.btc_r_short,
+      eth_r_short: r.eth_r_short,
+      eth_confirming: r.eth_confirming,
+    }));
 
     return NextResponse.json({
       regimes,
@@ -153,6 +150,7 @@ for (const row of (livePriceResult.data ?? []) as any[]) {
       days_requested: days,
       generated_at: new Date().toISOString(),
       current_prices: currentPrices,
+      intraday_signals: intradaySignals,
     });
   } catch (err) {
     console.error('Market context API error:', err);
