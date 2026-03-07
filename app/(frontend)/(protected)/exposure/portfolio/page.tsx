@@ -1,31 +1,49 @@
-// v2.5.0 · ca-story78 · Sprint 19
-// S78: Shared helpers extracted to lib/ui-helpers + components/shared/
+// v4.0.0 · S165/S166 · Sprint 35
+// Changelog:
+//   v4.0.0 — S165: Sparkline + Beta + PriceContext (Pro), PriceContextTeaser (Free)
+//            S166: Full opacity on all holdings, "Not in posture" pill, remove weight %
+//                  duplication, P&L on all, expand only on in-posture.
+//            - AllocationCard reused from exposure (buildAllocations + component)
+//            - isPro from profiles.tier (same pattern as Exposure v4)
+//            - Total portfolio movement (free feature, not Pro-gated)
+//            - MisalignmentFramingCard + ProgressiveDisclosure removed (v4 cleanup)
+//            - Local CryptoIcon replaced by shared/CryptoIcon
+//   v2.5.0 — S78: Shared helpers extracted
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Pencil, Wallet, Eye, EyeOff } from 'lucide-react'
+import { Plus, Pencil, Eye, EyeOff, Wallet, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react'
 import { M } from '@/lib/meridian'
-import { usePortfolio } from '@/hooks/usePortfolio'
-import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
-import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
-import MisalignmentFramingCard from '@/components/portfolio/MisalignmentFramingCard'
-import type { PortfolioExposure, Holding } from '@/types'
-import ProgressiveDisclosure, { DisclosureGroup } from "@/components/education/ProgressiveDisclosure"
 import { card, anim } from '@/lib/ui-helpers'
-import GradientBar from '@/components/shared/GradientBar'
+import { usePortfolio } from '@/hooks/usePortfolio'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { createClient } from '@/lib/supabase/client'
+import CryptoIcon from '@/components/shared/CryptoIcon'
+import GradientBar from '@/components/shared/GradientBar'
+import AllocationCard, { buildAllocations } from '@/components/exposure/AllocationCard'
+import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
+import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
+import PriceContext from '@/components/portfolio/PriceContext'
+import PriceContextTeaser from '@/components/portfolio/PriceContextTeaser'
 import { AnonPortfolioCTA } from '@/components/portfolio/AnonPortfolioCTA'
+import type { PortfolioExposure, Holding } from '@/types'
 
-// ── Helpers ───────────────────────────────────
 
-const fmt = (n: number) =>
-  n.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  })
-const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`
+// ── Fonts ─────────────────────────────────────────────────────────────────────
+const FONT_DISPLAY = "'Outfit', sans-serif"
+const FONT_BODY = "'DM Sans', sans-serif"
+const FONT_MONO = "'DM Mono', monospace"
+const FONT_NUM = "'DM Sans', sans-serif"
+const NUM_FEATURES = "'tnum' 1, 'lnum' 1"
+
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const fmtUsd = (n: number) =>
+  n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
+
 const qtyFmt = (n: number) => {
   if (n === 0) return '0'
   if (n < 0.0001) return n.toPrecision(2)
@@ -34,81 +52,422 @@ const qtyFmt = (n: number) => {
   return n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
-function getSegKey(symbol: string): 'BTC' | 'ETH' | 'ALT' {
-  if (symbol === 'BTC') return 'BTC'
-  if (symbol === 'ETH') return 'ETH'
-  return 'ALT'
+const maskUsd = (v: number, hidden: boolean) => hidden ? '$\u2022\u2022\u2022\u2022' : fmtUsd(v)
+const maskQty = (q: number, hidden: boolean) => hidden ? '\u2022\u2022\u2022\u2022' : qtyFmt(q)
+const maskPct = (p: number, hidden: boolean) => hidden ? '\u2022\u2022%' : fmtPct(p)
+
+
+// ── Coin context types ────────────────────────────────────────────────────────
+
+interface CoinContextData {
+  sparkline: number[]
+  beta: number
+  high30d: number
+  low30d: number
+  change30d: number
 }
 
-// ── Crypto Icon (branded gradients from artifact) ──
 
-function CryptoIcon({ symbol, size = 48, iconUrl }: { symbol: string; size?: number; iconUrl?: string | null }) {
-  const segColors: Record<string, string> = {
-    BTC: '#F7931A', ETH: '#627EEA', SOL: '#9945FF', ADA: '#0033AD',
-    DOT: '#E6007A', RUNE: '#33FF99', DOGE: '#C3A634',
-  }
-  const color = segColors[symbol] || '#A78BFA'
+// ── Sheet state ───────────────────────────────────────────────────────────────
 
-  if (iconUrl) {
-    return (
-      <div style={{ width: size, height: size, position: 'relative', flexShrink: 0 }}>
-        <img
-          src={iconUrl}
-          alt={symbol}
-          width={size}
-          height={size}
-          style={{ borderRadius: '50%', background: M.surfaceLight, display: 'block' }}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-            const fb = e.currentTarget.nextElementSibling as HTMLElement
-            if (fb) fb.style.display = 'flex'
-          }}
-        />
-        <div
-          style={{
-            width: size, height: size, background: `${color}20`, borderRadius: '50%',
-            display: 'none', alignItems: 'center', justifyContent: 'center',
-            position: 'absolute', top: 0, left: 0,
-          }}
-        >
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: size * 0.28, fontWeight: 700, color }}>
-            {symbol.slice(0, 3)}
-          </span>
-        </div>
-      </div>
-    )
-  }
+type SheetState = { type: 'closed' } | { type: 'add' } | { type: 'edit'; holding: Holding }
+
+
+// ── HoldingCard ───────────────────────────────────────────────────────────────
+
+function HoldingCard({
+  holding, price, name, iconUrl, hidden, isPro, coinContext, coinContextLoading, authChecked, onEdit,
+}: {
+  holding: Holding
+  price: { usd_price: number; value_usd: number; weight: number } | null
+  name: string
+  iconUrl: string | null
+  hidden: boolean
+  isPro: boolean
+  coinContext: CoinContextData | null
+  coinContextLoading: boolean
+  authChecked: boolean
+  onEdit: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const valueUsd = price ? price.usd_price * holding.quantity : null
+  const inPosture = holding.include_in_exposure
+
+  // P&L from cost basis (S166: show on ALL holdings)
+  const baseline = holding.price_at_add ?? holding.cost_basis ?? null
+  const currentPrice = price?.usd_price ?? null
+  const hasPnl = baseline != null && currentPrice != null && baseline > 0
+  const pctChange = hasPnl ? ((currentPrice! - baseline!) / baseline!) * 100 : 0
+  const up = pctChange >= 0
+  const addedDate = new Date(holding.created_at)
+  const dateLbl = addedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  // Unrealized P&L values (for expanded section)
+  const costBasis = baseline != null ? baseline * holding.quantity : 0
+  const currentValue = valueUsd ?? 0
+  const unrealizedPnl = currentValue - costBasis
+  const unrealizedPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0
+  const unrealizedUp = unrealizedPnl >= 0
 
   return (
-    <div
-      style={{
-        width: size, height: size, background: `${color}20`, borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}
-    >
-      <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: size * 0.28, fontWeight: 700, color }}>
-        {symbol.slice(0, 3)}
-      </span>
+    <div style={{ ...card({ padding: 16, borderRadius: 20 }) }}>
+      {/* Main row: icon | name+qty+change | value+edit */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <CryptoIcon symbol={holding.asset} size={36} iconUrl={iconUrl} />
+
+        {/* Left: name + qty + P&L line */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>{name}</span>
+            <span style={{
+              fontSize: 10, color: M.textMuted,
+              fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+            }}>
+              {maskQty(holding.quantity, hidden)} {holding.asset}
+            </span>
+          </div>
+
+          {/* P&L change line (S166: on ALL holdings) */}
+          {hasPnl ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+                color: up ? M.positive : M.negative,
+              }}>
+                {maskPct(pctChange, hidden)}
+              </span>
+              <span style={{ fontSize: 9, color: M.textMuted }}>
+                since {hidden ? '\u2022\u2022\u2022' : dateLbl}
+              </span>
+              {/* S166: "Not in posture" pill on non-posture holdings */}
+              {!inPosture && (
+                <span style={{
+                  fontSize: 8, color: M.textMuted, background: M.surfaceLight,
+                  padding: '1px 6px', borderRadius: 4, fontWeight: 500,
+                }}>
+                  Not in posture
+                </span>
+              )}
+            </div>
+          ) : (
+            !inPosture && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <span style={{
+                  fontSize: 8, color: M.textMuted, background: M.surfaceLight,
+                  padding: '1px 6px', borderRadius: 4, fontWeight: 500,
+                }}>
+                  Not in posture
+                </span>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Right: value + edit button (S166: no weight % line) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {valueUsd !== null && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: M.text,
+                fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+              }}>
+                {maskUsd(valueUsd, hidden)}
+              </div>
+            </div>
+          )}
+          <button
+            onClick={onEdit}
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.5)',
+              border: `1px solid ${M.border}`,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Pencil size={12} color={M.textSecondary} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      {/* Posture contribution bar — only for in-posture holdings */}
+      {inPosture && price && price.weight > 0 && (
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 9, color: M.textMuted, whiteSpace: 'nowrap' }}>Posture</span>
+          <GradientBar pct={hidden ? 0 : Math.min(Math.round(price.weight * 100) * 2.5, 100)} h={4} />
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: M.text, whiteSpace: 'nowrap',
+            fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+          }}>
+            {hidden ? '\u2022\u2022%' : `${Math.round(price.weight * 100)}%`}
+          </span>
+        </div>
+      )}
+
+      {/* Pro: Price Context (sparkline + beta + range) */}
+      {!authChecked ? null : isPro && coinContext ? (
+        <div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginTop: 10, marginBottom: 0,
+          }}>
+            <span style={{
+              fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5,
+            }}>
+              Price context
+            </span>
+            {/* P&L expand button — only on in-posture holdings (S166) */}
+            {inPosture && hasPnl && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  fontSize: 9, color: M.accent, fontWeight: 600, fontFamily: FONT_BODY,
+                }}
+              >
+                {expanded ? 'Less' : 'P&L'}
+                {expanded
+                  ? <ChevronUp size={10} color={M.accent} />
+                  : <ChevronDown size={10} color={M.accent} />
+                }
+              </button>
+            )}
+          </div>
+          <PriceContext
+            sparkline={coinContext.sparkline}
+            beta={coinContext.beta}
+            high30d={coinContext.high30d}
+            low30d={coinContext.low30d}
+            current={price?.usd_price ?? 0}
+            change30d={coinContext.change30d}
+            hidden={hidden}
+          />
+        </div>
+      ) : !isPro ? (
+        <PriceContextTeaser />
+      ) : coinContextLoading ? (
+        <div style={{
+          marginTop: 10, padding: '10px 12px', borderRadius: 12,
+          background: 'rgba(255,255,255,0.4)', border: `1px solid ${M.border}`,
+        }}>
+          <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ height: 10, width: 60, borderRadius: 4, background: M.surfaceLight }} />
+              <div style={{ height: 10, width: 80, borderRadius: 4, background: M.surfaceLight }} />
+            </div>
+            <div style={{ height: 36, borderRadius: 6, background: M.surfaceLight }} />
+            <div style={{ height: 4, borderRadius: 4, background: M.surfaceLight }} />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Expanded P&L detail (Pro + in-posture only) */}
+      {inPosture && isPro && expanded && hasPnl && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 12, padding: '6px 0' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontSize: 9, color: M.textMuted, textTransform: 'uppercase',
+                letterSpacing: 0.5, marginBottom: 2,
+              }}>
+                Cost basis
+              </div>
+              <div style={{
+                fontSize: 12, fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+                color: M.textSecondary,
+              }}>
+                {maskUsd(costBasis, hidden)}
+              </div>
+            </div>
+            <div style={{ width: 1, background: M.borderSubtle }} />
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontSize: 9, color: M.textMuted, textTransform: 'uppercase',
+                letterSpacing: 0.5, marginBottom: 2,
+              }}>
+                Current
+              </div>
+              <div style={{
+                fontSize: 12, fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+                color: M.text,
+              }}>
+                {maskUsd(currentValue, hidden)}
+              </div>
+            </div>
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 0', borderTop: `1px solid ${M.borderSubtle}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: 6,
+                background: unrealizedUp ? M.positiveDim : M.negativeDim,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {unrealizedUp
+                  ? <TrendingUp size={10} color={M.positive} />
+                  : <TrendingDown size={10} color={M.negative} />
+                }
+              </div>
+              <span style={{ fontSize: 10, color: M.textMuted }}>Unrealized P&L</span>
+            </div>
+            {hidden ? (
+              <span style={{ fontSize: 12, fontWeight: 600, color: M.textMuted }}>$\u2022\u2022\u2022\u2022</span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 600,
+                  fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+                  color: unrealizedUp ? M.positive : M.negative,
+                }}>
+                  {unrealizedUp ? '+' : ''}{fmtUsd(unrealizedPnl)}
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600,
+                  fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+                  color: unrealizedUp ? M.positive : M.negative,
+                  opacity: 0.7,
+                }}>
+                  {fmtPct(unrealizedPct)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Allocation gradients ──────────────────────
 
-const ALLOC_GRADIENTS: Record<string, string> = {
-  BTC: 'linear-gradient(90deg, #F7931A, #F79A1F)',
-  ETH: 'linear-gradient(90deg, #627EEA, #7B9FF5)',
-  ALT: 'linear-gradient(90deg, #14F195, #9945FF)',
-  Stable: 'linear-gradient(90deg, #2A9D8F, rgba(42,157,143,0.7))',
+// ── Total Movement Card (free) / P&L Summary (Pro) ───────────────────────────
+
+function TotalMovementCard({
+  holdings, priceLookup, hidden, isPro,
+}: {
+  holdings: Holding[]
+  priceLookup: Record<string, { usd_price: number; value_usd: number; weight: number }>
+  hidden: boolean
+  isPro: boolean
+}) {
+  let totalCost = 0
+  let totalCurrent = 0
+  let hasCostBasis = false
+
+  for (const h of holdings) {
+    const price = priceLookup[h.asset]
+    if (!price) continue
+    const baseline = h.price_at_add ?? h.cost_basis ?? null
+    if (baseline == null) continue
+    hasCostBasis = true
+    totalCost += baseline * h.quantity
+    totalCurrent += price.usd_price * h.quantity
+  }
+
+  if (!hasCostBasis || totalCost === 0) return null
+
+  const change = totalCurrent - totalCost
+  const changePct = (change / totalCost) * 100
+  const up = change >= 0
+
+  return (
+    <div style={{
+      ...card({
+        padding: 16,
+        background: `linear-gradient(135deg, ${up ? M.positiveDim : M.negativeDim}, rgba(255,255,255,0.3))`,
+        border: `1px solid ${up ? M.borderPositive : 'rgba(231,111,81,0.2)'}`,
+      }),
+      marginBottom: 14,
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 10,
+            background: up ? M.positiveDim : M.negativeDim,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {up
+              ? <TrendingUp size={15} color={M.positive} />
+              : <TrendingDown size={15} color={M.negative} />
+            }
+          </div>
+          <div>
+            <div style={{
+              fontSize: 10, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5,
+            }}>
+              {isPro ? 'Unrealized P&L' : 'Total movement'}
+            </div>
+            <div style={{
+              fontSize: 16, fontWeight: 600,
+              fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+              color: up ? M.positive : M.negative,
+            }}>
+              {hidden ? '$\u2022\u2022\u2022\u2022' : `${up ? '+' : ''}${fmtUsd(change)}`}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          padding: '4px 10px', borderRadius: 10,
+          background: up ? M.positiveDim : M.negativeDim,
+        }}>
+          <span style={{
+            fontSize: 12, fontWeight: 600,
+            fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+            color: up ? M.positive : M.negative,
+          }}>
+            {maskPct(changePct, hidden)}
+          </span>
+        </div>
+      </div>
+
+      {/* Pro: cost basis + current value breakdown */}
+      {isPro && (
+        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+          <div>
+            <div style={{
+              fontSize: 9, color: M.textMuted, textTransform: 'uppercase',
+              letterSpacing: 0.5, marginBottom: 2,
+            }}>
+              Total cost
+            </div>
+            <span style={{
+              fontSize: 12, fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+              color: M.textSecondary,
+            }}>
+              {hidden ? '$\u2022\u2022\u2022\u2022' : fmtUsd(totalCost)}
+            </span>
+          </div>
+          <div>
+            <div style={{
+              fontSize: 9, color: M.textMuted, textTransform: 'uppercase',
+              letterSpacing: 0.5, marginBottom: 2,
+            }}>
+              Current value
+            </div>
+            <span style={{
+              fontSize: 12, fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES,
+              color: M.text,
+            }}>
+              {hidden ? '$\u2022\u2022\u2022\u2022' : fmtUsd(totalCurrent)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
-// ── Sheet state ───────────────────────────────
 
-type SheetState = { type: 'closed' } | { type: 'add' } | { type: 'edit'; holding: Holding }
-
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function PortfolioPage() {
   const [isAnon, setIsAnon] = useState(true)
@@ -118,12 +477,20 @@ export default function PortfolioPage() {
   const [snapshotError, setSnapshotError] = useState(false)
   const [sheet, setSheet] = useState<SheetState>({ type: 'closed' })
   const [mounted, setMounted] = useState(false)
+  const [isPro, setIsPro] = useState(false)
   const [regime, setRegime] = useState<string>('range')
+  const [coinContextMap, setCoinContextMap] = useState<Record<string, CoinContextData>>({})
+  const [coinContextLoading, setCoinContextLoading] = useState(true)
 
   const { holdings, assets, isLoading: holdingsLoading, addHolding, updateHolding, removeHolding } =
     usePortfolio()
   const { hidden, toggleHidden } = usePrivacy()
 
+  // ── Stable key for coin-context dependency ──
+  const heldSymbols = useMemo(() => holdings.map(h => h.asset), [holdings])
+  const heldSymbolsKey = heldSymbols.join(',')
+
+  // ── Snapshot fetch ──
   const fetchSnapshot = async () => {
     try {
       const res = await fetch('/api/portfolio-snapshot')
@@ -138,52 +505,70 @@ export default function PortfolioPage() {
     }
   }
 
-  const [allocationExplainer, setAllocationExplainer] = useState<string>('The percentage each asset or category represents in your total portfolio.')
-const [contributionExplainer, setContributionExplainer] = useState<string>('How much a single holding adds to or subtracts from your overall posture score.')
+  // ── Coin context fetch helper ──
+  const fetchCoinContext = (symbols: string) => {
+    if (!symbols) return
+    setCoinContextLoading(true)
+    fetch(`/api/coin-context?symbols=${symbols}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: Record<string, CoinContextData> | null) => {
+        if (data) setCoinContextMap(prev => ({ ...prev, ...data }))
+        setCoinContextLoading(false)
+      })
+      .catch(() => { setCoinContextLoading(false) })
+  }
 
-useEffect(() => {
-  Promise.all([
-    fetch('/api/glossary?slug=glossary-allocation').then(r => r.ok ? r.json() : null),
-    fetch('/api/glossary?slug=glossary-posture-contribution').then(r => r.ok ? r.json() : null),
-  ]).then(([allocation, contribution]) => {
-    if (allocation?.summary) setAllocationExplainer(allocation.summary)
-    if (contribution?.summary) setContributionExplainer(contribution.summary)
-  }).catch(() => {})
-}, [])
+  // ── Auth + tier check (same pattern as Exposure v4) ──
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 100)
 
+    ;(async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAnon(!user)
+        setAuthChecked(true)
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tier')
+            .eq('id', user.id)
+            .maybeSingle()
+          setIsPro(profile?.tier === 'pro')
+        }
+      } catch {
+        setAuthChecked(true)
+      }
+    })()
+
+    return () => clearTimeout(t)
+  }, [])
+
+  // ── Snapshot on auth ──
   useEffect(() => {
     if (!isAnon) fetchSnapshot()
     else setSnapshotLoading(false)
   }, [isAnon])
-  // S61: Fetch regime for misalignment framing
+
+  // ── Regime fetch (for AllocationCard) ──
   useEffect(() => {
-  fetch('/api/market')
-    .then(r => r.ok ? r.json() : null)
-    .then(d => { if (d?.regime?.current) setRegime(d.regime.current) })
-    .catch(() => {})
-}, [])
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 100)
-    return () => clearTimeout(t)
+    fetch('/api/market')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.regime?.current) setRegime(d.regime.current) })
+      .catch(() => {})
   }, [])
 
+  // ── Coin context fetch (Pro feature — sparkline + beta) ──
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsAnon(!user)
-      setAuthChecked(true)
-    })
-  }, [])
+    if (!heldSymbolsKey || isAnon) { setCoinContextLoading(false); return }
+    fetchCoinContext(heldSymbolsKey)
+  }, [heldSymbolsKey, isAnon])
 
-  const heldSymbols = useMemo(() => holdings.map((h) => h.asset), [holdings])
-
-  // Build price lookup from snapshot
+  // ── Price lookup from snapshot ──
   const priceLookup = useMemo(() => {
     const map: Record<string, { usd_price: number; value_usd: number; weight: number }> = {}
     if (!snapshot || snapshot.isEmpty) return map
     const cp = (snapshot as any).current_prices as Record<string, number> ?? {}
-
-    // Use current_prices from asset_prices cache (S141)
     const totalValue = snapshot.total_value_usd_all ?? 0
     for (const h of holdings) {
       const price = cp[h.asset]
@@ -198,37 +583,43 @@ useEffect(() => {
     return map
   }, [snapshot, holdings])
 
+  // ── CRUD handlers ──
   const handleAdd = async (asset: string, quantity: number, costBasis?: number | null) => {
     const ok = await addHolding({ asset, quantity, cost_basis: costBasis })
-    if (ok) fetchSnapshot()
+    if (ok) { fetchSnapshot(); fetchCoinContext(asset) }
     return ok
   }
-
   const handleUpdate = async (id: string, updates: any) => {
     const ok = await updateHolding(id, updates)
-    if (ok) fetchSnapshot()
+    if (ok) { fetchSnapshot(); fetchCoinContext(heldSymbolsKey) }
     return ok
   }
-
   const handleRemove = async (id: string) => {
     const ok = await removeHolding(id)
-    if (ok) fetchSnapshot()
+    if (ok) { fetchSnapshot(); fetchCoinContext(heldSymbolsKey) }
     return ok
   }
 
-
-  const loading = snapshotLoading || holdingsLoading
+  // ── Derived state ──
+  const loading = snapshotLoading || holdingsLoading || !authChecked || (isPro && coinContextLoading)
   const isEmpty = holdings.length === 0
   const hasSnapshot = snapshot && !snapshot.isEmpty && (snapshot.total_value_usd_all ?? 0) > 0
   const totalValue = snapshot?.total_value_usd_all || 0
 
-  // ── Loading state ──
+  // ── Allocation (reused from Exposure) ──
+  const btcWeight = snapshot?.btc_weight_all ?? 0
+  const ethWeight = snapshot?.eth_weight_all ?? 0
+  const altWeight = snapshot?.alt_weight_all ?? 0
+  const stableWeight = Math.max(0, 1 - btcWeight - ethWeight - altWeight)
+  const allocations = buildAllocations(btcWeight, ethWeight, altWeight, stableWeight)
 
-if (authChecked && isAnon) {
+  // ── Early returns ──
+
+  if (authChecked && isAnon) {
     return <AnonPortfolioCTA />
   }
 
-if (snapshotError && !holdingsLoading) {
+  if (snapshotError && !holdingsLoading) {
     return (
       <div style={{ padding: '24px 20px', textAlign: 'center' }}>
         <div style={{ padding: '48px 20px' }}>
@@ -241,14 +632,9 @@ if (snapshotError && !holdingsLoading) {
           <button
             onClick={() => { setSnapshotError(false); setSnapshotLoading(true); fetchSnapshot() }}
             style={{
-              background: M.surface,
-              border: `1px solid ${M.border}`,
-              borderRadius: 12,
-              padding: '8px 16px',
-              fontSize: 12,
-              color: M.text,
-              cursor: 'pointer',
-              fontFamily: "'DM Sans', sans-serif",
+              background: M.surface, border: `1px solid ${M.border}`, borderRadius: 12,
+              padding: '8px 16px', fontSize: 12, color: M.text, cursor: 'pointer',
+              fontFamily: FONT_BODY,
             }}
           >
             Try again
@@ -261,14 +647,11 @@ if (snapshotError && !holdingsLoading) {
   if (loading) {
     return (
       <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3].map(i => (
           <div
             key={i}
-            className="rounded-3xl animate-pulse"
-            style={{
-              background: M.surfaceLight,
-              height: i === 1 ? 160 : 120,
-            }}
+            className="animate-pulse"
+            style={{ background: M.surfaceLight, height: i === 1 ? 160 : 120, borderRadius: 24 }}
           />
         ))}
       </div>
@@ -276,7 +659,6 @@ if (snapshotError && !holdingsLoading) {
   }
 
   // ── Sheet overlay ──
-
   if (sheet.type !== 'closed') {
     return (
       <div style={{ minHeight: '100vh' }}>
@@ -301,93 +683,53 @@ if (snapshotError && !holdingsLoading) {
   }
 
   // ── Empty state ──
-
   if (isEmpty) {
     return (
       <div style={{ padding: '24px 20px' }}>
         <div style={{ marginBottom: 28, ...anim(mounted, 0) }}>
-          <h1
-            style={{
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: 24,
-              fontWeight: 500,
-              color: M.text,
-              margin: '0 0 4px',
-            }}
-          >
+          <h1 style={{
+            fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, color: M.text,
+            margin: '0 0 2px',
+          }}>
             Your portfolio
           </h1>
-          <p style={{ fontSize: 14, color: M.textSecondary, margin: 0 }}>
+          <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
             Tell Meridian what you hold
           </p>
         </div>
-
-        <div
-          style={{
-            ...card({
-              background:
-                `linear-gradient(135deg, ${M.accentDim}, ${M.accentGlow})`,
-              border: `1px solid ${M.borderAccent}`,
-            }),
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            padding: '48px 24px',
-            ...anim(mounted, 1),
-          }}
-        >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              background:
-                `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 20,
-            }}
-          >
+        <div style={{
+          ...card({
+            background: `linear-gradient(135deg, ${M.accentDim}, ${M.accentGlow})`,
+            border: `1px solid ${M.borderAccent}`,
+          }),
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          textAlign: 'center', padding: '48px 24px',
+          ...anim(mounted, 1),
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 20,
+          }}>
             <Wallet size={28} color={M.accentDeep} strokeWidth={2} />
           </div>
-          <p
-            style={{
-              fontSize: 16,
-              fontWeight: 500,
-              color: M.text,
-              margin: '0 0 8px',
-            }}
-          >
+          <p style={{ fontSize: 16, fontWeight: 500, color: M.text, margin: '0 0 8px' }}>
             Add your first holding
           </p>
-          <p
-            style={{
-              fontSize: 14,
-              color: M.textSecondary,
-              lineHeight: 1.6,
-              margin: '0 0 24px',
-              maxWidth: 280,
-            }}
-          >
+          <p style={{
+            fontSize: 14, color: M.textSecondary, lineHeight: 1.6,
+            margin: '0 0 24px', maxWidth: 280,
+          }}>
             Once Meridian knows what you hold, it can show how your portfolio aligns
             with current market conditions.
           </p>
           <button
             onClick={() => setSheet({ type: 'add' })}
             style={{
-              background: M.accentGradient,
-              color: 'white',
-              padding: '14px 32px',
-              borderRadius: 20,
-              border: 'none',
-              fontSize: 16,
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
+              background: M.accentGradient, color: 'white', padding: '14px 32px',
+              borderRadius: 20, border: 'none', fontSize: 16, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
               boxShadow: `0 4px 16px ${M.accentGlow}`,
             }}
           >
@@ -398,112 +740,73 @@ if (snapshotError && !holdingsLoading) {
     )
   }
 
-  // ── Main portfolio view ──
 
-  // Build allocation rows from snapshot
-  const allocRows: { label: string; pct: number; gradient: string }[] = []
-  if (hasSnapshot) {
-    if (snapshot!.btc_weight_all > 0) {
-      allocRows.push({
-        label: 'BTC',
-        pct: Math.round(snapshot!.btc_weight_all * 100),
-        gradient: ALLOC_GRADIENTS.BTC,
-      })
-    }
-    if (snapshot!.eth_weight_all > 0) {
-      allocRows.push({
-        label: 'ETH',
-        pct: Math.round(snapshot!.eth_weight_all * 100),
-        gradient: ALLOC_GRADIENTS.ETH,
-      })
-    }
-    if (snapshot!.alt_weight_all > 0) {
-      allocRows.push({
-        label: 'ALT',
-        pct: Math.round(snapshot!.alt_weight_all * 100),
-        gradient: ALLOC_GRADIENTS.ALT,
-      })
-    }
-    // Stable row — always show (design v3.1)
-    const usedPct = allocRows.reduce((s, r) => s + r.pct, 0)
-    allocRows.push({
-      label: 'Stable',
-      pct: Math.max(0, 100 - usedPct),
-      gradient: ALLOC_GRADIENTS.Stable,
-    })
-  }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN PORTFOLIO VIEW
+  // ═══════════════════════════════════════════════════════════════════════════
 
   return (
-    <DisclosureGroup>
-    <div style={{ padding: '24px 20px' }}>
+    <div style={{ minHeight: '100vh', background: M.bg, padding: '24px 20px 100px' }}>
+
       {/* ── Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: 24,
-          ...anim(mounted, 0),
-        }}
-      >
+      <div style={{
+        ...anim(mounted, 0),
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        marginBottom: 16,
+      }}>
         <div>
-          <h1
-            style={{
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: 22,
-              fontWeight: 500,
-              color: M.text,
-              margin: '0 0 2px',
-            }}
-          >
+          <h1 style={{
+            fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 500, color: M.text,
+            margin: '0 0 2px',
+          }}>
             Your portfolio
           </h1>
           <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>{holdings.length}</span> holding
-            {holdings.length !== 1 ? 's' : ''}
+            <span style={{ fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES }}>
+              {holdings.length}
+            </span>
+            {' '}holding{holdings.length !== 1 ? 's' : ''}
             {hasSnapshot && (
               <>
                 {' · '}
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>{hidden ? '$••••' : fmt(totalValue)}</span>
+                <span style={{ fontFamily: FONT_NUM, fontFeatureSettings: NUM_FEATURES }}>
+                  {maskUsd(totalValue, hidden)}
+                </span>
               </>
+            )}
+            {isPro && (
+              <span style={{
+                marginLeft: 8, fontSize: 9, fontWeight: 700, color: M.accent,
+                background: M.accentDim, padding: '2px 6px', borderRadius: 6,
+                verticalAlign: 'middle',
+              }}>
+                PRO
+              </span>
             )}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={toggleHidden}
             aria-label={hidden ? 'Show amounts' : 'Hide amounts'}
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: '50%',
+              width: 44, height: 44, borderRadius: '50%', cursor: 'pointer',
               background: 'rgba(255,255,255,0.5)',
               border: `1px solid ${M.border}`,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            {hidden ? (
-              <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
-            ) : (
-              <Eye size={16} color={M.textSecondary} strokeWidth={2} />
-            )}
+            {hidden
+              ? <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
+              : <Eye size={16} color={M.textSecondary} strokeWidth={2} />
+            }
           </button>
           <button
             onClick={() => setSheet({ type: 'add' })}
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: '50%',
-              background: M.accentGradient,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              width: 44, height: 44, borderRadius: '50%',
+              background: M.accentGradient, border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: `0 4px 12px ${M.accentGlow}`,
             }}
           >
@@ -512,80 +815,26 @@ if (snapshotError && !holdingsLoading) {
         </div>
       </div>
 
-      {/* ── Allocation card (on top) ── */}
-      {hasSnapshot && allocRows.length > 0 && (
-        <div
-          style={{
-            ...card({
-              background:
-                'linear-gradient(135deg, rgba(42,157,143,0.1), rgba(42,157,143,0.05))',
-              border: `1px solid ${M.borderPositive}`,
-            }),
-            marginBottom: 16,
-            ...anim(mounted, 1),
-          }}
-        >
-          <div style={{ marginBottom: 12 }}>
-            <ProgressiveDisclosure
-              id="allocation"
-              summary={
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, color: M.text }}>
-                  Allocation
-                </span>
-              }
-              context={allocationExplainer}
-              learnMoreHref="/profile/learn/glossary#glossary-allocation"
-            />
-          </div>
-          {allocRows.map((a, i) => (
-            <div key={a.label} style={{ marginBottom: i < allocRows.length - 1 ? 6 : 0 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: 11,
-                  marginBottom: 3,
-                }}
-              >
-                <span style={{ color: M.textSecondary }}>{a.label}</span>
-                <span
-                  style={{
-                    fontWeight: 600,
-                    color: M.text,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                  }}
-                >
-                  {a.pct}%
-                </span>
-              </div>
-              <GradientBar pct={a.pct} gradient={a.gradient} h={5} />
-            </div>
-          ))}
+      {/* ── Allocation Card (shared with Exposure) ── */}
+      {hasSnapshot && allocations.length > 0 && (
+        <div style={anim(mounted, 1)}>
+          <AllocationCard allocations={allocations} regime={regime} hidden={hidden} />
         </div>
       )}
-      
-      {/* ── Misalignment framing (S61) ── */}
-        {hasSnapshot && snapshot && (
-          <div style={{ marginBottom: 16, ...anim(mounted, 1) }}>
-            <MisalignmentFramingCard snapshot={snapshot} regime={regime} />
-          </div>
-        )}
+
+      {/* ── Total Movement (free feature) ── */}
+      <div style={anim(mounted, 2)}>
+        <TotalMovementCard holdings={holdings} priceLookup={priceLookup} hidden={hidden} isPro={isPro} />
+      </div>
 
       {/* ── No snapshot notice ── */}
       {!hasSnapshot && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '12px 14px',
-            borderRadius: 16,
-            background: M.accentMuted,
-            marginBottom: 12,
-            ...anim(mounted, 1),
-          }}
-        >
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '12px 14px', borderRadius: 16,
+          background: M.accentMuted, marginBottom: 12,
+          ...anim(mounted, 2),
+        }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: M.accent }}>
             Exposure data will update on next analysis cycle
           </span>
@@ -593,216 +842,57 @@ if (snapshotError && !holdingsLoading) {
       )}
 
       {/* ── Holdings heading ── */}
-      <h2
-        style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 15,
-          fontWeight: 600,
-          color: M.text,
-          margin: '0 0 8px',
-          ...anim(mounted, 2),
-        }}
-      >
-        Holdings
-      </h2>
+      <div style={{
+        ...anim(mounted, 3),
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        margin: '0 0 10px',
+      }}>
+        <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: M.text }}>
+          Holdings
+        </h2>
+        {isPro && (
+          <span style={{ fontSize: 10, color: M.textMuted }}>Tap P&L for cost basis</span>
+        )}
+      </div>
 
       {/* ── Holdings list ── */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          ...anim(mounted, 3),
-        }}
-      >
-        {holdings.map((h) => {
-          const price = priceLookup[h.asset]
-          const valueUsd = price ? price.usd_price * h.quantity : null
-          const weight = price?.weight ?? null
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {holdings.map((h, i) => {
+          const price = priceLookup[h.asset] ?? null
           const name = h.asset_mapping?.name || h.asset
           const iconUrl = h.asset_mapping?.icon_url || null
-          const weightPct = weight !== null ? Math.round(weight * 100) : null
+          const coinCtx = coinContextMap[h.asset] ?? null
 
           return (
-            <div
-              key={h.id}
-              style={{
-                ...card({ padding: '14px' }),
-                opacity: h.include_in_exposure ? 1 : 0.55,
-              }}
-            >
-              {/* Main row: icon | name+qty | value+edit — single horizontal line */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <CryptoIcon symbol={h.asset} size={36} iconUrl={iconUrl} />
-
-                {/* Left: name + qty inline + since-added or excluded */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>{name}</span>
-                    <span style={{
-                      fontSize: 10, color: M.textMuted,
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                    }}>
-                      {hidden ? '\u2022\u2022\u2022\u2022' : qtyFmt(h.quantity)} {h.asset}
-                    </span>
-                    {(h as any).asset_mapping?.subcategory && (
-                      <span style={{
-                        fontSize: 9, color: M.textMuted, background: 'rgba(139,117,101,0.08)',
-                        borderRadius: 6, padding: '1px 6px', marginLeft: 4,
-                      }}>
-                        {(h as any).asset_mapping.subcategory}
-                      </span>
-                    )}
-                  </div>
-                  {h.include_in_exposure ? (
-                    (h.price_at_add != null || h.cost_basis != null) && price ? (() => {
-                      const baseline = h.price_at_add ?? h.cost_basis!
-                      const pctChange = ((price.usd_price - baseline) / baseline) * 100
-                      const up = pctChange >= 0
-                      const addedDate = new Date(h.created_at)
-                      const dateLbl = addedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                      return hidden ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: M.textMuted, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>\u2022\u2022%</span>
-                          <span style={{ fontSize: 9, color: M.textMuted }}>since \u2022\u2022\u2022</span>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 600,
-                            fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                            color: up ? M.positive : M.negative,
-                          }}>
-                            {up ? '+' : ''}{pctChange.toFixed(1)}%
-                          </span>
-                          <span style={{ fontSize: 9, color: M.textMuted }}>since {dateLbl}</span>
-                          <span style={{
-                            fontSize: 10, color: up ? M.positive : M.negative,
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                            opacity: 0.75,
-                          }}>
-                            {hidden ? '' : `${up ? '+' : '-'}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs((price.usd_price - baseline) * h.quantity))}`}
-                          </span>
-                        </div>
-                      )
-                    })() : null
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                      <EyeOff size={9} color={M.textMuted} strokeWidth={2} />
-                      <span style={{ fontSize: 9, color: M.textMuted }}>Excluded from posture</span>
-                    </div>
-                  )}
-                </div>
-
-
-                {/* Right: value + edit */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {valueUsd !== null && (
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{
-                        fontSize: 13, fontWeight: 600, color: M.text,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                      }}>
-                        {hidden ? '$\u2022\u2022\u2022\u2022' : fmt(valueUsd)}
-                      </div>
-                      {weightPct !== null && weightPct > 0 && (
-                        <div style={{
-                          fontSize: 10, color: M.textMuted,
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                        }}>
-                          {hidden ? '\u2022\u2022%' : `${weightPct}%`}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setSheet({ type: 'edit', holding: h })}
-                    style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.5)',
-                      border: `1px solid ${M.border}`,
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Pencil size={12} color={M.textSecondary} strokeWidth={2} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Posture contribution bar — inline compact (v3.1) */}
-              {h.include_in_exposure && weightPct !== null && weightPct > 0 && (
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 9, color: M.textMuted, whiteSpace: 'nowrap' }}>Posture</span>
-                  <GradientBar pct={hidden ? 0 : Math.min(weightPct * 2.5, 100)} h={4} />
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, color: M.text, whiteSpace: 'nowrap',
-                    fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1",
-                  }}>
-                    {hidden ? '\u2022\u2022%' : `${weightPct}%`}
-                  </span>
-                </div>
-              )}
-
-              {/* Pro teaser — regime performance preview (v3.1) */}
-              {h.include_in_exposure && (
-                <div style={{
-                  marginTop: 10, padding: '8px 10px', borderRadius: 12,
-                  background: 'linear-gradient(135deg, rgba(42,157,143,0.04), M.accentDim})',
-                  border: '1px solid rgba(42,157,143,0.08)',
-                  position: 'relative', overflow: 'hidden',
-                }}>
-                  {/* Blurred mini regime strip */}
-                  <div style={{ display: 'flex', gap: 2, marginBottom: 6, filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}>
-                    {[
-                      { w: '35%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
-                      { w: '15%', bg: 'linear-gradient(90deg,#8B7565,#A08979)' },
-                      { w: '25%', bg: 'linear-gradient(90deg,#2A9D8F,#5CC4B5)' },
-                      { w: '10%', bg: 'linear-gradient(90deg,#E76F51,#F08C70)' },
-                      { w: '15%', bg: 'linear-gradient(90deg,#2A9D8F,#3DB8A9)' },
-                    ].map((b, i) => (
-                      <div key={i} style={{ width: b.w, height: 16, borderRadius: 4, background: b.bg }} />
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <div style={{
-                        width: 12, height: 12, borderRadius: 4,
-                        background: M.accentGradient,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <span style={{ fontSize: 7, color: 'white', fontWeight: 700 }}>P</span>
-                      </div>
-                      <span style={{ fontSize: 9, color: M.textMuted }}>Regime performance · P&L tracking</span>
-                    </div>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: M.accent }}>Pro</span>
-                  </div>
-                </div>
-              )}
+            <div key={h.id} style={anim(mounted, 4 + i)}>
+              <HoldingCard
+                holding={h}
+                price={price}
+                name={name}
+                iconUrl={iconUrl}
+                hidden={hidden}
+                isPro={isPro}
+                coinContext={coinCtx}
+                coinContextLoading={coinContextLoading}
+                authChecked={authChecked}
+                onEdit={() => setSheet({ type: 'edit', holding: h })}
+              />
             </div>
           )
         })}
       </div>
 
       {/* ── Footer ── */}
-      <div
-        style={{
-          textAlign: 'center',
-          padding: '16px 0 8px',
-          fontSize: 11,
-          color: M.textMuted,
-          lineHeight: 1.5,
-          ...anim(mounted, 5),
-        }}
-      >
-        Exposure data reflects current holdings, not recommendations.
+      <div style={{
+        ...anim(mounted, 10),
+        textAlign: 'center', padding: '16px 0 4px',
+        fontSize: 10, color: M.textMuted, lineHeight: 1.5,
+      }}>
+        {isPro
+          ? 'P&L reflects unrealized gains. Not financial advice.'
+          : 'Holdings data, not recommendations.'
+        }
       </div>
     </div>
-    </DisclosureGroup>
   )
 }

@@ -132,7 +132,6 @@ function ExposureEmptyState({
     <div style={{ padding: '28px 0 0' }}>
       {/* Regime context card */}
       <div style={{
-        ...anim(mounted, 1),
         ...card({ padding: 20 }),
         background: `linear-gradient(135deg, ${rc.d}, rgba(42,157,143,0.02))`,
         border: `1px solid ${rc.s}33`, marginBottom: 12,
@@ -172,7 +171,7 @@ function ExposureEmptyState({
       </div>
 
       {/* Educational insight */}
-      <div style={anim(mounted, 2)}>
+      <div >
         <InsightCard
           icon={BookOpen}
           variant="neutral"
@@ -182,7 +181,7 @@ function ExposureEmptyState({
       </div>
 
       {/* CTA */}
-      <div style={{ ...anim(mounted, 3), marginTop: 24, textAlign: 'center' }}>
+      <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Link href="/portfolio" style={{
           display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px',
           background: M.accentGradient, borderRadius: 20, boxShadow: `0 4px 16px ${M.accentGlow}`,
@@ -297,7 +296,6 @@ export default function ExposurePage() {
 
       {/* ── Header (v4) ── */}
       <div style={{
-        ...anim(mounted, 0),
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
@@ -383,7 +381,7 @@ export default function ExposurePage() {
         <>
           {/* ── PostureHero or skeleton ── */}
           {snapshot ? (
-            <div style={{ ...anim(mounted, 1), marginBottom: 12 }}>
+            <div style={{ marginBottom: 12 }}>
               <PostureHero
                 score={score}
                 label={label}
@@ -393,7 +391,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), marginBottom: 16, ...anim(mounted, 1) }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16,  }}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ width: 72, height: 52, borderRadius: 8, background: M.surfaceLight, marginBottom: 8 }} />
                 <div style={{ width: 56, height: 12, borderRadius: 6, background: M.surfaceLight }} />
@@ -408,7 +406,7 @@ export default function ExposurePage() {
 
           {/* ── Regime Timeline (S163) ── */}
           {regimeHistory.length > 0 && (
-            <div style={anim(mounted, 2)}>
+            <div >
               <RegimeTimeline
                 regimeHistory={regimeHistory}
                 currentRegime={regime}
@@ -421,7 +419,7 @@ export default function ExposurePage() {
 
           {/* ── Allocation vs Target (S164) ── */}
           {snapshot ? (
-            <div style={anim(mounted, 3)}>
+            <div >
               <AllocationCard
                 allocations={allocations}
                 regime={regime}
@@ -429,7 +427,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 3), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '40%' }} />
                 {[0, 1, 2, 3].map(i => (
@@ -441,12 +439,12 @@ export default function ExposurePage() {
 
           {/* ── Holdings ── */}
           {snapshot && (
-            <div style={anim(mounted, 4)}>
+            <div >
               <Divider label={isMisaligned ? 'Most Exposed' : 'Holdings'} />
             </div>
           )}
           {snapshot ? (
-            <div style={anim(mounted, 5)}>
+            <div >
               <HoldingsSection
                 btcWeight={btcWeight}
                 ethWeight={ethWeight}
@@ -466,7 +464,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), ...anim(mounted, 5), marginBottom: 16 }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ height: 12, borderRadius: 6, background: M.surfaceLight, width: '30%' }} />
                 {[0, 1, 2].map(i => (
@@ -479,10 +477,10 @@ export default function ExposurePage() {
           {/* ── Analysis ── */}
           {snapshot && (
             <>
-              <div style={anim(mounted, 6)}>
+              <div >
                 <Divider label="Analysis" />
               </div>
-              <div style={anim(mounted, 7)}>
+              <div >
                 {isMisaligned ? (
                   <>
                     <InsightCard
@@ -515,13 +513,12 @@ export default function ExposurePage() {
           )}
 
           {/* ── Pro CTA ── */}
-          <div style={anim(mounted, 8)}>
+          <div >
             <ProFeaturesCta />
           </div>
 
           {/* Footer */}
           <div style={{
-            ...anim(mounted, 9),
             textAlign: 'center', padding: '12px 0 4px', fontSize: 10, color: M.textMuted, lineHeight: 1.5,
           }}>
             Exposure data reflects current holdings, not recommendations.
