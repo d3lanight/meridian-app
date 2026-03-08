@@ -1,5 +1,5 @@
 // ━━━ Market Pulse Page ━━━
-// v4.2.0 · S173 · Sprint 35 — EthConfirmationCard added after RegimeHero
+// v4.4.0 · S173 · Sprint 35 — range→steel blue, volatile→burnt orange
 // "The market now, alive" — prices, regime history, market signals, movers, intraday
 //
 // Changelog:
@@ -13,7 +13,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Lock } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { anim } from '@/lib/ui-helpers'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
@@ -118,12 +118,40 @@ function toRegimeRows(raw: any[]): RegimeRow[] {
   }))
 }
 
+// ── Regime Icons (SVG, no emoji) ────────────────
+// Bull/Bear reuse Lucide. Range/Volatility are custom SVGs
+// to avoid emoji rendering on Safari/Chrome mobile.
+function RegimeIcon({ regime, size = 20, color = 'white' }: { regime: string; size?: number; color?: string }) {
+  if (regime === 'bull') return <TrendingUp size={size} color={color} strokeWidth={2.5} />
+  if (regime === 'bear') return <TrendingDown size={size} color={color} strokeWidth={2.5} />
+  if (regime === 'range') return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <path d="M3 10h14M3 10l3-3M3 10l3 3M17 10l-3-3M17 10l-3 3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+  if (regime === 'volatility') return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <path d="M10 3v14M10 3l-3 3M10 3l3 3M10 17l-3-3M10 17l3-3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+  return null
+}
+
+function ProIcon({ size = 14, color = M.accent }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="1" width="12" height="12" rx="3" stroke={color} strokeWidth="1.2" fill={color} fillOpacity="0.1"/>
+      <path d="M3.5 10.5V3.5L7 8L10.5 3.5V10.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 // ── Intraday Block — newest on top ────────────
-const RC_INTRA: Record<string, { label: string; icon: string; color: string; dim: string; bg: string }> = {
-  bull:       { label: 'Bull',    icon: '↗', color: M.positive,   dim: M.positiveDim,   bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
-  bear:       { label: 'Bear',    icon: '↘', color: M.negative,   dim: M.negativeDim,   bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
-  range:      { label: 'Range',   icon: '→', color: M.neutral,    dim: 'rgba(139,117,101,0.1)', bg: 'linear-gradient(135deg,#8B7565,#A08B7B)' },
-  volatility: { label: 'Volatile',icon: '↕', color: M.volatility, dim: M.volatilityDim, bg: 'linear-gradient(135deg,#D4A017,#E0B030)' },
+const RC_INTRA: Record<string, { label: string; color: string; dim: string; bg: string }> = {
+  bull:       { label: 'Bull',     color: M.positive,   dim: M.positiveDim,          bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
+  bear:       { label: 'Bear',     color: M.negative,   dim: M.negativeDim,          bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
+  range:      { label: 'Range',    color: '#5B7FA6',  dim: 'rgba(91,127,166,0.12)',  bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)' },
+  volatility: { label: 'Volatile', color: '#C8782A',  dim: 'rgba(200,120,42,0.12)',  bg: 'linear-gradient(135deg,#C8782A,#D9904A)' },
 }
 
 function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: boolean }) {
@@ -132,7 +160,7 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
       <div style={{ background: `linear-gradient(135deg, ${M.accentMuted}, rgba(123,111,168,0.06))`, border: `1px solid ${M.borderAccent}`, borderRadius: 20, padding: 16, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 12, background: M.accentDim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontSize: 16 }}>⚡</span>
+            <Lock size={16} color={M.accent} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_DISPLAY }}>Intraday Regime Signals</div>
@@ -147,9 +175,8 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
   return (
     <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: 20, border: `1px solid ${M.border}`, padding: 16, marginBottom: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 16 }}>⚡</span>
+        <ProIcon size={15} color={M.accent} />
         <span style={{ fontFamily: FONT_DISPLAY, fontSize: 14, fontWeight: 600, color: M.text }}>Intraday Regime Signals</span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: M.accent, background: M.accentDim, padding: '2px 6px', borderRadius: 6, fontFamily: FONT_BODY }}>PRO</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {displaySignals.map((s, i) => {
@@ -159,7 +186,7 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: isNow ? rc.dim : 'transparent', border: isNow ? `1px solid ${rc.color}22` : '1px solid transparent' }}>
               <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: M.textMuted, width: 42, flexShrink: 0 }}>{s.time}</span>
               <div style={{ width: 20, height: 20, borderRadius: 6, background: isNow ? rc.bg : rc.dim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <span style={{ fontSize: 10, color: isNow ? 'white' : rc.color, fontWeight: 700 }}>{rc.icon}</span>
+                <RegimeIcon regime={s.regime} size={11} color={isNow ? 'white' : rc.color} />
               </div>
               <span style={{ fontSize: 12, fontWeight: isNow ? 600 : 400, color: isNow ? M.text : M.textSecondary, flex: 1, fontFamily: FONT_BODY }}>{rc.label}</span>
               <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: isNow ? rc.color : M.textMuted, fontWeight: 600 }}>{s.confidence}%</span>
@@ -282,7 +309,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
       >
         <div style={{ flex: 1, padding: '10px 14px', borderRight: `1px solid ${M.borderSubtle}` }}>
           <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>24h Vol</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_MONO }}>{formatVolume(totalVolume)}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{formatVolume(totalVolume)}</div>
         </div>
         <div style={{ flex: 1, padding: '10px 14px', borderRight: `1px solid ${M.borderSubtle}` }}>
           <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Vol Profile</div>
@@ -496,13 +523,8 @@ export default function PulsePage() {
             />
           </div>
 
-          {/* ETH Confirmation */}
-          <div style={anim(mounted, 2)}>
-            <EthConfirmationCard btcChange={btcChange} ethChange={ethChange} regime={regime} />
-          </div>
-
           {/* BTC + ETH prices */}
-          <div style={{ ...anim(mounted, 3), display: 'flex', gap: 10, marginBottom: 12 }}>
+          <div style={{ ...anim(mounted, 2), display: 'flex', gap: 10, marginBottom: 12 }}>
             <PriceCard symbol="BTC" name="Bitcoin"   price={btcPrice} change={btcChange} iconUrl={btcIcon} />
             <PriceCard symbol="ETH" name="Ethereum"  price={ethPrice} change={ethChange} iconUrl={ethIcon} />
           </div>
@@ -516,6 +538,11 @@ export default function PulsePage() {
             marketCap={marketCap}
             mounted={mounted}
           />
+
+          {/* ETH Confirmation */}
+          <div style={anim(mounted, 4)}>
+            <EthConfirmationCard btcChange={btcChange} ethChange={ethChange} regime={regime} />
+          </div>
 
           {/* Gainers / Losers */}
           <div style={anim(mounted, 4)}>

@@ -28,8 +28,8 @@ const FONT_BODY    = "'DM Sans', sans-serif"
 const RC: Record<string, { label: string; icon: string; color: string; dim: string; glow: string; bg: string }> = {
   bull:       { label: 'Bull',     icon: '↗', color: M.positive,    dim: M.positiveDim,    glow: 'rgba(42,157,143,0.3)',   bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
   bear:       { label: 'Bear',     icon: '↘', color: M.negative,    dim: M.negativeDim,    glow: 'rgba(231,111,81,0.3)',   bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
-  range:      { label: 'Range',    icon: '→', color: M.neutral,     dim: 'rgba(139,117,101,0.1)', glow: 'rgba(139,117,101,0.2)', bg: 'linear-gradient(135deg,#8B7565,#A08B7B)' },
-  volatility: { label: 'Volatile', icon: '↕', color: M.volatility,  dim: M.volatilityDim,  glow: 'rgba(212,160,23,0.3)',   bg: 'linear-gradient(135deg,#D4A017,#E0B030)' },
+  range:      { label: 'Range',    icon: '→', color: '#5B7FA6',     dim: 'rgba(91,127,166,0.12)', glow: 'rgba(91,127,166,0.2)',  bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)' },
+  volatility: { label: 'Volatile', icon: '↕', color: '#C8782A',     dim: 'rgba(200,120,42,0.12)', glow: 'rgba(200,120,42,0.3)',  bg: 'linear-gradient(135deg,#C8782A,#D9904A)' },
 }
 function getRC(regime: string) {
   return RC[regime?.toLowerCase()] || RC.range

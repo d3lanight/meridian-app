@@ -165,13 +165,13 @@ export default function HoldingCard({
             <>
               {/* 30d header: label · change · beta */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 10, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>30d price</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>30d price</span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: up30 ? M.positive : M.negative, fontFamily: "'DM Sans', sans-serif" }}>
                     {hidden ? '••%' : fP(change30d)}
                   </span>
-                  <BetaBadge beta={beta} />
                 </div>
+                <BetaBadge beta={beta} />
               </div>
 
               {/* Sparkline */}
