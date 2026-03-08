@@ -295,6 +295,7 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
       {/* Backdrop */}
       <div
         onClick={onClose}
+        onWheel={e => e.preventDefault()}
         style={{
           position: 'absolute', inset: 0,
           background: 'rgba(0,0,0,0.2)',
@@ -309,12 +310,14 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
         background: M.surfaceElevated,
         borderRadius: '24px 24px 0 0',
         margin: '0 12px',
-        padding: '12px 20px 28px',
+        padding: '12px 20px 0',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         maxHeight: '82vh',
-        overflowY: 'auto',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
         transform: visible ? 'translateY(0)' : 'translateY(100%)',
         transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
       }}>
@@ -323,7 +326,11 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
           width: 36, height: 4, borderRadius: 2,
           background: M.borderSubtle,
           margin: '0 auto 12px',
+          flexShrink: 0,
         }} />
+
+        {/* Scrollable content */}
+        <div style={{ overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: 28, flex: 1 }}>
 
         {/* Header */}
         <div style={{
@@ -481,6 +488,7 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
             )}
           </>
         )}
+        </div>{/* end scrollable content */}
       </div>
     </div>
   )

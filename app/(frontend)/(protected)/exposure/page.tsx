@@ -549,9 +549,9 @@ export default function ExposurePage() {
       {/* ── Add Holding Sheet ── */}
       {sheet?.type === 'add' && (
         <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
+          <div onClick={() => setSheet(null)} onWheel={e => e.preventDefault()} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
+          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 0 0', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px', flexShrink: 0 }} />
             <AddHoldingSheet
               assets={assets}
               heldSymbols={portfolioHoldings.map(h => h.asset)}
@@ -572,9 +572,9 @@ export default function ExposurePage() {
         if (!h) return null
         return (
           <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-            <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
-              <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
+            <div onClick={() => setSheet(null)} onWheel={e => e.preventDefault()} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
+            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 0 0', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px', flexShrink: 0 }} />
               <EditHoldingSheet
                 holding={h}
                 onUpdate={async (id, updates) => {
