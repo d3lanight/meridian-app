@@ -1,7 +1,7 @@
 // ━━━ HoldingsSection Component ━━━
-// v1.0.0 · ca-story132 · Sprint 28
-// Holdings list in Exposure page with flagged state for misalignment
-// ETH-fold: ETH row hidden when eth_weight = 0 and no ETH holdings
+// v1.4.0 · S173 · Sprint 35
+// Added: isPro, enrichedHoldings, currentPrices, coinContext, portfolioHoldings, onEdit
+// HoldingCard updated to v2.4.0 (expandable, sparkline, 24h change, P&L)
 
 'use client'
 
@@ -10,6 +10,7 @@ import { card, anim } from '@/lib/ui-helpers'
 import HoldingCard from '@/components/exposure/HoldingCard'
 import type { AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
+import { usePortfolio } from '@/hooks/usePortfolio'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,11 @@ interface HoldingsSectionProps {
   score:        number        // posture score 0–100
   mounted:      boolean
   hidden?:      boolean
+  isPro?:       boolean
+  enrichedHoldings?: any[]
+  currentPrices?: Record<string, { price: number; change_24h: number }>
+  coinContext?: Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>
+  onEdit?: (id: string) => void
 }
 
 // ─── Fallback bands ───────────────────────────────────────────────────────────
@@ -105,9 +111,26 @@ export default function HoldingsSection({
   score,
   mounted,
   hidden = false,
+  isPro = false,
+  enrichedHoldings = [],
+  currentPrices = {},
+  coinContext = {},
+  onEdit,
 }: HoldingsSectionProps) {
   const bands = targetBands ?? FALLBACK_BANDS
   const isMisaligned = score < 40
+
+  // Build lookup maps
+  const enrichedMap: Record<string, any> = {}
+  for (const h of enrichedHoldings) {
+    if (h?.asset) enrichedMap[h.asset.toUpperCase()] = h
+  }
+
+  const { holdings: portfolioHoldings } = usePortfolio()
+  const holdingIdMap: Record<string, string> = {}
+  for (const h of portfolioHoldings) {
+    if (h?.asset) holdingIdMap[h.asset.toUpperCase()] = h.id
+  }
 
   // Build rows
   const rows: HoldingRow[] = []
@@ -178,12 +201,25 @@ export default function HoldingsSection({
         <HoldingCard
           key={row.symbol}
           symbol={row.symbol}
-          name={row.name}
+          name={row.name ?? row.symbol}
           iconUrl={row.iconUrl}
-          valueUsd={row.valueUsd}
-          weightPct={row.weight * 100}
-          flagged={row.symbol === flaggedSymbol}
+          pctExposure={Math.round(row.weight * 100)}
+          inPosture={true}
+          offTarget={row.symbol === flaggedSymbol}
           hidden={hidden}
+          isPro={isPro}
+          qty={enrichedMap[row.symbol]?.quantity ?? 0}
+          price={enrichedMap[row.symbol]?.price_usd ?? currentPrices[row.symbol]?.price ?? 0}
+          addedPrice={enrichedMap[row.symbol]?.price_at_add ?? 0}
+          addedDate={enrichedMap[row.symbol]?.created_at ?? null}
+          change24h={currentPrices[row.symbol]?.change_24h ?? 0}
+          sparkline={coinContext[row.symbol]?.sparkline ?? []}
+          high30d={coinContext[row.symbol]?.high30d ?? 0}
+          low30d={coinContext[row.symbol]?.low30d ?? 0}
+          change30d={coinContext[row.symbol]?.change30d ?? 0}
+          beta={coinContext[row.symbol]?.beta ?? 0}
+          holdingId={holdingIdMap[row.symbol] ?? null}
+          onEdit={onEdit}
         />
       ))}
     </div>

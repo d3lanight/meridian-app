@@ -1,5 +1,5 @@
 // ━━━ Market Context API ━━━
-// v3.3.1 · S147 · 2026-03-06
+// v3.4.0 · S173 · Sprint 35 — current_prices for ALL symbols (not just BTC/ETH); change_24h rounded to 2dp
 // Fetches regime history + price history + duration patterns + transitions + intraday signals
 // Changelog:
 //  v3.3.1 — S147: Added intraday_signals to response (last 6 snapshots from intraday_regimes)
@@ -79,8 +79,7 @@ export async function GET(request: NextRequest) {
       supabase.rpc('regime_duration_stats'),
       supabase
         .from('asset_prices')
-        .select('price_usd, change_24h, recorded_at, asset_mapping!inner(symbol)')
-        .in('asset_mapping.symbol', ['BTC', 'ETH']),
+        .select('price_usd, change_24h, recorded_at, asset_mapping!inner(symbol)'),
       supabase
         .from('intraday_regimes')
         .select('regime, confidence, btc_r_short, eth_r_short, eth_confirming, created_at')
@@ -94,7 +93,7 @@ export async function GET(request: NextRequest) {
       if (symbol) {
         currentPrices[symbol] = {
           price: Number(row.price_usd),
-          change_24h: Number(row.change_24h),
+          change_24h: Math.round(Number(row.change_24h) * 100) / 100,
           recorded_at: row.recorded_at,
         }
       }

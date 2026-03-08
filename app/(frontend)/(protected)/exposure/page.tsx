@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v3.0.0 — S163/S164 · Sprint 34
+//   v3.2.0 — S173 · Sprint 35
 // Changelog:
+//   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
 //   v3.0.0 — S163/S164: Full v4 redesign.
 //            - RegimeTimeline: collapsible, period tabs (7d/30d/90d), 90d pro-locked, rich blocks
 //            - AllocationCard: teal-tinted, regime badge, target zone bars, warning text
@@ -15,18 +16,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, Zap, TrendingUp, Wallet, BookOpen, Eye, EyeOff } from 'lucide-react'
+import { Shield, Zap, TrendingUp, Plus, BookOpen, Eye, EyeOff } from 'lucide-react'
 import { getTargetBands } from '@/lib/risk-profiles'
 import { getRegimeConfig } from '@/lib/regime-utils'
 import type { RegimeRow } from '@/lib/regime-utils'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
 import PostureHero from '@/components/exposure/PostureHero'
-import RegimeTimeline from '@/components/exposure/RegimeTimeline'
 import AllocationCard, { buildAllocations } from '@/components/exposure/AllocationCard'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
+import { usePortfolio } from '@/hooks/usePortfolio'
 import InsightCard from '@/components/exposure/InsightCard'
+import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
+import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
 import ProFeaturesCta from '@/components/exposure/ProFeaturesCta'
 import type { PortfolioSnapshot, AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
@@ -208,7 +211,11 @@ export default function ExposurePage() {
   const [regimePersistence, setRegimePersistence] = useState(1)
   const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
   const [isPro, setIsPro]       = useState(false)
+  const [sheet, setSheet]       = useState<{ type: 'add' } | { type: 'edit'; holdingId: string } | null>(null)
+  const [currentPrices, setCurrentPrices] = useState<Record<string, { price: number; change_24h: number }>>({})
+  const [coinContext, setCoinContext]      = useState<Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>>({})
   const { hidden, toggleHidden } = usePrivacy()
+  const { holdings: portfolioHoldings, assets, addHolding, updateHolding, removeHolding, refresh } = usePortfolio()
 
 
   useEffect(() => {
@@ -238,7 +245,20 @@ export default function ExposurePage() {
           setRegimePersistence(days)
         }
         setRegimeHistory(toRegimeRows(regimes))
+        if (data?.current_prices) setCurrentPrices(data.current_prices)
       })
+      .catch(() => {})
+
+    // Coin context for sparklines/beta/30d range (Pro)
+    fetch('/api/portfolio-snapshot')
+      .then(r => r.ok ? r.json() : null)
+      .then((snap: any) => {
+        if (!snap?.enriched_holdings?.length) return null
+        const symbols = snap.enriched_holdings.map((h: any) => h.asset).join(',')
+        return fetch(`/api/coin-context?symbols=${symbols}`)
+      })
+      .then(r => r && r.ok ? r.json() : null)
+      .then((ctx: any) => { if (ctx) setCoinContext(ctx) })
       .catch(() => {})
 
     // Auth + tier check
@@ -330,15 +350,18 @@ export default function ExposurePage() {
               ? <EyeOff size={16} color={M.textMuted} strokeWidth={2} />
               : <Eye size={16} color={M.textSecondary} strokeWidth={2} />}
           </button>
-          <Link href="/portfolio" style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: M.accentGradient, border: 'none',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 4px 12px ${M.accentGlow}`,
-            textDecoration: 'none',
-          }} aria-label="Manage holdings">
-            <Wallet size={18} color="white" strokeWidth={2} />
-          </Link>
+          <button
+            onClick={() => setSheet({ type: 'add' })}
+            style={{
+              width: 44, height: 44, borderRadius: '50%',
+              background: M.accentGradient, border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 4px 12px ${M.accentGlow}`,
+            }}
+            aria-label="Add holding"
+          >
+            <Plus size={20} color="white" strokeWidth={2.5} />
+          </button>
         </div>
       </div>
 
@@ -404,19 +427,6 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Regime Timeline (S163) ── */}
-          {regimeHistory.length > 0 && (
-            <div >
-              <RegimeTimeline
-                regimeHistory={regimeHistory}
-                currentRegime={regime}
-                confidence={regimeConfidence}
-                persistence={regimePersistence}
-                isPro={isPro}
-              />
-            </div>
-          )}
-
           {/* ── Allocation vs Target (S164) ── */}
           {snapshot ? (
             <div >
@@ -461,6 +471,11 @@ export default function ExposurePage() {
                 score={score}
                 mounted={mounted}
                 hidden={hidden}
+                isPro={isPro}
+                enrichedHoldings={snapshot?.enriched_holdings ?? []}
+                currentPrices={currentPrices}
+                coinContext={coinContext}
+                onEdit={(id) => setSheet({ type: 'edit', holdingId: id })}
               />
             </div>
           ) : (
@@ -525,6 +540,55 @@ export default function ExposurePage() {
           </div>
         </>
       )}
+
+      {/* ── Add Holding Sheet ── */}
+      {sheet?.type === 'add' && (
+        <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+          <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
+          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
+            <AddHoldingSheet
+              assets={assets}
+              heldSymbols={portfolioHoldings.map(h => h.asset)}
+              onAdd={async (asset, quantity, costBasis) => {
+                const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
+                if (ok) { refresh(); setSheet(null) }
+                return ok
+              }}
+              onClose={() => setSheet(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Holding Sheet ── */}
+      {sheet?.type === 'edit' && (() => {
+        const h = portfolioHoldings.find(p => p.id === sheet.holdingId)
+        if (!h) return null
+        return (
+          <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
+            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
+              <EditHoldingSheet
+                holding={h}
+                onUpdate={async (id, updates) => {
+                  const ok = await updateHolding(id, updates)
+                  if (ok) refresh()
+                  return ok
+                }}
+                onRemove={async (id) => {
+                  const ok = await removeHolding(id)
+                  if (ok) { refresh(); setSheet(null) }
+                  return ok
+                }}
+                onClose={() => setSheet(null)}
+              />
+            </div>
+          </div>
+        )
+      })()}
+
     </div>
   )
 }
