@@ -1,22 +1,35 @@
-// ━━━ ProUpgradeCard ━━━
-// v1.2.0 · ca-story115 · Sprint 25
-// Tier-aware: rendered conditionally by Profile page (tier === free)
-// CTA calls onUpgrade callback (toggles tier in DB during testing phase)
+// ProUpgradeCard.tsx
+// Profile — Pro upgrade CTA card
+// Version: 2.0.0
+// Sprint: 35 (S168)
+// Changelog:
+//   2.0.0 - Updated feature list to v4 items (S168):
+//           "Price context + BTC correlation per coin",
+//           "90-day regime timeline",
+//           "Intraday regime signals",
+//           "Custom notification thresholds"
+//   1.0.0 - Initial (S87): accent CTA, 4-item feature list.
 
 import { Crown } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 
-interface ProUpgradeCardProps {
-  onUpgrade?: () => void
-}
+const FONT_DISPLAY = "'Outfit', sans-serif"
+const FONT_BODY = "'DM Sans', sans-serif"
 
-export function ProUpgradeCard({ onUpgrade }: ProUpgradeCardProps) {
+const V4_FEATURES = [
+  'Price context + BTC correlation per coin',
+  '90-day regime timeline',
+  'Intraday regime signals',
+  'Custom notification thresholds',
+]
+
+export function ProUpgradeCard() {
   return (
     <div
       style={{
         ...card({
-          background: 'linear-gradient(135deg, rgba(244,162,97,0.08), rgba(231,111,81,0.05))',
+          background: `linear-gradient(135deg, ${M.accentMuted}, rgba(123,111,168,0.04))`,
           border: `1px solid ${M.borderAccent}`,
           padding: 18,
         }),
@@ -39,19 +52,23 @@ export function ProUpgradeCard({ onUpgrade }: ProUpgradeCardProps) {
           <Crown size={16} color="white" strokeWidth={2} />
         </div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: M.text }}>Meridian Pro</div>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: M.text,
+              fontFamily: FONT_DISPLAY,
+            }}
+          >
+            Meridian Pro
+          </div>
           <div style={{ fontSize: 11, color: M.textMuted }}>Unlock the full picture</div>
         </div>
       </div>
 
       {/* Feature list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-        {[
-          'Per-coin regime performance',
-          'P&L tracking with custom dates',
-          'AI-powered portfolio insights',
-          '90-day regime timeline (180d, 360d coming)',
-        ].map((feature, i) => (
+        {V4_FEATURES.map((feature, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div
               style={{
@@ -62,18 +79,20 @@ export function ProUpgradeCard({ onUpgrade }: ProUpgradeCardProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <span style={{ fontSize: 9, color: M.positive, fontWeight: 700 }}>✓</span>
             </div>
-            <span style={{ fontSize: 12, color: M.textSecondary }}>{feature}</span>
+            <span style={{ fontSize: 12, color: M.textSecondary, fontFamily: FONT_BODY }}>
+              {feature}
+            </span>
           </div>
         ))}
       </div>
 
       {/* CTA button */}
       <button
-        onClick={onUpgrade}
         style={{
           width: '100%',
           padding: 12,
@@ -84,7 +103,8 @@ export function ProUpgradeCard({ onUpgrade }: ProUpgradeCardProps) {
           fontSize: 14,
           fontWeight: 600,
           cursor: 'pointer',
-          fontFamily: "'DM Sans', sans-serif",
+          fontFamily: FONT_BODY,
+          boxShadow: `0 4px 16px ${M.accentGlow}`,
         }}
       >
         Upgrade to Pro
