@@ -40,24 +40,28 @@ function getScoreThreshold(score: number): {
   scoreColor: string
   iconBg: string
   dotBorder: string
+  cardBorder: string
 } {
   if (score >= 60) return {
     tint:       'rgba(42,157,143,0.08)',
     scoreColor: M.positive,
     iconBg:     'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))',
     dotBorder:  M.positive,
+    cardBorder: M.borderPositive,
   }
   if (score < 40) return {
     tint:       'rgba(231,111,81,0.08)',
     scoreColor: M.negative,
     iconBg:     'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))',
     dotBorder:  M.negative,
+    cardBorder: 'rgba(231,111,81,0.3)',
   }
   return {
     tint:       'transparent',
     scoreColor: M.textMuted,
     iconBg:     'linear-gradient(135deg, #8B7565, rgba(139,117,101,0.8))',
     dotBorder:  M.accent,
+    cardBorder: 'rgba(255,255,255,0.9)',
   }
 }
 
@@ -92,7 +96,7 @@ export default function PostureHero({ score, label, regime, hidden, profile }: P
     return () => observer.disconnect()
   }, [])
 
-  const { tint, scoreColor, iconBg, dotBorder } = getScoreThreshold(score)
+  const { tint, scoreColor, iconBg, dotBorder, cardBorder } = getScoreThreshold(score)
   const narrative  = postureNarrative(toPostureKey(label), regime, profile)
   const clampedScore = Math.min(100, Math.max(0, score))
 
@@ -105,7 +109,7 @@ export default function PostureHero({ score, label, regime, hidden, profile }: P
     <div
       style={{
         ...card(),
-        border: '1px solid rgba(255,255,255,0.9)',
+        border: `1px solid ${cardBorder}`,
         background: tint !== 'transparent'
           ? `linear-gradient(135deg, ${tint}, ${tint}), ${M.surface}`
           : M.surface,
