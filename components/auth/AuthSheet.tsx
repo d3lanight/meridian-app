@@ -1,5 +1,8 @@
 // ━━━ Auth Sheet ━━━
-// v1.0.0 · S160 · Sprint 33
+// v1.1.0 · S169 · Sprint 35
+// Changelog:
+//   v1.1.0 — S169: sheet inset margin 12px; scroll lock useEffect.
+//   v1.0.0 · S160 · Sprint 33
 // Bottom sheet overlay for inline authentication
 // Replaces full-page /login redirect for protected features
 'use client'
@@ -125,6 +128,13 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
       return () => clearTimeout(t)
     }
     setVisible(false)
+  }, [isOpen])
+
+  // Scroll lock
+  useEffect(() => {
+    if (!isOpen) return
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
   // Reset state when closed
@@ -298,6 +308,7 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
         position: 'relative',
         background: M.surfaceElevated,
         borderRadius: '24px 24px 0 0',
+        margin: '0 12px',
         padding: '12px 20px 28px',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
         backdropFilter: 'blur(20px)',

@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v3.2.0 — S173 · Sprint 35
+//   v3.3.0 — S169 · Sprint 35
 // Changelog:
+//   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
 //   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
 //   v3.0.0 — S163/S164: Full v4 redesign.
 //            - RegimeTimeline: collapsible, period tabs (7d/30d/90d), 90d pro-locked, rich blocks
@@ -218,14 +219,18 @@ export default function ExposurePage() {
   const { holdings: portfolioHoldings, assets, addHolding, updateHolding, removeHolding, refresh } = usePortfolio()
 
 
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 100)
-
-    // Portfolio snapshot (auth required — will 401 for anon, that's fine)
+  const fetchSnapshot = () => {
     fetch('/api/portfolio-snapshot')
       .then(r => r.ok ? r.json() : null)
       .then((data: SnapshotWithPosture | null) => { if (data) setSnapshot(data) })
       .catch(() => {})
+  }
+
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 100)
+
+    // Portfolio snapshot (auth required — will 401 for anon, that's fine)
+    fetchSnapshot()
 
     // Market context (public)
     fetch('/api/market-context?days=90')
@@ -545,14 +550,14 @@ export default function ExposurePage() {
       {sheet?.type === 'add' && (
         <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
           <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
+          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
             <AddHoldingSheet
               assets={assets}
               heldSymbols={portfolioHoldings.map(h => h.asset)}
               onAdd={async (asset, quantity, costBasis) => {
                 const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
-                if (ok) { refresh(); setSheet(null) }
+                if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
                 return ok
               }}
               onClose={() => setSheet(null)}
@@ -568,7 +573,7 @@ export default function ExposurePage() {
         return (
           <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
             <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 20px 28px', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflowY: 'auto' }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px' }} />
               <EditHoldingSheet
                 holding={h}

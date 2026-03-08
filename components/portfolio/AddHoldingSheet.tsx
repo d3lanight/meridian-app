@@ -1,13 +1,17 @@
 // ━━━ Add Holding Sheet — Asset select → Quantity → Confirm ━━━
-// v1.1.0 · ca-story-design-refresh · Sprint 24
+// v1.2.0 · S169 · Sprint 35
+// Changelog:
+//   v1.2.0 — S169: CryptoIcon for confirmation step; scroll lock useEffect.
+//   v1.1.0 · ca-story-design-refresh · Sprint 24
 // Meridian v2: glassmorphic, warm theme, progress steps
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, X, ChevronLeft } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import AssetPicker from './AssetPicker';
+import CryptoIcon from '@/components/shared/CryptoIcon';
 import type { AssetMapping } from '@/types';
 
 interface AddHoldingSheetProps {
@@ -26,6 +30,12 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
   const [costBasis, setCostBasis] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Scroll lock
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
 
   const handleSelect = (asset: AssetMapping) => {
     setSelected(asset);
@@ -106,15 +116,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           }}
         >
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold relative" style={{ flexShrink: 0 }}>
-              {selected?.icon_url ? (
-                <img src={selected.icon_url} alt={selected.symbol} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
-              ) : (
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: M.accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
-                  {selected?.symbol?.slice(0, 3)}
-                </div>
-              )}
-            </div>
+            <CryptoIcon symbol={selected?.symbol || ''} size={48} iconUrl={selected?.icon_url} />
             <div>
               <div className="text-base font-medium" style={{ color: M.text }}>{name}</div>
               <div className="text-xs" style={{ color: M.textSecondary }}>{selected?.symbol}</div>

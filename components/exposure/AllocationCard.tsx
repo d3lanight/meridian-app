@@ -12,7 +12,8 @@ import { getRegimeConfig } from '@/lib/regime-utils'
 
 // ─── Fonts ────────────────────────────────────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
-const FONT_MONO = "'DM Mono', monospace"
+const FONT_BODY    = "'DM Sans', sans-serif"
+const FONT_MONO    = "'DM Mono', monospace"
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export default function AllocationCard({ allocations, regime, hidden = false }: 
             </div>
             <span style={{
               fontWeight: 600, fontSize: 12, color: M.text,
-              fontFamily: FONT_MONO,
+              fontFamily: FONT_BODY,
               fontFeatureSettings: "'tnum' 1, 'lnum' 1",
             }}>
               {hidden ? '••' : `${a.current}%`}

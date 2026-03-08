@@ -1,13 +1,17 @@
 // ━━━ Edit Holding Sheet — Update quantity, cost basis, exposure toggle, remove ━━━
-// v1.2.0 · ca-story-design-refresh · Sprint 24
+// v1.3.0 · S169 · Sprint 35
+// Changelog:
+//   v1.3.0 — S169: CryptoIcon for asset identity; scroll lock useEffect.
+//   v1.2.0 · ca-story-design-refresh · Sprint 24
 // Meridian v2: glassmorphic, warm theme
 // Fix: toggle + save button state tracking
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, X, Trash2 } from 'lucide-react';
 import { M } from '@/lib/meridian';
+import CryptoIcon from '@/components/shared/CryptoIcon';
 import type { Holding } from '@/types';
 
 
@@ -38,6 +42,12 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
   const [error, setError] = useState<string | null>(null);
 
   const name = (holding as any).asset_mapping?.name || holding.asset;
+
+  // Scroll lock
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
 
   // Clean comparison against original values
   const currentQty = parseFloat(qty) || 0;
@@ -115,15 +125,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
           }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold relative" style={{ flexShrink: 0 }}>
-              {(holding as any).asset_mapping?.icon_url ? (
-                <img src={(holding as any).asset_mapping.icon_url} alt={holding.asset} width={48} height={48} style={{ borderRadius: '50%', display: 'block' }} />
-              ) : (
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: M.accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 600 }}>
-                  {holding.asset.slice(0, 3)}
-                </div>
-              )}
-            </div>
+            <CryptoIcon symbol={holding.asset} size={48} iconUrl={(holding as any).asset_mapping?.icon_url} />
             <div>
               <div className="text-base font-medium" style={{ color: M.text }}>{name}</div>
               <div className="text-xs" style={{ color: M.textSecondary }}>{holding.asset}</div>
