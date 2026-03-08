@@ -122,9 +122,9 @@ export default function HoldingCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
           <CryptoIcon symbol={symbol} size={38} iconUrl={iconUrl} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: M.display }}>{name}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'Outfit', sans-serif" }}>{name}</span>
           </div>
-          <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: M.num, fontFeatureSettings: M.numF, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", flexShrink: 0 }}>
             {hidden ? '$••••' : fU(value)}
           </span>
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: expanded ? M.accentDim : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 2, transition: 'background 0.2s ease' }}>
@@ -134,11 +134,11 @@ export default function HoldingCard({
 
         {/* Row 2: qty · 24h change */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 48, marginBottom: 8 }}>
-          <span style={{ fontSize: 11, color: M.textMuted, fontFamily: M.body, fontWeight: 400, letterSpacing: 0.1 }}>
+          <span style={{ fontSize: 11, color: M.textMuted, fontFamily: "'DM Sans', sans-serif", fontWeight: 400, letterSpacing: 0.1 }}>
             {qtyFmt}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginRight: 30 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: change24hColor, fontFamily: M.num, fontFeatureSettings: M.numF }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: change24hColor, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>
               {hidden ? '••%' : `${change24h >= 0 ? '+' : ''}${change24h}%`}
             </span>
             <span style={{ fontSize: 9, color: M.textMuted }}>24h</span>
@@ -151,7 +151,7 @@ export default function HoldingCard({
           <div style={{ flex: 1, height: 4, borderRadius: 4, background: M.surfaceLight, overflow: 'hidden' }}>
             <div style={{ height: '100%', borderRadius: 4, background: coinGrad, width: `${Math.min(100, pctExposure)}%`, transition: 'width 0.5s ease' }} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: M.textSecondary, fontFamily: M.num, fontFeatureSettings: M.numF, minWidth: 30, textAlign: 'right', flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: M.textSecondary, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", minWidth: 30, textAlign: 'right', flexShrink: 0 }}>
             {hidden ? '••%' : `${pctExposure}%`}
           </span>
           <PosturePill inPosture={inPosture} offTarget={offTarget} />
@@ -167,7 +167,7 @@ export default function HoldingCard({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontSize: 10, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>30d price</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: up30 ? M.positive : M.negative, fontFamily: M.num }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: up30 ? M.positive : M.negative, fontFamily: "'DM Sans', sans-serif" }}>
                     {hidden ? '••%' : fP(change30d)}
                   </span>
                   <BetaBadge beta={beta} />
@@ -181,7 +181,7 @@ export default function HoldingCard({
 
               {/* 30d range bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <span style={{ fontSize: 9, color: M.textMuted, fontFamily: M.mono, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 9, color: M.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
                   {hidden ? '$••••' : `$${low30d.toLocaleString()}`}
                 </span>
                 <div style={{ flex: 1, height: 4, borderRadius: 4, background: M.surfaceLight, position: 'relative' }}>
@@ -189,7 +189,7 @@ export default function HoldingCard({
                     <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, pctInRange))}%`, top: -3, width: 10, height: 10, borderRadius: '50%', background: up30 ? M.positive : M.negative, border: '1.5px solid white', transform: 'translateX(-50%)', boxShadow: `0 1px 4px ${up30 ? M.positive : M.negative}44` }} />
                   )}
                 </div>
-                <span style={{ fontSize: 9, color: M.textMuted, fontFamily: M.mono, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 9, color: M.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
                   {hidden ? '$••••' : `$${high30d.toLocaleString()}`}
                 </span>
               </div>
@@ -212,22 +212,22 @@ export default function HoldingCard({
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Added at</div>
-                  <span style={{ fontSize: 12, fontFamily: M.num, fontFeatureSettings: M.numF, color: M.textSecondary }}>
+                  <span style={{ fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", color: M.textSecondary }}>
                     {hidden ? '$••••' : fU(addedPrice)}
                   </span>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Current</div>
-                  <span style={{ fontSize: 12, fontFamily: M.num, fontFeatureSettings: M.numF, color: M.text }}>
+                  <span style={{ fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", color: M.text }}>
                     {hidden ? '$••••' : fU(price)}
                   </span>
                 </div>
                 <div style={{ flex: 1, textAlign: 'right' }}>
                   <div style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>P&L</div>
                   {hidden ? (
-                    <span style={{ fontSize: 12, fontWeight: 600, color: M.textMuted, fontFamily: M.num }}>$••••</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: M.textMuted, fontFamily: "'DM Sans', sans-serif" }}>$••••</span>
                   ) : (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: pnlUp ? M.positive : M.negative, fontFamily: M.num, fontFeatureSettings: M.numF }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: pnlUp ? M.positive : M.negative, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>
                       {pnlUp ? '+' : ''}{fU(pnl)}{' '}
                       <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>{fP(pnlPct)}</span>
                     </span>
@@ -252,7 +252,7 @@ export default function HoldingCard({
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={(e) => { e.stopPropagation(); if (holdingId && onEdit) onEdit(holdingId) }}
-              style={{ padding: '7px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: M.textSecondary, fontFamily: M.body }}
+              style={{ padding: '7px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, color: M.textSecondary, fontFamily: "'DM Sans', sans-serif" }}
             >
               Edit holding
             </button>
