@@ -1,7 +1,8 @@
 // ━━━ RegimeHero ━━━
-// v2.0.0 · S172 · Sprint 35
-// Expandable regime history drawer.
+// v2.1.0 · S174 · Sprint 35
+// Import RC + getRegime from shared RegimeIcon (S174).
 // Changelog:
+//   v2.1.0 — S174: Remove local RC/gR. Import { RC, getRegime } from shared.
 //   v2.0.0 — S172: Tappable hero row toggles history drawer.
 //            Period tabs 7d/30d/90d (90d pro-locked).
 //            Scrollable regime blocks + breakdown bar.
@@ -15,25 +16,14 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
-import { compressToRuns, confTraj, getRegimeConfig } from '@/lib/regime-utils'
+import { compressToRuns, confTraj } from '@/lib/regime-utils'
 import type { RegimeRow } from '@/lib/regime-utils'
+import RegimeIcon, { RC, getRegime } from '@/components/shared/RegimeIcon'
 
 // ── Fonts ──────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_MONO    = "'DM Mono', monospace"
 const FONT_BODY    = "'DM Sans', sans-serif"
-
-// ── RC shorthand (local, consistent with Exposure/RegimeTimeline) ──
-// TODO: migrate to shared RC after S174 ships
-const RC: Record<string, { label: string; icon: string; color: string; dim: string; glow: string; bg: string }> = {
-  bull:       { label: 'Bull',     icon: '↗', color: M.positive,    dim: M.positiveDim,    glow: 'rgba(42,157,143,0.3)',   bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
-  bear:       { label: 'Bear',     icon: '↘', color: M.negative,    dim: M.negativeDim,    glow: 'rgba(231,111,81,0.3)',   bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
-  range:      { label: 'Range',    icon: '→', color: '#5B7FA6',     dim: 'rgba(91,127,166,0.12)', glow: 'rgba(91,127,166,0.2)',  bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)' },
-  volatility: { label: 'Volatile', icon: '↕', color: '#C8782A',     dim: 'rgba(200,120,42,0.12)', glow: 'rgba(200,120,42,0.3)',  bg: 'linear-gradient(135deg,#C8782A,#D9904A)' },
-}
-function getRC(regime: string) {
-  return RC[regime?.toLowerCase()] || RC.range
-}
 
 // ── Props ──────────────────────────────────────
 
@@ -57,7 +47,7 @@ export default function RegimeHero({
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState(30)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const rc = getRC(regime)
+  const rc = getRegime(regime)
 
   // Slice history to selected period
   const filtered = useMemo(
@@ -121,7 +111,7 @@ export default function RegimeHero({
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: `0 4px 16px ${rc.glow}`, flexShrink: 0,
         }}>
-          <span style={{ fontSize: 24, color: 'white' }}>{rc.icon}</span>
+          <RegimeIcon regime={regime} size={24} color="white" />
         </div>
 
         {/* Label + stats */}
@@ -150,7 +140,7 @@ export default function RegimeHero({
           </div>
         </div>
 
-        {/* "history" label + chevron — opacity 0.45 per spec */}
+        {/* "history" label + chevron */}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
           opacity: 0.45,
@@ -223,7 +213,7 @@ export default function RegimeHero({
             )
           })()}
 
-          {/* Scrollable regime blocks — current is rightmost */}
+          {/* Scrollable regime blocks */}
           <div
             ref={scrollRef}
             style={{
@@ -234,7 +224,7 @@ export default function RegimeHero({
             <div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
               {runs.map((run, i) => {
                 const isNow = i === runs.length - 1
-                const cfg = getRC(run.regime)
+                const cfg = getRegime(run.regime)
                 const avgConf = run.confs.length
                   ? Math.round((run.confs.reduce((s, v) => s + v, 0) / run.confs.length) * 100)
                   : 0
@@ -272,7 +262,7 @@ export default function RegimeHero({
                           background: isNow ? 'rgba(255,255,255,0.2)' : cfg.color,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                         }}>
-                          <span style={{ fontSize: 8, color: 'white', lineHeight: 1 }}>{cfg.icon}</span>
+                          <RegimeIcon regime={run.regime} size={9} color="white" />
                         </div>
                         <span style={{
                           fontSize: 9, fontWeight: 600,
@@ -332,7 +322,7 @@ export default function RegimeHero({
               {/* Proportional colour bar */}
               <div style={{ display: 'flex', gap: 2, height: 8, borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
                 {agg.bd.map(b => {
-                  const cfg = getRC(b.regime)
+                  const cfg = getRegime(b.regime)
                   return (
                     <div key={b.regime} style={{ flex: b.pct, background: cfg.color, opacity: 0.7 }} />
                   )
@@ -341,7 +331,7 @@ export default function RegimeHero({
               {/* Legend */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
                 {agg.bd.map(b => {
-                  const cfg = getRC(b.regime)
+                  const cfg = getRegime(b.regime)
                   return (
                     <div key={b.regime} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <div style={{ width: 6, height: 6, borderRadius: 2, background: cfg.color }} />

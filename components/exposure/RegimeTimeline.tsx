@@ -1,7 +1,11 @@
 // ━━━ RegimeTimeline ━━━
-// v1.0.0 · S163 · Sprint 34
-// Collapsible regime timeline with period tabs (7d/30d/90d), rich blocks, breakdown pills
-// Shared component — used by Exposure page. Potential reuse on Portfolio.
+// v1.1.0 · S174 · Sprint 35
+// Import RC + getRegime from shared RegimeIcon (S174).
+// Changelog:
+//   v1.1.0 — S174: Remove local RC/gR. Import { RC, getRegime } from shared.
+//            Use RegimeIcon component for SVG icons in blocks.
+//   v1.0.0 — S163: Collapsible regime timeline with period tabs (7d/30d/90d),
+//            rich blocks, breakdown pills.
 
 'use client'
 
@@ -9,8 +13,9 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
-import { getRegimeConfig, compressToRuns, confTraj } from '@/lib/regime-utils'
+import { compressToRuns, confTraj } from '@/lib/regime-utils'
 import type { RegimeRow, Run } from '@/lib/regime-utils'
+import RegimeIcon, { getRegime } from '@/components/shared/RegimeIcon'
 
 // ─── Fonts ────────────────────────────────────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
@@ -80,7 +85,7 @@ export default function RegimeTimeline({
     }
   }, [expanded, runs])
 
-  const rc = getRegimeConfig(currentRegime)
+  const rc = getRegime(currentRegime)
 
   if (!regimeHistory?.length) return null
 
@@ -97,18 +102,18 @@ export default function RegimeTimeline({
         <div style={{
           width: 40, height: 40, borderRadius: 12,
           background: rc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 3px 10px ${rc.d}`,
+          boxShadow: `0 3px 10px ${rc.glow}`,
         }}>
-          <span style={{ fontSize: 18, color: 'white' }}>{rc.icon}</span>
+          <RegimeIcon regime={currentRegime} size={18} color="white" />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontSize: 15, fontWeight: 600, color: M.text }}>
-              {rc.l} Market
+              {rc.label} Market
             </span>
             <span style={{
               fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 6,
-              background: rc.d, color: rc.s,
+              background: rc.dim, color: rc.color,
             }}>
               Day {persistence}
             </span>
@@ -137,10 +142,10 @@ export default function RegimeTimeline({
       {/* ── Compact strip (always visible) ── */}
       <div style={{ display: 'flex', gap: 1.5, height: 6, borderRadius: 6, overflow: 'hidden', marginTop: 12 }}>
         {runs.map((run, i) => {
-          const cfg = getRegimeConfig(run.regime)
+          const cfg = getRegime(run.regime)
           return (
             <div key={i} style={{
-              flex: run.days, background: cfg.s,
+              flex: run.days, background: cfg.color,
               opacity: i === runs.length - 1 ? 1 : 0.5,
             }} />
           )
@@ -201,7 +206,7 @@ export default function RegimeTimeline({
             <div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
               {runs.map((run, i) => {
                 const isLast = i === runs.length - 1
-                const cfg = getRegimeConfig(run.regime)
+                const cfg = getRegime(run.regime)
                 const avgConf = run.confs.length
                   ? Math.round((run.confs.reduce((s, v) => s + v, 0) / run.confs.length) * 100) : 0
                 const traj = confTraj(run.confs)
@@ -214,10 +219,10 @@ export default function RegimeTimeline({
                   <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: minW, flexShrink: 0 }}>
                     <div style={{
                       width: '100%',
-                      background: isLast ? cfg.bg : cfg.d,
+                      background: isLast ? cfg.bg : cfg.dim,
                       borderRadius: 14,
                       padding: '8px 10px 7px',
-                      border: isLast ? `1.5px solid ${cfg.s}` : `1px solid ${M.border}`,
+                      border: isLast ? `1.5px solid ${cfg.color}` : `1px solid ${M.border}`,
                       position: 'relative',
                       display: 'flex', flexDirection: 'column', gap: 2,
                       minHeight: 62,
@@ -236,15 +241,16 @@ export default function RegimeTimeline({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <div style={{
                           width: 16, height: 16, borderRadius: '50%',
-                          background: isLast ? 'rgba(255,255,255,0.25)' : cfg.s,
+                          background: isLast ? 'rgba(255,255,255,0.25)' : cfg.color,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 8, color: 'white', fontWeight: 700,
-                        }}>{cfg.icon}</div>
+                        }}>
+                          <RegimeIcon regime={run.regime} size={9} color="white" />
+                        </div>
                         <span style={{
                           fontSize: 9, fontWeight: 600,
                           color: isLast ? 'white' : M.text,
                           whiteSpace: 'nowrap',
-                        }}>{cfg.l}</span>
+                        }}>{cfg.label}</span>
                       </div>
 
                       {/* Duration */}
@@ -285,25 +291,24 @@ export default function RegimeTimeline({
             </div>
           </div>
 
-          {/* Breakdown bar — single line, proportional by regime */}
+          {/* Breakdown bar — proportional by regime */}
           <div style={{ display: 'flex', gap: 1.5, height: 10, borderRadius: 6, overflow: 'hidden', marginTop: 12 }}>
             {agg.bd.map((b) => {
-              const cfg = getRegimeConfig(b.regime)
+              const cfg = getRegime(b.regime)
               return (
                 <div key={b.regime} style={{
                   flex: b.totalDays,
-                  background: cfg.s,
+                  background: cfg.color,
                   position: 'relative',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {/* Label inside bar if wide enough */}
                   {b.pct >= 15 && (
                     <span style={{
                       fontSize: 7, fontWeight: 700, color: 'white',
                       textTransform: 'uppercase', letterSpacing: 0.5,
                       whiteSpace: 'nowrap',
                     }}>
-                      {cfg.l}
+                      {cfg.label}
                     </span>
                   )}
                 </div>
