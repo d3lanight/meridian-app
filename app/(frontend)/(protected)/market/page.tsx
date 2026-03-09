@@ -1,5 +1,7 @@
 // ━━━ Market Pulse Page ━━━
-// v4.4.0 · S173 · Sprint 35 — range→steel blue, volatile→burnt orange
+// v4.5.0 · S177 · Sprint 36
+// Changelog:
+//   v4.5.0 — S177: Fix Fear & Greed color scale (low=red/fear, high=green/greed) + gradient bar direction. — range→steel blue, volatile→burnt orange
 // "The market now, alive" — prices, regime history, market signals, movers, intraday
 //
 // Changelog:
@@ -273,11 +275,11 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
 
   const vp = deriveVolumeProfile(totalVolume)
 
-  const fgColor = fearGreed >= 75 ? M.negative
-    : fearGreed >= 55 ? M.volatility
+  const fgColor = fearGreed >= 75 ? M.positive
+    : fearGreed >= 55 ? '#3DB89A'
     : fearGreed >= 45 ? M.neutral
-    : fearGreed >= 25 ? M.accent
-    : M.positive
+    : fearGreed >= 25 ? M.volatility
+    : M.negative
   const fgLabel = fearGreed >= 75 ? 'Extreme Greed'
     : fearGreed >= 55 ? 'Greed'
     : fearGreed >= 45 ? 'Neutral'
@@ -376,7 +378,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
                 <span style={{ fontSize: 9, color: fgColor, fontWeight: 600, fontFamily: FONT_BODY }}>{fgLabel}</span>
               </div>
             </div>
-            <div style={{ position: 'relative', height: 5, borderRadius: 5, background: `linear-gradient(90deg, ${M.positive}, ${M.accent} 35%, ${M.volatility} 65%, ${M.negative})`, marginBottom: 3 }}>
+            <div style={{ position: 'relative', height: 5, borderRadius: 5, background: `linear-gradient(90deg, ${M.negative}, ${M.volatility} 35%, #3DB89A 65%, ${M.positive})`, marginBottom: 3 }}>
               <div style={{ position: 'absolute', left: `${fearGreed}%`, top: '50%', width: 11, height: 11, borderRadius: '50%', background: 'white', border: `2px solid ${fgColor}`, transform: 'translate(-50%, -50%)', boxShadow: `0 1px 4px ${fgColor}55` }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
