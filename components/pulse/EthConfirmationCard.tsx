@@ -1,12 +1,15 @@
 // components/pulse/EthConfirmationCard.tsx
-// v1.0.0 · S173 · Sprint 35
-// ETH confirming or diverging from BTC regime — port of EthConfirmationCard from meridian-pulse-v4.1.jsx
+// v1.1.0 · S177 · Sprint 36
+// Changelog:
+//   v1.1.0 — Replace hardcoded ETH SVG with iconUrl prop from asset_mapping.
+//   v1.0.0 · S173 · Sprint 35 — Initial.
 
 'use client'
 
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
+import CryptoIcon from '@/components/shared/CryptoIcon'
 
 const FONT_NUM  = "'DM Sans', sans-serif"
 const FONT_NUMF = "'tnum' 1, 'lnum' 1"
@@ -20,12 +23,13 @@ const REGIME_LABELS: Record<string, string> = {
 }
 
 interface EthConfirmationCardProps {
-  btcChange: number
-  ethChange: number
-  regime:    string
+  btcChange:   number
+  ethChange:   number
+  regime:      string
+  ethIconUrl?: string | null
 }
 
-export default function EthConfirmationCard({ btcChange, ethChange, regime }: EthConfirmationCardProps) {
+export default function EthConfirmationCard({ btcChange, ethChange, regime, ethIconUrl }: EthConfirmationCardProps) {
   const confirming =
     regime === 'bull'  ? ethChange >= 0 :
     regime === 'bear'  ? ethChange <= 0 :
@@ -40,13 +44,7 @@ export default function EthConfirmationCard({ btcChange, ethChange, regime }: Et
   return (
     <div style={{ ...card({ padding: 14 }), marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg,#627EEA,#7B9FF5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-              <path d="M11.94 17.97L4.58 13.62 11.94 24l7.37-10.38-7.37 4.35z" fill="white" fillOpacity="0.6"/>
-              <path d="M12.06 0L4.69 12.22l7.37 4.35 7.36-4.35L12.06 0z" fill="white" fillOpacity="0.6"/>
-              <path d="M11.94 0v11.65l7.37 4.35L11.94 0z" fill="white"/>
-            </svg>
-          </div>
+        <CryptoIcon symbol="ETH" iconUrl={ethIconUrl} size={26} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: M.text }}>ETH Confirmation</span>

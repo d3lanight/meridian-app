@@ -545,7 +545,7 @@ export default function PulsePage() {
 
           {/* ETH Confirmation */}
           <div style={anim(mounted, 4)}>
-            <EthConfirmationCard btcChange={btcChange} ethChange={ethChange} regime={regime} />
+            <EthConfirmationCard btcChange={btcChange} ethChange={ethChange} regime={regime} ethIconUrl={ethIcon} />
           </div>
 
           {/* Gainers / Losers */}
