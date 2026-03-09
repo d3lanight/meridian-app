@@ -1,13 +1,14 @@
 'use client'
 
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.2 — Mobile sub-view UX fixes
+// Profile v4.0.3 — Sub-view structural fix
 // Sprint: 36
 // Changelog:
-//   4.0.2 - Sub-view scroll lock: subViewWrapper uses height:100dvh + overflow:hidden + flex column.
-//           All sub-views (Display, Notifications, Email, RiskProfile) replaced ← Back button with
-//           SubViewHeader (title left, X button right). Content area uses overflowY:auto + flex:1.
-//   4.0.1 - S177 regression fix: risk_profile write uses .update().eq() not upsert (no unique constraint).
+//   4.0.3 - subViewWrapper changed to position:fixed inset:0 zIndex:20. Escapes layout
+//           pb-[88px] so sub-views are truly full-screen. Eliminates phantom scroll on
+//           short content (Risk Profile 3 items). Sticky header now works in all sub-views
+//           including imported components (ChangePasswordSheet, EditNameSheet).
+//           globals.css: scrollbar hidden globally (scrollbar-width:none + webkit).
 //   4.0.0 - S167: IdentityHero replaces IdentityCard. AccentBanner + avatar overlap + connected
 //           sources row + member since. EditNameSheet sub-view (saves to profiles.display_name).
 //           S168: MenuRow dual badge (pro + coming simultaneously). Privacy toggle in Preferences
@@ -328,15 +329,16 @@ export default function ProfilePage() {
 
   // Shared page wrapper style for sub-views
   const subViewWrapper = {
+    position: 'fixed' as const,
+    inset: 0,
     maxWidth: 430,
     margin: '0 auto',
     background: M.bg,
-    height: '100dvh',
-    overflow: 'hidden' as const,
     fontFamily: FONT_BODY,
     color: M.text,
     display: 'flex' as const,
     flexDirection: 'column' as const,
+    zIndex: 20,
   }
 
   // ── Sub-view routing ─────────────────────────

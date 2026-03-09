@@ -7,6 +7,15 @@ body {
   color: #2D2416;
 }
 
+/* ── Mobile-first: hide scrollbars globally ── */
+* {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge legacy */
+}
+*::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari / WebKit */
+}
+
 /* Regime timeline — live indicator pulse */
 @keyframes livePulse {
   0%, 100% { opacity: 0.9; transform: scale(1); }
