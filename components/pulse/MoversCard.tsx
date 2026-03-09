@@ -1,5 +1,8 @@
-// ━━━ MoversCard ━━━ v2.0.0 · S162
-// Live data from /api/top-movers (asset_prices table)
+// ━━━ MoversCard ━━━
+// v2.1.0 · Sprint 36
+// Changelog:
+//   v2.1.0 — Gainers active tab → M.accent / M.accentMuted (indigo). Losers keeps coral.
+//   v2.0.0 — S162: Live data from /api/top-movers.
 'use client'
 import { useState, useEffect } from 'react'
 import { M } from '@/lib/meridian'
@@ -46,9 +49,9 @@ function MoversSkeleton() {
 }
 
 export default function MoversCard() {
-  const [tab, setTab] = useState<'gainers' | 'losers'>('gainers')
+  const [tab, setTab]       = useState<'gainers' | 'losers'>('gainers')
   const [gainers, setGainers] = useState<Mover[]>([])
-  const [losers, setLosers] = useState<Mover[]>([])
+  const [losers, setLosers]   = useState<Mover[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -64,22 +67,28 @@ export default function MoversCard() {
 
   if (loading) return <MoversSkeleton />
 
-  const list = tab === 'gainers' ? gainers : losers
+  const list  = tab === 'gainers' ? gainers : losers
   const empty = list.length === 0
 
   return (
     <div style={{ ...card({ padding: 16 }), marginBottom: 12 }}>
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-        {(['gainers', 'losers'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: 1, padding: '7px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-            fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textTransform: 'capitalize',
-            background: tab === t ? (t === 'gainers' ? M.positiveDim : M.negativeDim) : 'rgba(255,255,255,0.5)',
-            color: tab === t ? (t === 'gainers' ? M.positive : M.negative) : M.textMuted,
-          }}>
-            {t === 'gainers' ? '↑ Gainers' : '↓ Losers'}
-          </button>
-        ))}
+        {(['gainers', 'losers'] as const).map(t => {
+          const active = tab === t
+          // Gainers → accent (indigo); Losers → coral. Inactive → muted.
+          const activeColor = t === 'gainers' ? M.accent    : M.negative
+          const activeBg    = t === 'gainers' ? M.accentMuted : M.negativeDim
+          return (
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '7px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textTransform: 'capitalize',
+              background: active ? activeBg    : 'rgba(255,255,255,0.5)',
+              color:      active ? activeColor : M.textMuted,
+            }}>
+              {t === 'gainers' ? '↑ Gainers' : '↓ Losers'}
+            </button>
+          )
+        })}
       </div>
       {empty ? (
         <p style={{ fontSize: 12, color: M.textMuted, textAlign: 'center', padding: '12px 0' }}>

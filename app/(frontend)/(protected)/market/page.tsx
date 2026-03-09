@@ -173,7 +173,7 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
               <span style={{ fontSize: 12, fontWeight: isNow ? 600 : 400, color: isNow ? M.text : M.textSecondary, flex: 1, fontFamily: FONT_BODY }}>{rc.label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
                 {isNow && <div style={{ width: 5, height: 5, borderRadius: '50%', background: rc.color, boxShadow: `0 0 6px ${rc.color}` }} />}
-                <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: isNow ? rc.color : M.textMuted, fontWeight: 600 }}>{s.confidence}%</span>
+                <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: isNow ? rc.color : M.text, fontWeight: isNow ? 600 : 500 }}>{s.confidence}%</span>
               </div>
             </div>
           )
@@ -354,7 +354,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
 
         {/* BTC Vol 7d — % number + pill inline */}
         <div style={{ flex: 1, padding: '10px 14px' }}>
-          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>BTC Volatility 7d</div>
+          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>BTC Vol 7d</div>
           {priceVol !== null ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>
@@ -391,7 +391,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
               <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>ALT Season</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: asColor, fontFamily: FONT_BODY }}>{altSeason}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{altSeason}</span>
                 <StatusPill label={asLabel} color={asColor} />
               </div>
             </div>
