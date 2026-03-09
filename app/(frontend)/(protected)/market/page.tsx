@@ -446,7 +446,7 @@ export default function PulsePage() {
   const [btcDom, setBtcDom]               = useState(50)
   const [marketCap, setMarketCap]         = useState<number | null>(null)
   const [priceVol, setPriceVol]           = useState<number | null>(null)   // S175 Part 3: vol_7d
-  const [isVolatile, setIsVolatile]       = useState(true)                  // S176 Part 5: volatile modifier
+  const [isVolatile, setIsVolatile]       = useState(false)                 // S176 Part 5: volatile modifier
   const [btcIcon, setBtcIcon]             = useState<string | null>(null)
   const [ethIcon, setEthIcon]             = useState<string | null>(null)
   const [isAnon, setIsAnon]               = useState(true)
