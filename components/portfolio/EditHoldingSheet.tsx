@@ -1,22 +1,21 @@
 // ━━━ Edit Holding Sheet — Update quantity, cost basis, exposure toggle, remove ━━━
-// v1.3.0 · S169 · Sprint 35
+// v1.4.0 · S177 · Sprint 36
 // Changelog:
+//   v1.4.0 — S177: Refactored to use shared BottomSheet (scrollable=false). Removes back-page scroll bleed.
 //   v1.3.0 — S169: CryptoIcon for asset identity; scroll lock useEffect.
 //   v1.2.0 · ca-story-design-refresh · Sprint 24
-// Meridian v2: glassmorphic, warm theme
-// Fix: toggle + save button state tracking
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Check, X, Trash2 } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import CryptoIcon from '@/components/shared/CryptoIcon';
+import BottomSheet from '@/components/shared/BottomSheet';
 import type { Holding } from '@/types';
 
-
-
 interface EditHoldingSheetProps {
+  isOpen: boolean;
   holding: Holding;
   onUpdate: (id: string, updates: {
     quantity?: number;
@@ -27,8 +26,7 @@ interface EditHoldingSheetProps {
   onClose: () => void;
 }
 
-export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose }: EditHoldingSheetProps) {
-  // Store originals for comparison
+export default function EditHoldingSheet({ isOpen, holding, onUpdate, onRemove, onClose }: EditHoldingSheetProps) {
   const origQty = holding.quantity;
   const origCb = holding.cost_basis;
   const origExposure = holding.include_in_exposure ?? true;
@@ -43,13 +41,6 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
 
   const name = (holding as any).asset_mapping?.name || holding.asset;
 
-  // Scroll lock
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
-
-  // Clean comparison against original values
   const currentQty = parseFloat(qty) || 0;
   const currentCb = costBasis ? parseFloat(costBasis) : null;
 
@@ -61,15 +52,12 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
   const handleUpdate = async () => {
     if (!qty || parseFloat(qty) <= 0) return;
     if (!hasChanges) { onClose(); return; }
-
     setSaving(true);
     setError(null);
-
     const updates: Record<string, any> = {};
     if (qtyChanged) updates.quantity = currentQty;
     if (cbChanged) updates.cost_basis = currentCb;
     if (exposureChanged) updates.include_in_exposure = includeExposure;
-
     const ok = await onUpdate(holding.id, updates);
     if (ok) {
       onClose();
@@ -94,28 +82,30 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
   const isValid = qty && parseFloat(qty) > 0 && (!costBasis || parseFloat(costBasis) >= 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <div>
-          <h2
-            className="text-xl font-display font-medium"
-            style={{ color: M.text, letterSpacing: '-0.02em' }}
-          >
-            Edit holding
-          </h2>
-          <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>Update or remove</p>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
-        >
-          <X size={18} color={M.textSecondary} />
-        </button>
-      </div>
+    // scrollable=false: content is fixed, no scroll, no back-page bleed
+    <BottomSheet isOpen={isOpen} onClose={onClose} scrollable={false}>
+      <div style={{ padding: '0 20px 28px', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 pt-1">
+          <div>
+            <h2
+              className="text-xl font-display font-medium"
+              style={{ color: M.text, letterSpacing: '-0.02em' }}
+            >
+              Edit holding
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>Update or remove</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+            style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
+          >
+            <X size={18} color={M.textSecondary} />
+          </button>
+        </div>
+
         {/* Asset identity */}
         <div
           className="rounded-3xl p-4 mb-5"
@@ -179,8 +169,8 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
           className="rounded-3xl px-4 py-3.5 mb-5 flex items-center justify-between"
           style={{
             background: M.surface,
-            backdropFilter: M.surfaceBlur,
-            WebkitBackdropFilter: M.surfaceBlur,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             border: `1px solid ${M.border}`,
           }}
         >
@@ -189,7 +179,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
               Include in exposure
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: M.textMuted }}>
-              Count toward posture & allocation
+              Count toward posture &amp; allocation
             </div>
           </div>
           <button
@@ -199,9 +189,7 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
               width: 48,
               height: 28,
               borderRadius: 28,
-              background: includeExposure
-                ? M.accentGradient
-                : M.surfaceLight,
+              background: includeExposure ? M.accentGradient : M.surfaceLight,
               transition: 'background 0.2s ease',
             }}
           >
@@ -305,6 +293,6 @@ export default function EditHoldingSheet({ holding, onUpdate, onRemove, onClose 
           </div>
         )}
       </div>
-    </div>
+    </BottomSheet>
   );
 }

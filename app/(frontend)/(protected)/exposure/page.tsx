@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v3.3.0 — S169 · Sprint 35
+//   v3.4.0 — S177 · Sprint 36
 // Changelog:
+//   v3.4.0 — S177: Replace inline sheet wrappers with shared BottomSheet component.
 //   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
 //   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
 //   v3.0.0 — S163/S164: Full v4 redesign.
@@ -547,50 +548,38 @@ export default function ExposurePage() {
       )}
 
       {/* ── Add Holding Sheet ── */}
-      {sheet?.type === 'add' && (
-        <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <div onClick={() => setSheet(null)} onWheel={e => e.preventDefault()} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 0 0', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px', flexShrink: 0 }} />
-            <AddHoldingSheet
-              assets={assets}
-              heldSymbols={portfolioHoldings.map(h => h.asset)}
-              onAdd={async (asset, quantity, costBasis) => {
-                const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
-                if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
-                return ok
-              }}
-              onClose={() => setSheet(null)}
-            />
-          </div>
-        </div>
-      )}
+      <AddHoldingSheet
+        isOpen={sheet?.type === 'add'}
+        assets={assets}
+        heldSymbols={portfolioHoldings.map(h => h.asset)}
+        onAdd={async (asset, quantity, costBasis) => {
+          const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
+          if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
+          return ok
+        }}
+        onClose={() => setSheet(null)}
+      />
 
       {/* ── Edit Holding Sheet ── */}
-      {sheet?.type === 'edit' && (() => {
-        const h = portfolioHoldings.find(p => p.id === sheet.holdingId)
+      {(() => {
+        const h = sheet?.type === 'edit' ? portfolioHoldings.find(p => p.id === sheet.holdingId) : undefined
         if (!h) return null
         return (
-          <div style={{ position: 'fixed', inset: 0, maxWidth: 430, margin: '0 auto', zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-            <div onClick={() => setSheet(null)} onWheel={e => e.preventDefault()} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} />
-            <div style={{ position: 'relative', background: 'rgba(255,255,255,0.9)', borderRadius: '24px 24px 0 0', margin: '0 12px', padding: '12px 0 0', boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ width: 36, height: 4, borderRadius: 2, background: M.borderSubtle, margin: '0 auto 12px', flexShrink: 0 }} />
-              <EditHoldingSheet
-                holding={h}
-                onUpdate={async (id, updates) => {
-                  const ok = await updateHolding(id, updates)
-                  if (ok) refresh()
-                  return ok
-                }}
-                onRemove={async (id) => {
-                  const ok = await removeHolding(id)
-                  if (ok) { refresh(); setSheet(null) }
-                  return ok
-                }}
-                onClose={() => setSheet(null)}
-              />
-            </div>
-          </div>
+          <EditHoldingSheet
+            isOpen={true}
+            holding={h}
+            onUpdate={async (id, updates) => {
+              const ok = await updateHolding(id, updates)
+              if (ok) refresh()
+              return ok
+            }}
+            onRemove={async (id) => {
+              const ok = await removeHolding(id)
+              if (ok) { refresh(); setSheet(null) }
+              return ok
+            }}
+            onClose={() => setSheet(null)}
+          />
         )
       })()}
 

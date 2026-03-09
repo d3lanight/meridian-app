@@ -1,41 +1,35 @@
 // ━━━ Add Holding Sheet — Asset select → Quantity → Confirm ━━━
-// v1.2.0 · S169 · Sprint 35
+// v1.3.0 · S177 · Sprint 36
 // Changelog:
+//   v1.3.0 — S177: Refactored to use shared BottomSheet (scrollable=true). Removed inline scroll lock.
 //   v1.2.0 — S169: CryptoIcon for confirmation step; scroll lock useEffect.
 //   v1.1.0 · ca-story-design-refresh · Sprint 24
-// Meridian v2: glassmorphic, warm theme, progress steps
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Check, X, ChevronLeft } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import AssetPicker from './AssetPicker';
 import CryptoIcon from '@/components/shared/CryptoIcon';
+import BottomSheet from '@/components/shared/BottomSheet';
 import type { AssetMapping } from '@/types';
 
 interface AddHoldingSheetProps {
+  isOpen: boolean;
   assets: AssetMapping[];
   heldSymbols: string[];
   onAdd: (asset: string, quantity: number, costBasis?: number | null) => Promise<boolean>;
   onClose: () => void;
 }
 
-
-
-export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }: AddHoldingSheetProps) {
+export default function AddHoldingSheet({ isOpen, assets, heldSymbols, onAdd, onClose }: AddHoldingSheetProps) {
   const [step, setStep] = useState<'select' | 'quantity'>('select');
   const [selected, setSelected] = useState<AssetMapping | null>(null);
   const [qty, setQty] = useState('');
   const [costBasis, setCostBasis] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Scroll lock
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
 
   const handleSelect = (asset: AssetMapping) => {
     setSelected(asset);
@@ -46,10 +40,8 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
     if (!selected || !qty || parseFloat(qty) <= 0) return;
     setSaving(true);
     setError(null);
-
     const cb = costBasis ? parseFloat(costBasis) : null;
     const ok = await onAdd(selected.symbol, parseFloat(qty), cb);
-
     if (ok) {
       onClose();
     } else {
@@ -58,55 +50,66 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
     }
   };
 
-  const isValid = qty && parseFloat(qty) > 0 && (!costBasis || parseFloat(costBasis) >= 0);
+  const handleClose = () => {
+    // Reset state on close
+    setStep('select');
+    setSelected(null);
+    setQty('');
+    setCostBasis('');
+    setError(null);
+    onClose();
+  };
 
+  const isValid = qty && parseFloat(qty) > 0 && (!costBasis || parseFloat(costBasis) >= 0);
+  const name = selected?.name || selected?.symbol || '';
+
+  // AssetPicker step — full-height, scrollable
   if (step === 'select') {
     return (
-      <AssetPicker
-        assets={assets}
-        heldSymbols={heldSymbols}
-        onSelect={handleSelect}
-        onClose={onClose}
-      />
+      <BottomSheet isOpen={isOpen} onClose={handleClose} scrollable={true}>
+        <AssetPicker
+          assets={assets}
+          heldSymbols={heldSymbols}
+          onSelect={handleSelect}
+          onClose={handleClose}
+        />
+      </BottomSheet>
     );
   }
 
-  const name = selected?.name || selected?.symbol || '';
-
+  // Quantity step — scrollable (inputs + optional keyboard push)
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
-        <div>
-          <h2
-            className="text-xl font-display font-medium"
-            style={{ color: M.text, letterSpacing: '-0.02em' }}
+    <BottomSheet isOpen={isOpen} onClose={handleClose} scrollable={true}>
+      <div className="flex flex-col" style={{ padding: '0 20px 28px' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 pt-1">
+          <div>
+            <h2
+              className="text-xl font-display font-medium"
+              style={{ color: M.text, letterSpacing: '-0.02em' }}
+            >
+              Enter quantity
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>
+              How much {selected?.symbol}?
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
+            style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
           >
-            Enter quantity
-          </h2>
-          <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>
-            How much {selected?.symbol}?
-          </p>
+            <X size={18} color={M.textSecondary} />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
-        >
-          <X size={18} color={M.textSecondary} />
-        </button>
-      </div>
 
-      {/* Progress */}
-      <div className="flex gap-2 px-5 pb-4">
-        <div className="flex-1 h-1 rounded-full" style={{ background: M.positive }} />
-        <div
-          className="flex-1 h-1 rounded-full"
-          style={{ background: M.accentGradient }}
-        />
-      </div>
+        {/* Progress */}
+        <div className="flex gap-2 pb-4">
+          <div className="flex-1 h-1 rounded-full" style={{ background: M.positive }} />
+          <div className="flex-1 h-1 rounded-full" style={{ background: M.accentGradient }} />
+        </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
         {/* Selected asset card */}
         <div
           className="rounded-3xl p-4 mb-5"
@@ -153,7 +156,7 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           />
         </div>
 
-        {/* Cost basis input (optional) */}
+        {/* Cost basis input */}
         <div className="mb-5">
           <label className="text-xs block mb-2" style={{ color: M.textMuted }}>
             Cost basis (USD) — optional
@@ -200,6 +203,6 @@ export default function AddHoldingSheet({ assets, heldSymbols, onAdd, onClose }:
           {saving ? 'Adding...' : 'Add to portfolio'}
         </button>
       </div>
-    </div>
+    </BottomSheet>
   );
 }

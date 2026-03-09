@@ -1,6 +1,8 @@
 // ━━━ Protected Layout ━━━
-// v1.1.0 · S177 · Sprint 36
+// v1.2.0 · S177 · Sprint 36
 // Changelog:
+//   v1.2.0 — S177: Mount AuthSheetContext.Provider so child pages can call useAuthSheet().
+//             Root cause fix: context was defined but Provider was never rendered.
 //   v1.1.0 — S177: Thread initialMode through openAuth to AuthSheet.
 //   v1.0.0 — S160: Initial implementation.
 // Auth-aware layout: anonymous users see AuthSheet on protected tab taps
@@ -12,6 +14,7 @@ import BottomNav from '@/components/navigation/BottomNav';
 import AuthSheet from '@/components/auth/AuthSheet';
 import type { NavTab } from '@/types';
 import { PrivacyProvider } from '@/contexts/PrivacyContext';
+import { AuthSheetContext } from '@/contexts/AuthSheetContext';
 import { M } from '@/lib/meridian';
 import { createClient } from '@/lib/supabase/client';
 
@@ -73,16 +76,18 @@ export default function ProtectedLayout({
 
   return (
     <PrivacyProvider>
-      <div className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden" style={{ background: M.bg }}>
-        {children}
-        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
-        <AuthSheet
-          isOpen={showAuth}
-          onClose={() => setShowAuth(false)}
-          trigger={authTrigger}
-          initialMode={authMode}
-        />
-      </div>
+      <AuthSheetContext.Provider value={{ openAuth }}>
+        <div className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden" style={{ background: M.bg }}>
+          {children}
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+          <AuthSheet
+            isOpen={showAuth}
+            onClose={() => setShowAuth(false)}
+            trigger={authTrigger}
+            initialMode={authMode}
+          />
+        </div>
+      </AuthSheetContext.Provider>
     </PrivacyProvider>
   );
 }

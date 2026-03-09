@@ -1,6 +1,7 @@
 // ━━━ Auth Sheet ━━━
-// v1.2.0 · S177 · Sprint 36
+// v1.3.0 · S177 · Sprint 36
 // Changelog:
+//   v1.3.0 — S177: Refactored to use shared BottomSheet component. Removed inline wrapper/scroll-lock/drag-handle.
 //   v1.2.0 — S177: initialMode prop to pre-select login/signup tab on open.
 //   v1.1.0 — S169: sheet inset margin 12px; scroll lock useEffect.
 //   v1.0.0 · S160 · Sprint 33
@@ -13,6 +14,7 @@ import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
+import BottomSheet from '@/components/shared/BottomSheet'
 
 // ── Icons ─────────────────────────────────────
 
@@ -58,7 +60,7 @@ interface AuthSheetProps {
   initialMode?: 'login' | 'signup'
   isOpen: boolean
   onClose: () => void
-  trigger?: string  // e.g. "Exposure", "Profile"
+  trigger?: string
 }
 
 // ── Shared styles ─────────────────────────────
@@ -115,29 +117,12 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [visible, setVisible] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const isSignup = mode === 'signup'
   const passwordMismatch = isSignup && confirmPassword.length > 0 && password !== confirmPassword
   const isValid = email.length > 0 && password.length >= 6 && (!isSignup || (confirmPassword.length > 0 && !passwordMismatch))
-
-  // Slide-in animation
-  useEffect(() => {
-    if (isOpen) {
-      const t = setTimeout(() => setVisible(true), 30)
-      return () => clearTimeout(t)
-    }
-    setVisible(false)
-  }, [isOpen])
-
-  // Scroll lock
-  useEffect(() => {
-    if (!isOpen) return
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
 
   // Apply initialMode when sheet opens
   useEffect(() => {
@@ -158,8 +143,6 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
       setLoading(false)
     }
   }, [isOpen])
-
-  if (!isOpen) return null
 
   // ── Handlers ────────────────────────────────
 
@@ -182,10 +165,7 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
         setView('confirm')
       }
     } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
       if (signInError) {
         setError(signInError.message)
         setLoading(false)
@@ -197,10 +177,7 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
   }
 
   const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Enter your email address first')
-      return
-    }
+    if (!email) { setError('Enter your email address first'); return }
     setLoading(true)
     setError('')
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
@@ -215,9 +192,7 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
     }
   }
 
-  const handleSSOClick = () => {
-    setError('SSO coming soon — use email for now')
-  }
+  const handleSSOClick = () => setError('SSO coming soon — use email for now')
 
   const switchMode = (m: AuthMode) => {
     setMode(m)
@@ -294,52 +269,8 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
   // ── Render ──────────────────────────────────
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0,
-      maxWidth: 428, margin: '0 auto',
-      zIndex: 50,
-      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-      pointerEvents: 'auto',
-    }}>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        onWheel={e => e.preventDefault()}
-        style={{
-          position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.2)',
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 0.3s',
-        }}
-      />
-
-      {/* Sheet */}
-      <div style={{
-        position: 'relative',
-        background: M.surfaceElevated,
-        borderRadius: '24px 24px 0 0',
-        margin: '0 12px',
-        padding: '12px 20px 0',
-        boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        maxHeight: '82vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        transition: 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
-      }}>
-        {/* Drag handle */}
-        <div style={{
-          width: 36, height: 4, borderRadius: 2,
-          background: M.borderSubtle,
-          margin: '0 auto 12px',
-          flexShrink: 0,
-        }} />
-
-        {/* Scrollable content */}
-        <div style={{ overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: 28, flex: 1 }}>
+    <BottomSheet isOpen={isOpen} onClose={onClose} scrollable={true} maxHeight="82vh">
+      <div style={{ padding: '0 20px 28px' }}>
 
         {/* Header */}
         <div style={{
@@ -497,8 +428,7 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
             )}
           </>
         )}
-        </div>{/* end scrollable content */}
       </div>
-    </div>
+    </BottomSheet>
   )
 }
