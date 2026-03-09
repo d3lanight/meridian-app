@@ -1,9 +1,9 @@
-'use client'
-
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.3 — Sub-view structural fix
+// Profile v4.0.4 — Polish fixes
 // Sprint: 36
 // Changelog:
+//   4.0.4 - Display MenuRow: removed onClick (not wired), added coming prop.
+//           About card version bump: v0.9 → v0.9.1.
 //   4.0.3 - subViewWrapper changed to position:fixed inset:0 zIndex:20. Escapes layout
 //           pb-[88px] so sub-views are truly full-screen. Eliminates phantom scroll on
 //           short content (Risk Profile 3 items). Sticky header now works in all sub-views
@@ -17,7 +17,7 @@
 //           Glossary (SOON), Export data (SOON), Delete account (SOON).
 //   3.0.0 - (S87, S125): Profile v3 hub, IdentityCard, 9 menu sections, sub-view routing,
 //           ChangePasswordSheet, Risk profile selector (S143), split useEffect 100ms delay.
-
+'use client'
 import { useState, useEffect } from 'react'
 import {
   Globe,
@@ -252,7 +252,7 @@ function RiskProfileDetail({
 }
 
 // ══════════════════════════════════════════════
-// PROFILE PAGE v4.0.2
+// PROFILE PAGE v4.0.4
 // ══════════════════════════════════════════════
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
@@ -484,11 +484,12 @@ export default function ProfilePage() {
         <div style={anim(isPro ? 2 : 3)}>
           <SectionHeader label="Preferences" />
           <MenuCard>
+            {/* Display — not yet wired */}
             <MenuRow
               icon={Globe}
               label="Display"
               desc="Timezone, format, currency"
-              onClick={() => setSection('display')}
+              coming
             />
             <MenuRow
               icon={Bell}
@@ -648,7 +649,7 @@ export default function ProfilePage() {
             >
               Meridian
             </div>
-            <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>v0.9</div>
+            <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>v0.9.1</div>
           </div>
         </div>
       </div>

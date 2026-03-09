@@ -1,8 +1,12 @@
 // ━━━ BetaSheet ━━━
-// v1.0.0 · S177 · Sprint 36
-// Bottom sheet — beta tracker with "What's working" + "Coming soon" tabs
+// v1.1.0 · Sprint 36
+// Bottom sheet — beta tracker with "What's working" + "Working on" tabs
 // Changelog:
-//   v1.0.0 — S177: Initial implementation. Scroll lock, two tabs, same pattern as EditHoldingSheet.
+//   v1.1.0 — Content audit: removed "live" from regime detection (accuracy).
+//             Renamed "Coming soon" tab → "Working on". Removed subtext sentence.
+//             Merged Today AI briefing + Ask Meridian → single generic item (no AI mention).
+//             Added: external portfolio integration, sources management, multiple portfolios.
+//   v1.0.0 — S177: Initial implementation.
 
 'use client'
 
@@ -15,19 +19,21 @@ const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_MONO = "'DM Mono', monospace"
 
 const WORKING = [
-  { text: 'Regime detection — live bull/bear/range/volatility classification' },
+  { text: 'Regime detection — bull/bear/range/volatility classification' },
   { text: 'Posture score — portfolio alignment against 4-bucket model' },
   { text: 'Exposure page — allocation breakdown with regime context' },
-  { text: 'Pulse page — live market regime, signals, and price data' },
+  { text: 'Pulse page — market regime, signals, and price data' },
   { text: 'Real-time prices — BTC, ETH, and held assets' },
   { text: 'Profile — holdings management, tier, and account settings' },
 ]
 
-const COMING = [
-  { text: 'Today AI briefing — personalized regime-aware summary, generated daily' },
+const WORKING_ON = [
+  { text: 'Today page — personalized briefings and regime-aware portfolio insights' },
   { text: 'External signal feed — curated posts, research, and market commentary' },
-  { text: 'Ask Meridian — contextual Q&A about your portfolio and the market' },
-  { text: 'Regime alerts — push notifications when the market regime shifts' },
+  { text: 'External portfolio integration — connect wallets and exchanges' },
+  { text: 'Sources management — control what data feeds your intelligence layer' },
+  { text: 'Multiple portfolios — track and compare different portfolio setups' },
+  { text: 'Regime alerts — notifications when the market regime shifts' },
   { text: 'Pro tier — advanced analytics, deeper posture breakdowns, and more' },
 ]
 
@@ -36,9 +42,8 @@ interface BetaSheetProps {
 }
 
 export default function BetaSheet({ onClose }: BetaSheetProps) {
-  const [tab, setTab] = useState<'working' | 'coming'>('working')
+  const [tab, setTab] = useState<'working' | 'working-on'>('working')
 
-  // Scroll lock — same pattern as EditHoldingSheet v1.3.0
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -96,8 +101,8 @@ export default function BetaSheet({ onClose }: BetaSheetProps) {
         padding: '14px 20px 0', flexShrink: 0,
       }}>
         {([
-          { key: 'working', label: '✅ What\'s working' },
-          { key: 'coming', label: '🔜 Coming soon' },
+          { key: 'working', label: "✅ What's working" },
+          { key: 'working-on', label: '🔨 Working on' },
         ] as const).map(t => (
           <button
             key={t.key}
@@ -142,30 +147,20 @@ export default function BetaSheet({ onClose }: BetaSheetProps) {
           </div>
         ))}
 
-        {tab === 'coming' && (
-          <>
+        {tab === 'working-on' && WORKING_ON.map((item, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: 'rgba(123,111,168,0.04)',
+            border: `1px solid ${M.borderAccent}`,
+            borderRadius: 14, padding: '10px 12px',
+          }}>
+            <Clock size={12} color={M.accent} style={{ flexShrink: 0, marginTop: 3 }} />
             <p style={{
-              fontSize: 12, color: M.textMuted, lineHeight: 1.6,
-              fontFamily: FONT_BODY, marginBottom: 4,
-            }}>
-              In active development. Building these right.
-            </p>
-            {COMING.map((item, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10,
-                background: 'rgba(123,111,168,0.04)',
-                border: `1px solid ${M.borderAccent}`,
-                borderRadius: 14, padding: '10px 12px',
-              }}>
-                <Clock size={12} color={M.accent} style={{ flexShrink: 0, marginTop: 3 }} />
-                <p style={{
-                  fontSize: 13, color: M.textSecondary,
-                  lineHeight: 1.55, margin: 0, fontFamily: FONT_BODY,
-                }}>{item.text}</p>
-              </div>
-            ))}
-          </>
-        )}
+              fontSize: 13, color: M.textSecondary,
+              lineHeight: 1.55, margin: 0, fontFamily: FONT_BODY,
+            }}>{item.text}</p>
+          </div>
+        ))}
       </div>
     </div>
   )
