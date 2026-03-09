@@ -1,7 +1,10 @@
 // ━━━ Today Page ━━━
-// v4.0.0 · S161 · Sprint 33
-// Contextual intelligence layer: AI briefing, agent prompt, external signals, learn
-// Replaces composeFeed pattern — no duplicated data from Pulse/Exposure
+// v4.1.0 · S177 · Sprint 36
+// WIP beta state: WelcomeCard + AnonCTA (anon only) + ExploreCard. Zero fetches.
+// Changelog:
+//   v4.1.0 — S177: Beta state. Remove AI briefing, AgentPrompt, signals, learn cards, prices.
+//             Add WelcomeCard, ExploreCard, AnonCTA, BetaChip, BetaSheet.
+//   v4.0.0 — S161: Contextual intelligence layer. AI briefing, agent prompt, external signals.
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,22 +12,16 @@ import { createClient } from '@/lib/supabase/client'
 import { M } from '@/lib/meridian'
 import { anim } from '@/lib/ui-helpers'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
-import { Shield, User } from 'lucide-react'
-
 import {
-  Briefing,
-  RegimePill,
-  AgentPrompt,
-  InsightCard,
-  ExternalCard,
-  LearnCard,
-  ActivityBadge,
-  Divider,
-} from '@/components/today'
+  Bell, Sparkles, Lock, ArrowUpRight, ChevronRight,
+  Activity, Shield,
+} from 'lucide-react'
+import BetaSheet from '@/components/today/BetaSheet'
 
 // ── Fonts ──────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_BODY = "'DM Sans', sans-serif"
+const FONT_MONO = "'DM Mono', monospace"
 
 // ── Helpers ────────────────────────────────────
 
@@ -41,102 +38,237 @@ function getDateString(): string {
   })
 }
 
-function scoreToLabel(score: number): string {
-  if (score >= 60) return 'Aligned'
-  if (score < 40) return 'Misaligned'
-  return 'Neutral'
-}
+// ── Beta Chip ──────────────────────────────────
 
-// ── Mock external signals (structure ready for API) ──
-const EXTERNAL_SIGNALS = [
-  {
-    sourceIcon: 'x', source: 'X', author: '@CredibleCrypto',
-    text: 'BTC just reclaimed the 200-day MA for the first time in 3 months. Last two times this happened, we saw a 20%+ move within 30 days.',
-    time: '3h ago',
-  },
-  {
-    sourceIcon: 'news', source: 'CoinDesk', author: 'CoinDesk',
-    text: 'SEC postpones decision on Ethereum ETF options to Q3. Market reaction muted — ETH holding above key support.',
-    time: '5h ago',
-  },
-  {
-    sourceIcon: 'blog', source: 'Messari', author: 'Messari Research',
-    text: 'Solana DeFi TVL hits new ATH at $14.2B. Network activity now exceeds Ethereum L1 in daily transactions for the third consecutive week.',
-    time: '8h ago',
-  },
-]
-
-// ── Mock learn content (contextual to market) ──
-const LEARN_CARDS = [
-  {
-    text: "When Bitcoin reclaims its 200-day moving average during a bull regime, historical data shows continuation in 73% of cases over the following 30 days. However, the first 7 days after reclamation often show increased volatility as the market tests the level. This is why confidence in the regime classification matters — a reading above 70% during this period suggests the move has structural support, not just momentum.",
-    topic: '200-day MA reclamation',
-  },
-  {
-    text: "Alt rotation typically follows a predictable sequence in bull markets: BTC leads → large caps (ETH, SOL) follow within 3-7 days → mid-caps rotate 1-2 weeks later → small caps last. The ALT Season Index helps track where we are in this cycle. Currently at 38, we're still in the BTC-led phase. Watching for 50+ to signal the start of broader rotation.",
-    topic: 'alt rotation cycles',
-  },
-]
-
-// ── Anon CTA ───────────────────────────────────
-
-function AnonCTA({ onAuth }: { onAuth: (trigger: string) => void }) {
+function BetaChip({ onClick }: { onClick: () => void }) {
   return (
-    <>
-      <div style={{
-        background: `linear-gradient(135deg, ${M.accentMuted}, rgba(123,111,168,0.04))`,
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        background: `linear-gradient(135deg, ${M.accentMuted}, rgba(90,77,138,0.05))`,
         border: `1px solid ${M.borderAccent}`,
-        borderRadius: 24, padding: 18,
-        marginBottom: 12,
+        borderRadius: 100, padding: '5px 11px 5px 8px',
+        cursor: 'pointer', fontFamily: FONT_BODY,
+      }}
+    >
+      <style>{`
+        @keyframes betapulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 2px rgba(123,111,168,0.18); }
+          50% { opacity: 0.45; box-shadow: 0 0 0 4px rgba(123,111,168,0.07); }
+        }
+      `}</style>
+      <div style={{
+        width: 5, height: 5, borderRadius: '50%',
+        background: M.accent,
+        boxShadow: `0 0 0 2px ${M.accentDim}`,
+        animation: 'betapulse 2.4s ease-in-out infinite',
+      }} />
+      <span style={{
+        fontSize: 10, fontWeight: 700, color: M.accent,
+        letterSpacing: '0.07em', textTransform: 'uppercase',
       }}>
-        <p style={{ fontSize: 14, color: M.text, lineHeight: 1.65, margin: 0, fontFamily: FONT_BODY }}>
-          Markets are moving. Sign in to see how your portfolio aligns with current conditions and get your personalized briefing.
-        </p>
-      </div>
-
-      {[
-        { trigger: 'Exposure', icon: Shield, color: M.accent, bg: M.accentDim, title: 'See your exposure', desc: 'Posture, allocation targets, regime context' },
-        { trigger: 'Profile', icon: User, color: M.positive, bg: M.positiveDim, title: 'Track your portfolio', desc: 'Holdings, sparklines, performance' },
-      ].map(item => (
-        <button
-          key={item.trigger}
-          onClick={() => onAuth(item.trigger)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-            background: M.surface, backdropFilter: M.surfaceBlur,
-            border: `1px solid ${M.border}`, borderRadius: 24,
-            padding: 16, cursor: 'pointer', marginBottom: 10,
-            textAlign: 'left',
-          }}
-        >
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: item.bg,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <item.icon size={18} color={item.color} />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: M.text }}>{item.title}</div>
-            <div style={{ fontSize: 12, color: M.textMuted }}>{item.desc}</div>
-          </div>
-        </button>
-      ))}
-    </>
+        Beta
+      </span>
+    </button>
   )
 }
 
-// ── Skeleton ────────────────────────────────────
+// ── Welcome / WIP Card ─────────────────────────
 
-function TodaySkeleton() {
+function WelcomeCard({ onBeta }: { onBeta: () => void }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ height: 32, width: '60%', background: M.surfaceLight, borderRadius: 12 }} className="animate-pulse" />
-      <div style={{ height: 16, width: '40%', background: M.surfaceLight, borderRadius: 8 }} className="animate-pulse" />
-      <div style={{ height: 32, width: '35%', background: M.surfaceLight, borderRadius: 20 }} className="animate-pulse" />
-      <div style={{ height: 120, background: M.surfaceLight, borderRadius: 24 }} className="animate-pulse" />
-      <div style={{ height: 80, background: M.surfaceLight, borderRadius: 24 }} className="animate-pulse" />
+    <div style={{
+      background: 'linear-gradient(150deg, rgba(123,111,168,0.09), rgba(90,77,138,0.03) 70%, rgba(255,255,255,0.25))',
+      border: `1px solid ${M.borderAccent}`,
+      borderRadius: 24,
+      overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+    }}>
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${M.accent}, ${M.accentDeep})`, opacity: 0.5 }} />
+      <div style={{ padding: '20px 20px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 9,
+            background: M.accentDim,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Sparkles size={13} color={M.accent} />
+          </div>
+          <span style={{
+            fontSize: 12, fontWeight: 600, color: M.accent,
+            fontFamily: FONT_DISPLAY, letterSpacing: '0.01em',
+          }}>
+            Welcome to Meridian
+          </span>
+        </div>
+
+        <p style={{
+          fontSize: 15, color: M.text, lineHeight: 1.7,
+          margin: '0 0 6px', fontFamily: FONT_BODY,
+        }}>
+          This page is a work in progress.{' '}
+          <span style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_MONO, verticalAlign: 'middle' }}>
+            v0.9.1
+          </span>
+        </p>
+        <p style={{
+          fontSize: 13, color: M.textSecondary, lineHeight: 1.65,
+          margin: '0 0 18px', fontFamily: FONT_BODY,
+        }}>
+          The full intelligence layer is being built — personalized briefings, regime-aware insights, and live portfolio context will live here.
+        </p>
+
+        <button
+          onClick={onBeta}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: M.accentMuted,
+            border: `1px solid ${M.borderAccent}`,
+            borderRadius: 12, padding: '9px 14px',
+            cursor: 'pointer', fontFamily: FONT_BODY,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 600, color: M.accentDeep }}>
+            Check the beta tracker
+          </span>
+          <ChevronRight size={13} color={M.accent} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Anon CTA ───────────────────────────────────
+
+function AnonCTA({ onAuth }: { onAuth: (trigger: string, mode?: 'login' | 'signup') => void }) {
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, ${M.accentMuted}, rgba(123,111,168,0.03))`,
+      border: `1px solid ${M.borderAccent}`,
+      borderRadius: 24, padding: 18,
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <Lock size={14} color={M.accent} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_DISPLAY }}>
+          Track your portfolio
+        </span>
+      </div>
+      <p style={{
+        fontSize: 13, color: M.textSecondary,
+        lineHeight: 1.65, margin: '0 0 14px', fontFamily: FONT_BODY,
+      }}>
+        Sign in to see your posture score, allocation targets, and how your portfolio aligns with the current market regime.
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={() => onAuth('Today', 'login')}
+          style={{
+            flex: 1,
+            background: `linear-gradient(90deg, ${M.accent}, ${M.accentDeep})`,
+            color: 'white', padding: '11px 16px',
+            borderRadius: 16, border: 'none',
+            fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: FONT_BODY,
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 6,
+            boxShadow: '0 4px 14px rgba(90,77,138,0.22)',
+          }}
+        >
+          Sign in <ArrowUpRight size={13} />
+        </button>
+        <button
+          onClick={() => onAuth('Today', 'signup')}
+          style={{
+            flex: 1,
+            background: 'rgba(255,255,255,0.5)',
+            color: M.accentDeep, padding: '11px 16px',
+            borderRadius: 16,
+            border: `1px solid ${M.borderAccent}`,
+            fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: FONT_BODY,
+          }}
+        >
+          Create account
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Explore Card ───────────────────────────────
+
+function ExploreCard() {
+  const items = [
+    {
+      icon: Activity,
+      label: 'Pulse',
+      desc: 'Live market regime & signals',
+      color: M.accent,
+      bg: M.accentDim,
+      href: '/market',
+    },
+    {
+      icon: Shield,
+      label: 'Exposure',
+      desc: 'Your portfolio posture & holdings',
+      color: M.positive,
+      bg: M.positiveDim,
+      href: '/exposure',
+    },
+  ]
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.6)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      borderRadius: 24, padding: '16px 18px',
+      border: '1px solid rgba(255,255,255,0.8)',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 600, color: M.textMuted,
+        textTransform: 'uppercase', letterSpacing: '0.09em',
+        fontFamily: FONT_BODY, marginBottom: 12,
+      }}>
+        Explore while Meridian is being built
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map(({ icon: Icon, label, desc, color, bg, href }) => (
+          <a
+            key={label}
+            href={href}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              background: 'rgba(255,255,255,0.45)',
+              border: '1px solid rgba(255,255,255,0.7)',
+              borderRadius: 16, padding: '12px 14px',
+              textDecoration: 'none',
+            }}
+          >
+            <div style={{
+              width: 36, height: 36, borderRadius: 11,
+              background: bg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Icon size={16} color={color} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_BODY }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 12, color: M.textMuted, fontFamily: FONT_BODY, marginTop: 1 }}>
+                {desc}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
@@ -146,17 +278,8 @@ function TodaySkeleton() {
 export default function TodayPage() {
   const [mounted, setMounted] = useState(false)
   const [isAnon, setIsAnon] = useState(true)
-  const [loading, setLoading] = useState(true)
   const [displayName, setDisplayName] = useState('')
-  const [regime, setRegime] = useState('')
-  const [regimeDay, setRegimeDay] = useState(0)
-  const [confidence, setConfidence] = useState(0)
-  const [postureLabel, setPostureLabel] = useState('')
-  const [portfolioNote, setPortfolioNote] = useState('')
-  const [btcPrice, setBtcPrice] = useState<number | null>(null)
-  const [btcChange, setBtcChange] = useState<number | null>(null)
-  const [ethPrice, setEthPrice] = useState<number | null>(null)
-  const [ethChange, setEthChange] = useState<number | null>(null)
+  const [betaOpen, setBetaOpen] = useState(false)
   const { openAuth } = useAuthSheet()
 
   useEffect(() => {
@@ -171,223 +294,120 @@ export default function TodayPage() {
       const anon = !user
       setIsAnon(anon)
 
-      // Fetch market context (public) + market data
-      try {
-        const [mcRes, mRes] = await Promise.all([
-          fetch('/api/market-context'),
-          fetch('/api/market'),
-        ])
-        if (mcRes.ok) {
-          const mc = await mcRes.json()
-          // Regimes array: field is "regime" not "regime_type"
-          if (mc.regimes?.length > 0) {
-            const latest = mc.regimes[0]
-            setRegime(latest.regime || 'range')
-            setConfidence(Math.round((latest.confidence || 0) * 100))
-          }
-          if (mc.regimes?.length > 1) {
-            const current = mc.regimes[0]?.regime
-            let days = 1
-            for (let i = 1; i < mc.regimes.length; i++) {
-              if (mc.regimes[i].regime === current) days++
-              else break
-            }
-            setRegimeDay(days)
-          } else {
-            setRegimeDay(1)
-          }
-          // current_prices is Record<symbol, {price, change_24h}>
-          if (mc.current_prices) {
-            const btc = mc.current_prices['BTC']
-            const eth = mc.current_prices['ETH']
-            if (btc) { setBtcPrice(btc.price); setBtcChange(btc.change_24h) }
-            if (eth) { setEthPrice(eth.price); setEthChange(eth.change_24h) }
-          }
-        }
-        // market API fallback handled by market-context current_prices above
-      } catch {}
-
-      // Fetch portfolio snapshot + profile (authenticated)
-      if (!anon) {
+      if (!anon && user) {
         try {
-          // Fetch display_name from profiles via API-compatible query
-          const [snapRes, profileRes] = await Promise.all([
-            fetch('/api/portfolio-snapshot'),
-            supabase.from('profiles').select('display_name').eq('id', user!.id).maybeSingle(),
-          ])
-
-          if (profileRes.data?.display_name) {
-            setDisplayName(profileRes.data.display_name)
-          }
-
-          if (snapRes.ok) {
-            const snap = await snapRes.json()
-            const score = snap.risk_score ?? 50
-            setPostureLabel(scoreToLabel(score))
-
-            // Generate contextual portfolio note
-            const holdingsCount = snap.holdings_count ?? 0
-            if (holdingsCount === 0) {
-              setPortfolioNote('Add holdings to get personalized portfolio insights.')
-            } else {
-              const totalVal = snap.total_value_usd_all
-              if (totalVal) {
-                setPortfolioNote('No action items — hold and observe.')
-              } else {
-                setPortfolioNote('Your portfolio is being analyzed.')
-              }
-            }
-          }
+          const { data } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (data?.display_name) setDisplayName(data.display_name)
         } catch {}
       }
-
-      setLoading(false)
     }
     load()
   }, [])
 
   const greeting = getGreeting()
-  const nameDisplay = displayName || (isAnon ? '' : '')
-  const title = nameDisplay ? `${greeting}, ${nameDisplay}` : greeting
+  const title = (!isAnon && displayName) ? `${greeting}, ${displayName}` : greeting
 
   return (
     <div style={{ padding: '20px 20px 24px' }}>
-      {loading ? (
-        <TodaySkeleton />
-      ) : (
-        <>
-          {/* Header: Greeting + Notification */}
-          <div style={{
-            ...anim(mounted, 0),
-            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-            marginBottom: 12,
+      {/* Header */}
+      <div style={{
+        ...anim(mounted, 0),
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        marginBottom: 24,
+      }}>
+        <div>
+          <h1 style={{
+            fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 400,
+            color: M.text, lineHeight: 1.3, marginBottom: 6,
           }}>
-            <div>
-              <h1 style={{
-                fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 400,
-                color: M.text, lineHeight: 1.3, marginBottom: 6,
-              }}>
-                {title}
-              </h1>
-              <p style={{ fontSize: 12, color: M.textMuted, margin: 0 }}>{getDateString()}</p>
-            </div>
-            {!isAnon && <ActivityBadge count={0} />}
-          </div>
+            {title}
+          </h1>
+          <p style={{ fontSize: 12, color: M.textMuted, margin: 0, fontFamily: FONT_BODY }}>
+            {getDateString()}
+          </p>
+        </div>
 
-          {/* Regime pill */}
-          {regime && (
-            <div style={{ ...anim(mounted, 1), marginBottom: 16 }}>
-              <RegimePill regime={regime} confidence={confidence} day={regimeDay} />
-            </div>
-          )}
-
-          {/* Anonymous path */}
-          {isAnon && (
-            <>
-              {/* BTC / ETH prices */}
-              {(btcPrice !== null) && (
-                <div style={{ ...anim(mounted, 2), display: 'flex', gap: 10, marginBottom: 12 }}>
-                  {[
-                    { s: 'BTC', p: btcPrice, c: btcChange },
-                    { s: 'ETH', p: ethPrice, c: ethChange },
-                  ].filter(coin => coin.p).map(coin => (
-                    <div key={coin.s} style={{
-                      background: M.surface, backdropFilter: M.surfaceBlur,
-                      WebkitBackdropFilter: M.surfaceBlur,
-                      border: `1px solid ${M.border}`, borderRadius: 24,
-                      padding: 14, flex: 1,
-                    }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'DM Mono', monospace", marginBottom: 6 }}>{coin.s}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: M.text, fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>
-                        ${(coin.p ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </div>
-                      {coin.c != null && (
-                        <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                          background: (coin.c ?? 0) >= 0 ? M.positiveDim : M.negativeDim,
-                          borderRadius: 8, padding: '3px 8px',
-                        }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: (coin.c ?? 0) >= 0 ? M.positive : M.negative }}>
-                            {(coin.c ?? 0) >= 0 ? '+' : ''}{(coin.c ?? 0).toFixed(2)}%
-                          </span>
-                          <span style={{ fontSize: 9, color: (coin.c ?? 0) >= 0 ? M.positive : M.negative, opacity: 0.7 }}>24h</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div style={anim(mounted, 3)}>
-                <AnonCTA onAuth={openAuth} />
-              </div>
-            </>
-          )}
-
-          {/* Authenticated path */}
-          {!isAnon && (
-            <>
-              {/* AI Briefing */}
-              <div style={{ ...anim(mounted, 2), marginBottom: 12 }}>
-                <Briefing
-                  regime={regime || 'range'}
-                  regimeDay={regimeDay}
-                  confidence={confidence}
-                  postureLabel={postureLabel || 'Neutral'}
-                  portfolioNote={portfolioNote || 'No action items — hold and observe.'}
-                />
-              </div>
-
-              {/* Agent Prompt */}
-              <div style={{ ...anim(mounted, 3), marginBottom: 12 }}>
-                <AgentPrompt />
-              </div>
-
-              {/* Contextual insights */}
-              <div style={anim(mounted, 4)}>
-                <Divider label="What's moving" />
-              </div>
-
-              <div style={{ ...anim(mounted, 5), marginBottom: 12 }}>
-                <InsightCard
-                  text="Markets are in a sustained trend. Check your Exposure page to see how your allocation targets shift with the current regime."
-                  linkLabel="View Exposure"
-                  accentColor="#6B5FBF"
-                />
-              </div>
-            </>
-          )}
-
-          {/* External signals — visible to all */}
-          <div style={anim(mounted, isAnon ? 3 : 6)}>
-            <Divider label="From the network" />
-          </div>
-
-          {EXTERNAL_SIGNALS.map((signal, i) => (
-            <div key={signal.author} style={{ ...anim(mounted, (isAnon ? 4 : 7) + i), marginBottom: 12 }}>
-              <ExternalCard {...signal} />
-            </div>
-          ))}
-
-          {/* Learn cards — visible to all */}
-          <div style={anim(mounted, isAnon ? 7 : 10)}>
-            <Divider label="Learn" />
-          </div>
-
-          {LEARN_CARDS.map((lc, i) => (
-            <div key={lc.topic} style={{ ...anim(mounted, (isAnon ? 8 : 11) + i), marginBottom: 12 }}>
-              <LearnCard text={lc.text} topic={lc.topic} />
-            </div>
-          ))}
-
-          {/* Footer */}
+        {/* Beta chip + bell */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BetaChip onClick={() => setBetaOpen(true)} />
           <div style={{
-            ...anim(mounted, isAnon ? 10 : 13),
-            textAlign: 'center', padding: '12px 0', fontSize: 10, color: M.textMuted,
+            width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.5)',
+            border: '1px solid rgba(255,255,255,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            Content curated for educational purposes. Not financial advice.
+            <Bell size={15} color={M.textSecondary} />
           </div>
-        </>
+        </div>
+      </div>
+
+      {/* WelcomeCard */}
+      <div style={{ ...anim(mounted, 1), marginBottom: 12 }}>
+        <WelcomeCard onBeta={() => setBetaOpen(true)} />
+      </div>
+
+      {/* AnonCTA — anonymous only */}
+      {isAnon && (
+        <div style={{ ...anim(mounted, 2), marginBottom: 12 }}>
+          <AnonCTA onAuth={openAuth} />
+        </div>
+      )}
+
+      {/* ExploreCard */}
+      <div style={{ ...anim(mounted, isAnon ? 3 : 2), marginBottom: 12 }}>
+        <ExploreCard />
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        ...anim(mounted, isAnon ? 4 : 3),
+        textAlign: 'center', padding: '12px 0', fontSize: 10, color: M.textMuted,
+        fontFamily: FONT_BODY,
+      }}>
+        Educational purposes only · Not financial advice
+      </div>
+
+      {/* BetaSheet */}
+      {betaOpen && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          maxWidth: 428, margin: '0 auto',
+          zIndex: 50,
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          pointerEvents: 'auto',
+        }}>
+          {/* Backdrop */}
+          <div
+            onClick={() => setBetaOpen(false)}
+            onWheel={e => e.preventDefault()}
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(45,36,22,0.22)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
+            }}
+          />
+          {/* Sheet — inset 12px matching AuthSheet v1.1.0 */}
+          <div style={{
+            position: 'relative',
+            background: 'rgba(255,255,255,0.96)',
+            borderRadius: '24px 24px 0 0',
+            margin: '0 12px',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            maxHeight: '78vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            <BetaSheet onClose={() => setBetaOpen(false)} />
+          </div>
+        </div>
       )}
     </div>
   )

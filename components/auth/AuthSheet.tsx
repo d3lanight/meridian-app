@@ -1,6 +1,7 @@
 // ━━━ Auth Sheet ━━━
-// v1.1.0 · S169 · Sprint 35
+// v1.2.0 · S177 · Sprint 36
 // Changelog:
+//   v1.2.0 — S177: initialMode prop to pre-select login/signup tab on open.
 //   v1.1.0 — S169: sheet inset margin 12px; scroll lock useEffect.
 //   v1.0.0 · S160 · Sprint 33
 // Bottom sheet overlay for inline authentication
@@ -54,6 +55,7 @@ type AuthMode = 'login' | 'signup'
 type AuthView = 'form' | 'confirm' | 'reset-sent'
 
 interface AuthSheetProps {
+  initialMode?: 'login' | 'signup'
   isOpen: boolean
   onClose: () => void
   trigger?: string  // e.g. "Exposure", "Profile"
@@ -105,7 +107,7 @@ const ssoButtonStyle: React.CSSProperties = {
 
 // ── Component ─────────────────────────────────
 
-export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) {
+export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: AuthSheetProps) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [view, setView] = useState<AuthView>('form')
   const [email, setEmail] = useState('')
@@ -136,6 +138,13 @@ export default function AuthSheet({ isOpen, onClose, trigger }: AuthSheetProps) 
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  // Apply initialMode when sheet opens
+  useEffect(() => {
+    if (isOpen && initialMode) {
+      setMode(initialMode)
+    }
+  }, [isOpen, initialMode])
 
   // Reset state when closed
   useEffect(() => {

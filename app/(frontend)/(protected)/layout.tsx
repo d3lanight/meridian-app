@@ -1,5 +1,8 @@
 // ━━━ Protected Layout ━━━
-// v1.0.0 · S160 · Sprint 33
+// v1.1.0 · S177 · Sprint 36
+// Changelog:
+//   v1.1.0 — S177: Thread initialMode through openAuth to AuthSheet.
+//   v1.0.0 — S160: Initial implementation.
 // Auth-aware layout: anonymous users see AuthSheet on protected tab taps
 'use client';
 
@@ -32,6 +35,7 @@ export default function ProtectedLayout({
   const [authChecked, setAuthChecked] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authTrigger, setAuthTrigger] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
     const supabase = createClient();
@@ -46,8 +50,9 @@ export default function ProtectedLayout({
     return () => subscription.unsubscribe();
   }, []);
 
-  const openAuth = (trigger: string) => {
+  const openAuth = (trigger: string, mode: 'login' | 'signup' = 'login') => {
     setAuthTrigger(trigger);
+    setAuthMode(mode);
     setShowAuth(true);
   };
 
@@ -75,6 +80,7 @@ export default function ProtectedLayout({
           isOpen={showAuth}
           onClose={() => setShowAuth(false)}
           trigger={authTrigger}
+          initialMode={authMode}
         />
       </div>
     </PrivacyProvider>
