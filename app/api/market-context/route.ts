@@ -1,4 +1,5 @@
 // ━━━ Market Context API ━━━
+// v3.5.0 · S176 · Sprint 36 — is_volatile added to market_regimes select and regimes map
 // v3.4.0 · S173 · Sprint 35 — current_prices for ALL symbols (not just BTC/ETH); change_24h rounded to 2dp
 // Fetches regime history + price history + duration patterns + transitions + intraday signals
 // Changelog:
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
     const [regimeResult, priceResult, durationResult, livePriceResult, intradayResult] = await Promise.all([
       supabase
         .from('market_regimes')
-        .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, eth_price_now, eth_r_7d, eth_vol_7d')
+        .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, is_volatile, eth_price_now, eth_r_7d, eth_vol_7d')
         .gte('created_at', cutoffISO)
         .order('created_at', { ascending: false }),
       supabase
@@ -126,6 +127,7 @@ export async function GET(request: NextRequest) {
       eth_price_now: r.eth_price_now,
       eth_r_7d: r.eth_r_7d,
       eth_vol_7d: r.eth_vol_7d,
+      is_volatile: r.is_volatile ?? false,
     }));
 
     const transitions = aggregateTransitions(regimeResult.data ?? []);
