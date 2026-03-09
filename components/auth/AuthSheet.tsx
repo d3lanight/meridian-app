@@ -1,6 +1,7 @@
 // ━━━ Auth Sheet ━━━
-// v1.3.0 · S177 · Sprint 36
+// v1.4.0 · S177 · Sprint 36
 // Changelog:
+//   v1.4.0 — S177: Fix post-login no-op — replace router.refresh() with window.location.reload().
 //   v1.3.0 — S177: Refactored to use shared BottomSheet component. Removed inline wrapper/scroll-lock/drag-handle.
 //   v1.2.0 — S177: initialMode prop to pre-select login/signup tab on open.
 //   v1.1.0 — S169: sheet inset margin 12px; scroll lock useEffect.
@@ -12,7 +13,6 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import BottomSheet from '@/components/shared/BottomSheet'
 
@@ -117,7 +117,6 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const isSignup = mode === 'signup'
@@ -171,7 +170,7 @@ export default function AuthSheet({ isOpen, onClose, trigger, initialMode }: Aut
         setLoading(false)
       } else {
         onClose()
-        router.refresh()
+        window.location.reload()
       }
     }
   }
