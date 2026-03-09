@@ -1,13 +1,12 @@
 // ProUpgradeCard.tsx
 // Profile — Pro upgrade CTA card
-// Version: 2.0.0
-// Sprint: 35 (S168)
+// Version: 2.1.0
+// Sprint: 36
 // Changelog:
-//   2.0.0 - Updated feature list to v4 items (S168):
-//           "Price context + BTC correlation per coin",
-//           "90-day regime timeline",
-//           "Intraday regime signals",
-//           "Custom notification thresholds"
+//   2.1.0 - Removed "Custom notification thresholds" (not yet built).
+//           Added note that Pro feature list grows as features ship.
+//           Added hint to use tier toggle below for testing.
+//   2.0.0 - Updated feature list to v4 items (S168).
 //   1.0.0 - Initial (S87): accent CTA, 4-item feature list.
 
 import { Crown } from 'lucide-react'
@@ -21,7 +20,6 @@ const V4_FEATURES = [
   'Price context + BTC correlation per coin',
   '90-day regime timeline',
   'Intraday regime signals',
-  'Custom notification thresholds',
 ]
 
 export function ProUpgradeCard() {
@@ -67,7 +65,7 @@ export function ProUpgradeCard() {
       </div>
 
       {/* Feature list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
         {V4_FEATURES.map((feature, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div
@@ -91,6 +89,18 @@ export function ProUpgradeCard() {
         ))}
       </div>
 
+      {/* Growing list note */}
+      <p style={{
+        fontSize: 11,
+        color: M.textMuted,
+        fontFamily: FONT_BODY,
+        margin: '0 0 14px',
+        paddingLeft: 24,
+        fontStyle: 'italic',
+      }}>
+        More Pro features added as they ship.
+      </p>
+
       {/* CTA button */}
       <button
         style={{
@@ -105,10 +115,22 @@ export function ProUpgradeCard() {
           cursor: 'pointer',
           fontFamily: FONT_BODY,
           boxShadow: `0 4px 16px ${M.accentGlow}`,
+          marginBottom: 8,
         }}
       >
         Upgrade to Pro
       </button>
+
+      {/* Test hint */}
+      <p style={{
+        fontSize: 11,
+        color: M.textMuted,
+        fontFamily: FONT_BODY,
+        margin: 0,
+        textAlign: 'center' as const,
+      }}>
+        Testing? Use the tier toggle in Account settings below.
+      </p>
     </div>
   )
 }

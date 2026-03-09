@@ -596,7 +596,7 @@ export default function ProfilePage() {
                   const { data: { user } } = await supabase.auth.getUser()
                   if (!user) return
                   await supabase.from('profiles').update({ tier: newTier }).eq('id', user.id)
-                  setTier(newTier)
+                  window.location.reload()
                 }}
               />
             )}
