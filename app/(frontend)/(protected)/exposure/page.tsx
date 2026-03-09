@@ -71,7 +71,7 @@ interface SnapshotWithPosture extends PortfolioSnapshot {
 function scoreToLabel(score: number): string {
   if (score >= 60) return 'Aligned'
   if (score < 40)  return 'Misaligned'
-  return 'Neutral'
+  return 'Steady'
 }
 
 function formatUsd(value: number): string {

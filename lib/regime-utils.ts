@@ -1,7 +1,9 @@
 // ━━━ Regime Utilities ━━━
-// v1.1.0 · ca-story-design-refresh · Sprint 24
-// Pure functions for regime timeline processing
-// v1.1: Range regime color → neutral taupe (decoupled from accent)
+// v1.2.0 · Sprint 36
+// Changelog:
+//   v1.2.0 — Range regime color → steel blue #5B7FA6 (was taupe #8B7565)
+//             Propagates to AllocationCard regime badge, RegimeHero, anywhere getRegimeConfig is called
+//   v1.1.0 — Range regime color → neutral taupe (decoupled from accent)
 
 // ── Types ─────────────────────────────────────
 
@@ -68,7 +70,7 @@ export interface RegimeConfig {
 export const REGIMES: Record<string, RegimeConfig> = {
   bull:     { bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)', s: '#2A9D8F', d: 'rgba(42,157,143,0.12)',  l: 'Bull',     icon: '↗︎' },
   bear:     { bg: 'linear-gradient(135deg,#E76F51,#F08C70)', s: '#E76F51', d: 'rgba(231,111,81,0.12)',  l: 'Bear',     icon: '↘︎' },
-  range:    { bg: 'linear-gradient(135deg,#8B7565,#A08979)', s: '#8B7565', d: 'rgba(139,117,101,0.12)', l: 'Range',    icon: '→︎' },
+  range:    { bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)', s: '#5B7FA6', d: 'rgba(91,127,166,0.12)',  l: 'Range',    icon: '→︎' },
   volatile: { bg: 'linear-gradient(135deg,#D4A017,#E8B84B)', s: '#D4A017', d: 'rgba(212,160,23,0.12)', l: 'Volatile', icon: '↕︎' },
 }
 
@@ -86,12 +88,9 @@ const LABEL_TO_KEY: Record<string, string> = {
 /** Lookup regime config by key, display label, or partial match (case-insensitive, defaults to range) */
 export function getRegimeConfig(regime: string | undefined | null): RegimeConfig {
   const r = regime?.toLowerCase() ?? ''
-  // Direct key match
   if (REGIMES[r]) return REGIMES[r]
-  // Display label reverse-lookup
   const key = LABEL_TO_KEY[r]
   if (key && REGIMES[key]) return REGIMES[key]
-  // Partial match fallback
   if (r.includes('bull')) return REGIMES.bull
   if (r.includes('bear')) return REGIMES.bear
   if (r.includes('volat')) return REGIMES.volatile
@@ -99,8 +98,6 @@ export function getRegimeConfig(regime: string | undefined | null): RegimeConfig
 }
 
 // ── Compress to Runs ──────────────────────────
-// Input: regime rows sorted NEWEST-FIRST (from API)
-// Output: Run[] sorted CHRONOLOGICALLY (oldest first)
 
 export function compressToRuns(rows: RegimeRow[]): Run[] {
   if (!rows?.length) return []
@@ -140,9 +137,6 @@ export function compressToRuns(rows: RegimeRow[]): Run[] {
 }
 
 // ── Confidence Trajectory ─────────────────────
-// Compares avg first-third vs last-third of confidence values
-// Returns ↑ (strengthening), ↓ (weakening), → (stable)
-// Threshold: ±0.03, min 3 data points
 
 export function confTraj(confs: number[]): '↑' | '↓' | '→' {
   if (confs.length < 3) return '→'
@@ -157,7 +151,6 @@ export function confTraj(confs: number[]): '↑' | '↓' | '→' {
 }
 
 // ── Build Aggregation ─────────────────────────
-// Computes period summary from runs + raw rows
 
 export function buildAgg(runs: Run[], rows: RegimeRow[]): RegimeAgg {
   const td = rows?.length || 0

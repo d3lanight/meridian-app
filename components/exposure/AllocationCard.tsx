@@ -1,8 +1,11 @@
 // ━━━ AllocationCard ━━━
-// v1.0.0 · S164 · Sprint 34
-// Allocation vs Target — teal-tinted card with regime badge, target zone overlay bars
-// Shared component — used by Exposure page. Designed for Portfolio reuse.
-// Replaces AllocationSection for v4 screens.
+// v1.1.0 · Sprint 36
+// Changelog:
+//   v1.1.0 — Remove hardcoded teal background + teal border.
+//             Plain glassmorphic card — coin colors carry the visual identity.
+//             Teal implied a false positive signal regardless of actual allocation.
+//             Regime badge still shows current regime context in header.
+//   v1.0.0 · S164 · Sprint 34 — Initial.
 
 'use client'
 
@@ -10,37 +13,22 @@ import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 import { getRegimeConfig } from '@/lib/regime-utils'
 
-// ─── Fonts ────────────────────────────────────────────────────────────────────
 const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_BODY    = "'DM Sans', sans-serif"
-const FONT_MONO    = "'DM Mono', monospace"
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface AllocationRow {
   label: string
-  /** Allocation color (solid) */
   color: string
-  /** Bar fill — gradient or solid. Falls back to color. */
   gradient?: string
-  /** Current allocation 0–100 */
   current: number
 }
 
 interface AllocationCardProps {
   allocations: AllocationRow[]
-  /** Regime display label e.g. "Bull", "Volatile" */
   regime: string
   hidden?: boolean
 }
 
-// ── Helper: build AllocationRow[] from raw weights ───────────────────────────
-
-/**
- * Build the allocations array from 4-bucket weights.
- * Target bands intentionally excluded — intelligence layer handles guidance.
- * Target bands reserved for Pro feature.
- */
 export function buildAllocations(
   btcWeight: number,
   ethWeight: number,
@@ -48,27 +36,18 @@ export function buildAllocations(
   stableWeight: number,
 ): AllocationRow[] {
   return [
-    { label: 'BTC', color: M.btcOrange, current: Math.round(btcWeight * 100) },
-    { label: 'ETH', color: M.ethBlue, current: Math.round(ethWeight * 100) },
-    { label: 'ALT', color: '#9945FF', gradient: 'linear-gradient(90deg,#14F195,#9945FF)', current: Math.round(altWeight * 100) },
-    { label: 'Stable', color: M.positive, current: Math.round(stableWeight * 100) },
+    { label: 'BTC',    color: M.btcOrange, current: Math.round(btcWeight    * 100) },
+    { label: 'ETH',    color: M.ethBlue,   current: Math.round(ethWeight    * 100) },
+    { label: 'ALT',    color: '#9945FF', gradient: 'linear-gradient(90deg,#14F195,#9945FF)', current: Math.round(altWeight * 100) },
+    { label: 'Stable', color: M.positive,  current: Math.round(stableWeight * 100) },
   ]
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AllocationCard({ allocations, regime, hidden = false }: AllocationCardProps) {
   const rc = getRegimeConfig(regime)
 
   return (
-    <div style={{
-      ...card({
-        padding: 16,
-        background: `linear-gradient(135deg, rgba(42,157,143,0.1), rgba(42,157,143,0.03))`,
-        border: `1px solid ${M.borderPositive}`,
-      }),
-      marginBottom: 12,
-    }}>
+    <div style={{ ...card({ padding: 16 }), marginBottom: 12 }}>
       {/* Header: title + regime badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
         <span style={{ fontFamily: FONT_DISPLAY, fontSize: 13, fontWeight: 600, color: M.text }}>
@@ -82,7 +61,7 @@ export default function AllocationCard({ allocations, regime, hidden = false }: 
         </span>
       </div>
 
-      {/* Allocation rows — simple: color dot + label + bar + % */}
+      {/* Allocation rows */}
       {allocations.map((a, i) => (
         <div key={a.label} style={{ marginBottom: i < allocations.length - 1 ? 10 : 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
@@ -92,14 +71,12 @@ export default function AllocationCard({ allocations, regime, hidden = false }: 
             </div>
             <span style={{
               fontWeight: 600, fontSize: 12, color: M.text,
-              fontFamily: FONT_BODY,
-              fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+              fontFamily: FONT_BODY, fontFeatureSettings: "'tnum' 1, 'lnum' 1",
             }}>
               {hidden ? '••' : `${a.current}%`}
             </span>
           </div>
 
-          {/* Simple bar — no target zone overlay */}
           <div style={{ height: 5, borderRadius: 5, background: M.borderSubtle }}>
             {!hidden && a.current > 0 && (
               <div style={{

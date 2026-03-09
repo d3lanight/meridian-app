@@ -1,6 +1,9 @@
 // ━━━ Shared UI Helpers ━━━
-// v1.1.0 · ca-story-design-refresh · Sprint 24
-// v1.1: Range regime color → neutral taupe (decoupled from accent)
+// v1.2.0 · Sprint 36
+// Changelog:
+//   v1.2.0 — postureNarrative: 'Steady' branch added (replaces 'Moderate' key for mid-band)
+//             regimeIconBg: range → steel blue #5B7FA6 (matches regime-utils v1.2)
+//   v1.1.0 — Range regime color → neutral taupe (decoupled from accent)
 
 import { M } from '@/lib/meridian'
 
@@ -21,10 +24,11 @@ export const card = (extra: React.CSSProperties = {}): React.CSSProperties => ({
 
 export function regimeIconBg(regime: string): string {
   const r = regime.toLowerCase()
-  if (r.includes('bull')) return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
-  if (r.includes('bear')) return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
+  if (r.includes('bull'))  return 'linear-gradient(135deg, #2A9D8F, rgba(42,157,143,0.8))'
+  if (r.includes('bear'))  return 'linear-gradient(135deg, #E76F51, rgba(231,111,81,0.8))'
   if (r.includes('volat')) return 'linear-gradient(135deg, #D4A017, rgba(212,160,23,0.8))'
-  return 'linear-gradient(135deg, #8B7565, rgba(139,117,101,0.8))'
+  // Range → steel blue (v1.2)
+  return 'linear-gradient(135deg, #5B7FA6, rgba(91,127,166,0.8))'
 }
 
 // ── Regime Narrative ──────────────────────────
@@ -46,15 +50,14 @@ export function postureNarrative(posture: string, regime: string, profile?: stri
   const p = profile ? ` for a ${profile.toLowerCase()} profile` : ''
   if (posture === 'Aligned')
     return `Your holdings are well-aligned with the current ${regime.toLowerCase()} regime${p}. Portfolio exposure is within target bands.`
-  if (posture === 'Watch' || posture === 'Moderate')
-    return `Your holdings are drifting from target bands${p}. Some buckets are near the edge of their range.`
+  if (posture === 'Steady' || posture === 'Watch' || posture === 'Moderate')
+    return `Your holdings are in a reasonable position${p}. Some buckets may be near the edge of their range — nothing that needs immediate attention.`
   if (posture === 'Misaligned')
     return `Your holdings diverge significantly from target allocations${p} in the current ${regime.toLowerCase()} regime.`
   return 'Add holdings to see portfolio posture analysis.'
 }
 
 // ── Stagger Animation ─────────────────────────
-// Usage: style={anim(mounted, 0)} for first card, anim(mounted, 1) for second, etc.
 
 export const anim = (mounted: boolean, i: number): React.CSSProperties => ({
   opacity: mounted ? 1 : 0,
