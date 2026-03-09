@@ -1,8 +1,9 @@
 // ━━━ usePortfolio Hook ━━━
-// v1.1.0 · ca-story107 · 2026-03-01
+// v1.2.0 · ca-story107 · 2026-03-01
 // CRUD operations with optimistic UI
 // S106: price_at_add auto-captured server-side
 // S107: asset_id FK support (bidirectional trigger handles sync)
+// v1.2.0 — Sprint 36: Fetch all assets (?all=true) so held coins can be filtered out in AssetPicker
 
 'use client';
 
@@ -51,7 +52,7 @@ export function usePortfolio(): UsePortfolioReturn {
 
   const fetchAssets = useCallback(async () => {
     try {
-      const res = await fetch('/api/assets');
+      const res = await fetch("/api/assets?all=true");
       if (!res.ok) throw new Error('Failed to fetch assets');
       const data = await res.json();
       setAssets(data.assets ?? []);

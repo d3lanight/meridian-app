@@ -1,8 +1,12 @@
-// ━━━ Asset Picker v2 — Top 20 + API search ━━━
-// v2.1.0 · ca-story-design-refresh · Sprint 24
-// Default: top 20 by market cap rank from /api/assets
-// On type: searches /api/asset-search (local 201 + CoinGecko fallback)
-// Uses asset_mapping.name and icon_url instead of hardcoded map
+// ━━━ Asset Picker — Top assets + API search ━━━
+// v2.2.0 · Sprint 36
+// Changelog:
+//   v2.2.0 — Held coins filtered out before rendering — no muted/disabled rows.
+//             Parent passes full asset list; heldSymbols used for client-side exclusion.
+//             Default list shows top unowned coins by rank (fills gap left by held coins).
+//             Subtitle: removed "Top N · type to search more" — redundant.
+//             Placeholder: "Search any coin..." (CoinGecko fallback for 250+ assets).
+//   v2.1.0 — ca-story-design-refresh · Sprint 24: asset_mapping.name + icon_url
 
 'use client';
 
@@ -11,19 +15,21 @@ import { Search, X, Loader2 } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import type { AssetMapping } from '@/types';
 
-// Category badge colors
 const CAT_COLORS: Record<string, { bg: string; text: string }> = {
-  core: { bg: M.positiveDim, text: M.positive },
-  alt: { bg: M.accentMuted, text: M.accent },
-  stable: { bg: M.neutralDim, text: M.textMuted },
+  core:   { bg: M.positiveDim,  text: M.positive },
+  alt:    { bg: M.accentMuted,  text: M.accent   },
+  stable: { bg: M.neutralDim,   text: M.textMuted },
 };
+
+// Default list cap — how many unowned coins to show before search
+const DEFAULT_LIMIT = 20;
 
 interface SearchResult extends AssetMapping {
   source?: 'local' | 'remote';
 }
 
 interface AssetPickerProps {
-  assets: AssetMapping[];       // top 20 from /api/assets (initial list)
+  assets: AssetMapping[];       // full ranked list from /api/assets?all=true
   heldSymbols: string[];
   onSelect: (asset: AssetMapping) => void;
   onClose: () => void;
@@ -35,8 +41,18 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // The displayed list: search results when typing, top 20 when empty
-  const displayList = searchResults ?? assets;
+  // Default list: top unowned coins by rank, capped at DEFAULT_LIMIT
+  const heldSet = new Set(heldSymbols.map(s => s.toUpperCase()));
+  const defaultList = assets
+    .filter(a => !heldSet.has(a.symbol.toUpperCase()))
+    .slice(0, DEFAULT_LIMIT);
+
+  // Search results are also filtered — don't show already-held coins
+  const filteredSearchResults = searchResults
+    ? searchResults.filter(a => !heldSet.has(a.symbol.toUpperCase()))
+    : null;
+
+  const displayList = filteredSearchResults ?? defaultList;
 
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 1) {
@@ -44,7 +60,6 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
       setSearching(false);
       return;
     }
-
     setSearching(true);
     try {
       const res = await fetch(`/api/asset-search?q=${encodeURIComponent(q)}`);
@@ -59,27 +74,20 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
     }
   }, []);
 
-  // Debounced search — 300ms after typing stops
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
     const q = search.trim();
     if (!q) {
       setSearchResults(null);
       setSearching(false);
       return;
     }
-
     setSearching(true);
     debounceRef.current = setTimeout(() => doSearch(q), 300);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search, doSearch]);
 
   const handleSelect = async (asset: SearchResult) => {
-    // If it's a remote result (from CoinGecko), add it to local catalog first
     if (asset.source === 'remote' && asset.coingecko_id) {
       try {
         const res = await fetch('/api/asset-search', {
@@ -94,12 +102,11 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
         });
         if (res.ok) {
           const data = await res.json();
-          // Use the locally-created asset (has real UUID)
           onSelect(data.asset);
           return;
         }
       } catch {
-        // Fall through to select with remote data
+        // Fall through
       }
     }
     onSelect(asset);
@@ -107,6 +114,7 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
 
   return (
     <div className="flex flex-col h-full">
+
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div>
@@ -116,20 +124,16 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
           >
             Select asset
           </h2>
-          <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>
-            {searchResults
-              ? `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`
-              : `Top ${assets.length} · type to search more`
-            }
-          </p>
+          {searchResults && (
+            <p className="text-xs mt-0.5" style={{ color: M.textMuted }}>
+              {filteredSearchResults?.length ?? 0} result{(filteredSearchResults?.length ?? 0) !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}
           className="w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer"
-          style={{
-            background: 'rgba(255,255,255,0.6)',
-            border: `1px solid ${M.border}`,
-          }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
         >
           <X size={18} color={M.textSecondary} />
         </button>
@@ -139,10 +143,7 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
       <div className="px-5 pb-3">
         <div
           className="flex items-center gap-2.5 rounded-2xl px-4 py-3"
-          style={{
-            background: 'rgba(255,255,255,0.6)',
-            border: `1px solid ${M.border}`,
-          }}
+          style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${M.border}` }}
         >
           {searching ? (
             <Loader2 size={16} color={M.textMuted} className="animate-spin" />
@@ -153,16 +154,13 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search 200+ assets..."
+            placeholder="Search any coin..."
             className="flex-1 bg-transparent border-none outline-none text-sm"
             style={{ color: M.text }}
             autoFocus
           />
           {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="bg-transparent border-none cursor-pointer p-0"
-            >
+            <button onClick={() => setSearch('')} className="bg-transparent border-none cursor-pointer p-0">
               <X size={14} color={M.textMuted} />
             </button>
           )}
@@ -173,15 +171,11 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
       <div className="flex-1 overflow-y-auto px-5 pb-4">
         <div className="flex flex-col gap-2">
           {displayList.length === 0 ? (
-            <div
-              className="text-center py-8 text-sm"
-              style={{ color: M.textMuted }}
-            >
+            <div className="text-center py-8 text-sm" style={{ color: M.textMuted }}>
               {searching ? 'Searching...' : `No assets match "${search}"`}
             </div>
           ) : (
             displayList.map(asset => {
-              const isHeld = heldSymbols.includes(asset.symbol);
               const name = asset.name || asset.symbol;
               const cat = CAT_COLORS[asset.category || ''] || CAT_COLORS.alt;
               const isRemote = (asset as SearchResult).source === 'remote';
@@ -189,21 +183,17 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
               return (
                 <button
                   key={`${asset.symbol}-${asset.id}`}
-                  onClick={() => !isHeld && handleSelect(asset as SearchResult)}
-                  disabled={isHeld}
-                  className="flex items-center justify-between rounded-3xl px-4 py-3.5 border-none cursor-pointer text-left w-full transition-opacity"
+                  onClick={() => handleSelect(asset as SearchResult)}
+                  className="flex items-center justify-between rounded-3xl px-4 py-3.5 border-none cursor-pointer text-left w-full"
                   style={{
                     background: M.surface,
                     backdropFilter: M.surfaceBlur,
                     WebkitBackdropFilter: M.surfaceBlur,
                     border: `1px solid ${M.border}`,
                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                    opacity: isHeld ? 0.4 : 1,
-                    cursor: isHeld ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Icon or symbol badge */}
                     {asset.icon_url ? (
                       <img
                         src={asset.icon_url}
@@ -213,7 +203,6 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                         className="rounded-full"
                         style={{ background: M.surfaceLight }}
                         onError={(e) => {
-                          // Fallback to text badge on load error
                           const target = e.currentTarget;
                           target.style.display = 'none';
                           const next = target.nextElementSibling as HTMLElement;
@@ -231,14 +220,11 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                     >
                       {asset.symbol.slice(0, 3)}
                     </div>
+
                     <div>
-                      <div className="text-sm font-medium" style={{ color: M.text }}>
-                        {name}
-                      </div>
+                      <div className="text-sm font-medium" style={{ color: M.text }}>{name}</div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs" style={{ color: M.textMuted }}>
-                          {asset.symbol}
-                        </span>
+                        <span className="text-xs" style={{ color: M.textMuted }}>{asset.symbol}</span>
                         {asset.category && (
                           <span
                             className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md uppercase"
@@ -259,16 +245,11 @@ export default function AssetPicker({ assets, heldSymbols, onSelect, onClose }: 
                     </div>
                   </div>
 
-                  {isHeld ? (
-                    <span className="text-[10px] font-medium" style={{ color: M.textMuted }}>
-                      Already held
-                    </span>
-                  ) : (
-                    <div
-                      className="w-5 h-5 rounded-full"
-                      style={{ border: `2px solid ${M.surfaceLight}` }}
-                    />
-                  )}
+                  {/* Selector dot */}
+                  <div
+                    className="w-5 h-5 rounded-full"
+                    style={{ border: `2px solid ${M.surfaceLight}` }}
+                  />
                 </button>
               );
             })
