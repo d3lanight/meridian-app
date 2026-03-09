@@ -1,20 +1,46 @@
 // EditNameSheet.tsx
 // Profile v4 — Edit display name sub-view
-// Version: 1.0.0
-// Sprint: 35 (S167)
+// Version: 1.1.0
+// Sprint: 36
 // Changelog:
+//   1.1.0 - Mobile UX: replaced ← Back button with SubViewHeader (title + X button).
 //   1.0.0 - New component. Saves display_name to profiles table via Supabase.
-//           Back button, input, Save button (accent gradient, disabled when empty).
-//           Same sub-view pattern as ChangePasswordSheet (section state routing, no new routes).
 
 'use client'
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { createClient } from '@/lib/supabase/client'
 
 const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_BODY = "'DM Sans', sans-serif"
+
+function SubViewHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'sticky' as const,
+      top: 0,
+      zIndex: 10,
+      background: M.bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '16px 20px 12px', borderBottom: `1px solid ${M.borderSubtle}`,
+    }}>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, color: M.text, margin: 0 }}>{title}</h2>
+      <button
+        onClick={onClose}
+        style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'rgba(139,117,101,0.1)', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', flexShrink: 0,
+        }}
+      >
+        <X size={16} color={M.textSecondary} />
+      </button>
+    </div>
+  )
+}
 
 interface EditNameSheetProps {
   current: string | null
@@ -49,38 +75,12 @@ export function EditNameSheet({ current, userId, onSave, onBack }: EditNameSheet
   }
 
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: 14,
-          color: M.accentDeep,
-          fontWeight: 500,
-          cursor: 'pointer',
-          marginBottom: 24,
-          padding: 0,
-          fontFamily: FONT_BODY,
-        }}
-      >
-        ← Back
-      </button>
-
-      <h2
-        style={{
-          fontFamily: FONT_DISPLAY,
-          fontSize: 20,
-          fontWeight: 500,
-          color: M.text,
-          marginBottom: 4,
-        }}
-      >
-        Display Name
-      </h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>
-        How you appear in the app
-      </p>
+    <>
+      <SubViewHeader title="Display Name" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20, marginTop: 0 }}>
+          How you appear in the app
+        </p>
 
       <div style={{ marginBottom: 16 }}>
         <label
@@ -147,6 +147,7 @@ export function EditNameSheet({ current, userId, onSave, onBack }: EditNameSheet
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
-    </div>
+      </div>
+    </>
   )
 }

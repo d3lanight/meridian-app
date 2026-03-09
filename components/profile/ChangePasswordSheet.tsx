@@ -1,17 +1,48 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, X } from 'lucide-react'
 
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 import { createClient } from '@/lib/supabase/client'
 
 // ═══════════════════════════════════════════════
-// ChangePasswordSheet v1.0.0 — Inline password
-// update within Profile page detail views
+// ChangePasswordSheet v1.1.0
 // Story: ca-story88-change-password | Sprint 21
+// Changelog:
+//   1.1.0 - Mobile UX: replaced ← Back button with SubViewHeader (title + X button).
+//   1.0.0 - Inline password update within Profile page detail views.
 // ═══════════════════════════════════════════════
+
+const FONT_DISPLAY = "'Outfit', sans-serif"
+const FONT_BODY = "'DM Sans', sans-serif"
+
+function SubViewHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'sticky' as const,
+      top: 0,
+      zIndex: 10,
+      background: M.bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '16px 20px 12px', borderBottom: `1px solid ${M.borderSubtle}`,
+    }}>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, color: M.text, margin: 0 }}>{title}</h2>
+      <button
+        onClick={onClose}
+        style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'rgba(139,117,101,0.1)', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', flexShrink: 0,
+        }}
+      >
+        <X size={16} color={M.textSecondary} />
+      </button>
+    </div>
+  )
+}
 
 interface ChangePasswordSheetProps {
   onBack: () => void
@@ -56,38 +87,12 @@ export function ChangePasswordSheet({ onBack }: ChangePasswordSheetProps) {
   }
 
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          fontSize: 14,
-          color: M.accentDeep,
-          fontWeight: 500,
-          cursor: 'pointer',
-          marginBottom: 24,
-          padding: 0,
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        ← Back
-      </button>
-
-      <h2
-        style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontSize: 20,
-          fontWeight: 500,
-          color: M.text,
-          marginBottom: 4,
-        }}
-      >
-        Change password
-      </h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 24 }}>
-        Choose a new password for your account
-      </p>
+    <>
+      <SubViewHeader title="Change Password" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 24, marginTop: 0 }}>
+          Choose a new password for your account
+        </p>
 
       {/* Success message */}
       {status === 'success' && (
@@ -297,6 +302,7 @@ export function ChangePasswordSheet({ onBack }: ChangePasswordSheetProps) {
       >
         {status === 'submitting' ? 'Updating...' : 'Update password'}
       </button>
-    </div>
+      </div>
+    </>
   )
 }

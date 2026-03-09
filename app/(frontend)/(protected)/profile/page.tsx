@@ -1,11 +1,13 @@
 'use client'
 
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.1 — Risk profile DB write fix
+// Profile v4.0.2 — Mobile sub-view UX fixes
 // Sprint: 36
 // Changelog:
-//   4.0.1 - S177 regression fix: onSelect in RiskProfileDetail now writes to user_preferences
-//           (upsert on user_id) before updating local state. Previously only updated local state.
+//   4.0.2 - Sub-view scroll lock: subViewWrapper uses height:100dvh + overflow:hidden + flex column.
+//           All sub-views (Display, Notifications, Email, RiskProfile) replaced ← Back button with
+//           SubViewHeader (title left, X button right). Content area uses overflowY:auto + flex:1.
+//   4.0.1 - S177 regression fix: risk_profile write uses .update().eq() not upsert (no unique constraint).
 //   4.0.0 - S167: IdentityHero replaces IdentityCard. AccentBanner + avatar overlap + connected
 //           sources row + member since. EditNameSheet sub-view (saves to profiles.display_name).
 //           S168: MenuRow dual badge (pro + coming simultaneously). Privacy toggle in Preferences
@@ -29,6 +31,7 @@ import {
   LogOut,
   Trash2,
   Crown,
+  X,
 } from 'lucide-react'
 import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
@@ -45,7 +48,34 @@ import {
   ChangePasswordSheet,
 } from '@/components/profile'
 
-// ── Sub-view imports (inline detail screens) ─
+// ── SubViewHeader — mobile-first top bar ─────
+function SubViewHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'sticky' as const,
+      top: 0,
+      zIndex: 10,
+      background: M.bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '16px 20px 12px', borderBottom: `1px solid ${M.borderSubtle}`,
+    }}>
+      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 500, color: M.text, margin: 0 }}>{title}</h2>
+      <button
+        onClick={onClose}
+        style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: 'rgba(139,117,101,0.1)', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', flexShrink: 0,
+        }}
+      >
+        <X size={16} color={M.textSecondary} />
+      </button>
+    </div>
+  )
+}
+
+
 // These remain as local components following the
 // existing v3 pattern (section state routing, no new routes).
 
@@ -57,33 +87,28 @@ const FONTS_LINK =
 // ── Display detail sub-view ──────────────────
 function DisplayDetail({ onBack }: { onBack: () => void }) {
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{ background: 'none', border: 'none', fontSize: 14, color: M.accentDeep, fontWeight: 500, cursor: 'pointer', marginBottom: 24, padding: 0, fontFamily: FONT_BODY }}
-      >
-        ← Back
-      </button>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: M.text, marginBottom: 4 }}>Display</h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>Customize how information appears</p>
-      <MenuCard>
-        {[
-          { label: 'Timezone', options: ['Europe/Brussels', 'America/New_York', 'Asia/Tokyo', 'UTC'], def: 'Europe/Brussels' },
-          { label: 'Date format', options: ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY'], def: 'YYYY-MM-DD' },
-          { label: 'Currency', options: ['USD', 'EUR', 'GBP', 'BTC'], def: 'USD' },
-        ].map((item, i) => (
-          <div key={i} style={{ padding: '14px 16px' }}>
-            <div style={{ fontSize: 11, color: M.textMuted, marginBottom: 6 }}>{item.label}</div>
-            <select
-              defaultValue={item.def}
-              style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 14, fontWeight: 500, color: M.text, outline: 'none', cursor: 'pointer', fontFamily: FONT_BODY }}
-            >
-              {item.options.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-        ))}
-      </MenuCard>
-    </div>
+    <>
+      <SubViewHeader title="Display" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <MenuCard>
+          {[
+            { label: 'Timezone', options: ['Europe/Brussels', 'America/New_York', 'Asia/Tokyo', 'UTC'], def: 'Europe/Brussels' },
+            { label: 'Date format', options: ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY'], def: 'YYYY-MM-DD' },
+            { label: 'Currency', options: ['USD', 'EUR', 'GBP', 'BTC'], def: 'USD' },
+          ].map((item, i) => (
+            <div key={i} style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: M.textMuted, marginBottom: 6 }}>{item.label}</div>
+              <select
+                defaultValue={item.def}
+                style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 14, fontWeight: 500, color: M.text, outline: 'none', cursor: 'pointer', fontFamily: FONT_BODY }}
+              >
+                {item.options.map((o) => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          ))}
+        </MenuCard>
+      </div>
+    </>
   )
 }
 
@@ -95,37 +120,32 @@ function NotificationDetail({ onBack }: { onBack: () => void }) {
   const [band, setBand] = useState(false)
 
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{ background: 'none', border: 'none', fontSize: 14, color: M.accentDeep, fontWeight: 500, cursor: 'pointer', marginBottom: 24, padding: 0, fontFamily: FONT_BODY }}
-      >
-        ← Back
-      </button>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: M.text, marginBottom: 4 }}>Notifications</h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>Choose which signals trigger alerts</p>
-      <MenuCard>
-        {[
-          { label: 'Posture mismatch', desc: 'When portfolio diverges from regime', on: posture, set: setPosture },
-          { label: 'Regime change', desc: 'When market regime shifts', on: regime, set: setRegime },
-          { label: 'ALT concentration', desc: 'When altcoin allocation is flagged', on: alt, set: setAlt },
-          { label: 'Band breach', desc: 'When weights move outside targets', on: band, set: setBand },
-        ].map((item, i) => (
-          <div key={i} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>{item.label}</div>
-              <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>{item.desc}</div>
+    <>
+      <SubViewHeader title="Notifications" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <MenuCard>
+          {[
+            { label: 'Posture mismatch', desc: 'When portfolio diverges from regime', on: posture, set: setPosture },
+            { label: 'Regime change', desc: 'When market regime shifts', on: regime, set: setRegime },
+            { label: 'ALT concentration', desc: 'When altcoin allocation is flagged', on: alt, set: setAlt },
+            { label: 'Band breach', desc: 'When weights move outside targets', on: band, set: setBand },
+          ].map((item, i) => (
+            <div key={i} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>{item.desc}</div>
+              </div>
+              <Toggle on={item.on} onToggle={item.set} />
             </div>
-            <Toggle on={item.on} onToggle={item.set} />
-          </div>
-        ))}
-      </MenuCard>
-      <SectionHeader label="Pro" />
-      <MenuCard>
-        <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro coming />
-        <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro coming />
-      </MenuCard>
-    </div>
+          ))}
+        </MenuCard>
+        <SectionHeader label="Pro" />
+        <MenuCard>
+          <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro coming />
+          <MenuRow icon={Bell} label="Quiet hours" desc="Pause notifications on schedule" pro coming />
+        </MenuCard>
+      </div>
+    </>
   )
 }
 
@@ -133,17 +153,11 @@ function NotificationDetail({ onBack }: { onBack: () => void }) {
 function EmailDetail({ onBack }: { onBack: () => void }) {
   const [emailOn, setEmailOn] = useState(true)
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{ background: 'none', border: 'none', fontSize: 14, color: M.accentDeep, fontWeight: 500, cursor: 'pointer', marginBottom: 24, padding: 0, fontFamily: FONT_BODY }}
-      >
-        ← Back
-      </button>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: M.text, marginBottom: 4 }}>Email</h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>Delivery and digest settings</p>
-      <MenuCard>
-        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <>
+      <SubViewHeader title="Email" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <MenuCard>
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>Email alerts</div>
             <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>Send signal alerts by email</div>
@@ -161,7 +175,8 @@ function EmailDetail({ onBack }: { onBack: () => void }) {
           </select>
         </div>
       </MenuCard>
-    </div>
+      </div>
+    </>
   )
 }
 
@@ -183,16 +198,11 @@ function RiskProfileDetail({
   const effective = current ?? 'neutral'
 
   return (
-    <div style={{ padding: '24px 20px' }}>
-      <button
-        onClick={onBack}
-        style={{ background: 'none', border: 'none', fontSize: 14, color: M.accentDeep, fontWeight: 500, cursor: 'pointer', marginBottom: 24, padding: 0, fontFamily: FONT_BODY }}
-      >
-        ← Back
-      </button>
-      <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 500, color: M.text, marginBottom: 4 }}>Risk Profile</h2>
-      <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 20 }}>Sets your target allocation bands on the Exposure page</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <>
+      <SubViewHeader title="Risk Profile" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 16, marginTop: 0 }}>Sets your target allocation bands on the Exposure page</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {opts.map((opt) => {
           const sel = effective === opt.value
           return (
@@ -234,13 +244,14 @@ function RiskProfileDetail({
             </button>
           )
         })}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
 // ══════════════════════════════════════════════
-// PROFILE PAGE v4.0.1
+// PROFILE PAGE v4.0.2
 // ══════════════════════════════════════════════
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
@@ -320,9 +331,12 @@ export default function ProfilePage() {
     maxWidth: 430,
     margin: '0 auto',
     background: M.bg,
-    minHeight: '100vh',
+    height: '100dvh',
+    overflow: 'hidden' as const,
     fontFamily: FONT_BODY,
     color: M.text,
+    display: 'flex' as const,
+    flexDirection: 'column' as const,
   }
 
   // ── Sub-view routing ─────────────────────────
