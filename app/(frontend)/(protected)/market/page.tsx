@@ -1,7 +1,8 @@
 // ━━━ Market Pulse Page ━━━
-// v4.5.0 · S177 · Sprint 36
+// v4.6.0 · S177 · Sprint 36
 // Changelog:
-//   v4.5.0 — S177: Fix Fear & Greed color scale (low=red/fear, high=green/greed) + gradient bar direction. — range→steel blue, volatile→burnt orange
+//   v4.6.0 — Fix intraday live dot alignment: dot moved to fixed-width 12px right column so
+//             confidence % numbers stay vertically aligned across all rows. — range→steel blue, volatile→burnt orange
 // "The market now, alive" — prices, regime history, market signals, movers, intraday
 //
 // Changelog:
@@ -191,8 +192,10 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
                 <RegimeIcon regime={s.regime} size={11} color={isNow ? 'white' : rc.color} />
               </div>
               <span style={{ fontSize: 12, fontWeight: isNow ? 600 : 400, color: isNow ? M.text : M.textSecondary, flex: 1, fontFamily: FONT_BODY }}>{rc.label}</span>
-              <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: isNow ? rc.color : M.textMuted, fontWeight: 600 }}>{s.confidence}%</span>
-              {isNow && <div style={{ width: 5, height: 5, borderRadius: '50%', background: rc.color, boxShadow: `0 0 6px ${rc.color}`, flexShrink: 0 }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                {isNow && <div style={{ width: 5, height: 5, borderRadius: '50%', background: rc.color, boxShadow: `0 0 6px ${rc.color}` }} />}
+                <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: isNow ? rc.color : M.textMuted, fontWeight: 600 }}>{s.confidence}%</span>
+              </div>
             </div>
           )
         })}
