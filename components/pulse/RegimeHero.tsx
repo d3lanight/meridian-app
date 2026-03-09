@@ -1,7 +1,8 @@
 // ━━━ RegimeHero ━━━
-// v2.1.0 · S174 · Sprint 35
-// Import RC + getRegime from shared RegimeIcon (S174).
+// v2.2.0 · S176 · Sprint 36
 // Changelog:
+//   v2.2.0 — S176: Add isVolatile prop. Renders "· Volatile" amber badge inline
+//             with regime label when true. Badge sits in existing flex row (alignItems: baseline).
 //   v2.1.0 — S174: Remove local RC/gR. Import { RC, getRegime } from shared.
 //   v2.0.0 — S172: Tappable hero row toggles history drawer.
 //            Period tabs 7d/30d/90d (90d pro-locked).
@@ -33,6 +34,7 @@ interface RegimeHeroProps {
   persistence: number    // day count
   regimeHistory?: RegimeRow[]
   isPro: boolean
+  isVolatile?: boolean   // S176: volatile modifier badge
 }
 
 // ── Component ──────────────────────────────────
@@ -43,6 +45,7 @@ export default function RegimeHero({
   persistence,
   regimeHistory,
   isPro,
+  isVolatile = false,
 }: RegimeHeroProps) {
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState(30)
@@ -116,10 +119,21 @@ export default function RegimeHero({
 
         {/* Label + stats */}
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, color: M.text }}>
               {rc.label}
             </span>
+            {/* S176: Volatile modifier badge — additive display layer, independent of direction */}
+            {isVolatile && (
+              <span style={{
+                fontSize: 10, fontWeight: 600,
+                padding: '2px 7px', borderRadius: 8,
+                background: 'rgba(200,120,42,0.12)',
+                color: '#C8782A',
+              }}>
+                · Volatile
+              </span>
+            )}
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
               background: rc.dim, color: rc.color,

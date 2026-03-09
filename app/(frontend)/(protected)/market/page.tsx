@@ -1,6 +1,9 @@
 // ━━━ Market Pulse Page ━━━
-// v4.7.0 · S175 · Sprint 36
+// v4.8.0 · S176 · Sprint 36
 // Changelog:
+//   v4.8.0 — S176 Part 5: isVolatile state added; wired from market-context is_volatile;
+//             passed to RegimeHero — renders "· Volatile" amber badge when true.
+//             Defaults false until Console lands DB + n8n + API (Parts 1–3).
 //   v4.7.0 — S175 Parts 2+3:
 //             Part 2: deriveVolumeProfile() thresholds tightened — Low <$60B, Moderate $60–120B, High >$120B
 //             Part 3: priceVol state added; vol_7d wired from market-context regimes[0];
@@ -442,7 +445,8 @@ export default function PulsePage() {
   const [altSeason, setAltSeason]         = useState(30)
   const [btcDom, setBtcDom]               = useState(50)
   const [marketCap, setMarketCap]         = useState<number | null>(null)
-  const [priceVol, setPriceVol]           = useState<number | null>(null)   // Part 3: vol_7d
+  const [priceVol, setPriceVol]           = useState<number | null>(null)   // S175 Part 3: vol_7d
+  const [isVolatile, setIsVolatile]       = useState(true)                  // S176 Part 5: volatile modifier
   const [btcIcon, setBtcIcon]             = useState<string | null>(null)
   const [ethIcon, setEthIcon]             = useState<string | null>(null)
   const [isAnon, setIsAnon]               = useState(true)
@@ -471,7 +475,8 @@ export default function PulsePage() {
             const latest = regimes[0]
             setRegime(latest.regime || 'range')
             setConfidence(Math.round((latest.confidence || 0) * 100))
-            setPriceVol(latest.vol_7d ?? null)   // Part 3: wire vol_7d
+            setPriceVol(latest.vol_7d ?? null)   // S175 Part 3: wire vol_7d
+            setIsVolatile(latest.is_volatile ?? false)  // S176 Part 5: wire volatile modifier
 
             let days = 1
             for (let i = 1; i < regimes.length; i++) {
@@ -555,6 +560,7 @@ export default function PulsePage() {
               persistence={persistence}
               regimeHistory={regimeHistory}
               isPro={isPro}
+              isVolatile={isVolatile}
             />
           </div>
 
