@@ -1,6 +1,11 @@
 // ━━━ Market Pulse Page ━━━
-// v4.6.0 · S177 · Sprint 36
+// v4.7.0 · S175 · Sprint 36
 // Changelog:
+//   v4.7.0 — S175 Parts 2+3:
+//             Part 2: deriveVolumeProfile() thresholds tightened — Low <$60B, Moderate $60–120B, High >$120B
+//             Part 3: priceVol state added; vol_7d wired from market-context regimes[0];
+//                     Price Vol tile added to MarketSignals expanded drawer (3-tile row: BTC Dom · ALT Season · Price Vol)
+//                     Mkt Cap tile removed (pipeline not built yet)
 //   v4.6.0 — Fix intraday live dot alignment: dot moved to fixed-width 12px right column so
 //             confidence % numbers stay vertically aligned across all rows. — range→steel blue, volatile→burnt orange
 // "The market now, alive" — prices, regime history, market signals, movers, intraday
@@ -67,11 +72,12 @@ function deriveFearGreedLabel(value: number): string {
   return 'Extreme greed'
 }
 
+// Part 2: Tightened thresholds — Low <$60B, Moderate $60–120B, High >$120B
 function deriveVolumeProfile(vol: number | null): { label: string; color: string } {
   if (!vol) return { label: '—', color: M.textMuted }
   const b = vol / 1e9
-  if (b < 80)  return { label: 'Low',      color: M.textMuted }
-  if (b < 200) return { label: 'Moderate', color: M.positive }
+  if (b < 60)  return { label: 'Low',      color: M.textMuted }
+  if (b < 120) return { label: 'Moderate', color: M.positive }
   return              { label: 'High',     color: M.negative }
 }
 
@@ -269,10 +275,11 @@ interface MarketSignalsProps {
   altSeason:    number
   btcDom:       number
   marketCap:    number | null
+  priceVol:     number | null   // Part 3: 7-day realised BTC price volatility (0–1 decimal)
   mounted:      boolean
 }
 
-function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, mounted }: MarketSignalsProps) {
+function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, priceVol, mounted }: MarketSignalsProps) {
   const [open, setOpen] = useState(false)
 
   const vp = deriveVolumeProfile(totalVolume)
@@ -296,6 +303,20 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
     : altSeason >= 50 ? 'Mixed'
     : altSeason >= 25 ? 'BTC-led'
     : 'BTC Dom'
+
+  // Part 3: Price Vol colour + label thresholds
+  const pvColor = priceVol !== null
+    ? priceVol > 0.05 ? M.negative
+    : priceVol > 0.03 ? M.volatility
+    : priceVol > 0.015 ? M.positive
+    : M.textMuted
+    : M.textMuted
+  const pvLabel = priceVol !== null
+    ? priceVol > 0.05 ? 'Extreme'
+    : priceVol > 0.03 ? 'Elevated'
+    : priceVol > 0.015 ? 'Normal'
+    : 'Calm'
+    : '—'
 
   return (
     <div style={{
@@ -343,13 +364,9 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
           <div onClick={() => setOpen(false)} style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
             <ChevronUp size={12} color={M.textMuted} style={{ opacity: 0.4 }} />
           </div>
+
+          {/* Part 3: 3-tile stat row — BTC Dom · ALT Season · Price Vol. Mkt Cap removed (pipeline not built). */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            {marketCap && (
-              <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Mkt Cap</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_MONO }}>{formatMarketCap(marketCap)}</div>
-              </div>
-            )}
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
               <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC Dom</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_MONO }}>{btcDom.toFixed(1)}%</div>
@@ -361,7 +378,19 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, m
                 <span style={{ fontSize: 9, fontWeight: 500, color: asColor, opacity: 0.85 }}>{asLabel}</span>
               </div>
             </div>
+            {priceVol !== null && (
+              <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
+                <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Price Vol</div>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO, color: pvColor }}>
+                  {(priceVol * 100).toFixed(1)}%
+                </div>
+                <div style={{ fontSize: 9, fontWeight: 500, color: pvColor, opacity: 0.85, marginTop: 1 }}>
+                  {pvLabel}
+                </div>
+              </div>
+            )}
           </div>
+
           <div style={{ marginBottom: 14 }}>
             <div style={{ height: 5, borderRadius: 5, background: M.surfaceLight, overflow: 'hidden', marginBottom: 3 }}>
               <div style={{ height: '100%', width: `${altSeason}%`, background: `linear-gradient(90deg, ${M.btcOrange}, ${M.accent} 50%, #14F195)`, transition: 'width 0.5s ease' }} />
@@ -413,6 +442,7 @@ export default function PulsePage() {
   const [altSeason, setAltSeason]         = useState(30)
   const [btcDom, setBtcDom]               = useState(50)
   const [marketCap, setMarketCap]         = useState<number | null>(null)
+  const [priceVol, setPriceVol]           = useState<number | null>(null)   // Part 3: vol_7d
   const [btcIcon, setBtcIcon]             = useState<string | null>(null)
   const [ethIcon, setEthIcon]             = useState<string | null>(null)
   const [isAnon, setIsAnon]               = useState(true)
@@ -441,6 +471,7 @@ export default function PulsePage() {
             const latest = regimes[0]
             setRegime(latest.regime || 'range')
             setConfidence(Math.round((latest.confidence || 0) * 100))
+            setPriceVol(latest.vol_7d ?? null)   // Part 3: wire vol_7d
 
             let days = 1
             for (let i = 1; i < regimes.length; i++) {
@@ -540,6 +571,7 @@ export default function PulsePage() {
             altSeason={altSeason}
             btcDom={btcDom}
             marketCap={marketCap}
+            priceVol={priceVol}
             mounted={mounted}
           />
 
