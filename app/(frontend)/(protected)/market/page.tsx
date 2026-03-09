@@ -397,9 +397,12 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
               <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC 7d</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: r7dColor, fontFamily: FONT_BODY }}>
-                {r7dDisplay}
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+               <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>
+                 {r7dDisplay}
+               </span>
+               <StatusPill label={r7dPct !== null ? (r7dPct >= 0 ? 'Up' : 'Down') : '—'} color={r7dColor} />
+               </div>
             </div>
           </div>
 
