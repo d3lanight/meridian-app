@@ -178,7 +178,6 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
   return (
     <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: 20, border: `1px solid ${M.border}`, padding: 16, marginBottom: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <ProIcon size={15} color={M.accent} />
         <span style={{ fontFamily: FONT_DISPLAY, fontSize: 14, fontWeight: 600, color: M.text }}>Intraday Regime Signals</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
