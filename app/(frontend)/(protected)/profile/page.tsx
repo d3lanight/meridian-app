@@ -1,9 +1,11 @@
 'use client'
 
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.0 — Full v4 redesign (S167, S168)
-// Sprint: 35
+// Profile v4.0.1 — Risk profile DB write fix
+// Sprint: 36
 // Changelog:
+//   4.0.1 - S177 regression fix: onSelect in RiskProfileDetail now writes to user_preferences
+//           (upsert on user_id) before updating local state. Previously only updated local state.
 //   4.0.0 - S167: IdentityHero replaces IdentityCard. AccentBanner + avatar overlap + connected
 //           sources row + member since. EditNameSheet sub-view (saves to profiles.display_name).
 //           S168: MenuRow dual badge (pro + coming simultaneously). Privacy toggle in Preferences
@@ -238,7 +240,7 @@ function RiskProfileDetail({
 }
 
 // ══════════════════════════════════════════════
-// PROFILE PAGE v4.0.0
+// PROFILE PAGE v4.0.1
 // ══════════════════════════════════════════════
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
@@ -362,7 +364,15 @@ export default function ProfilePage() {
         <link href={FONTS_LINK} rel="stylesheet" />
         <RiskProfileDetail
           current={riskProfile}
-          onSelect={(v) => { setRiskProfile(v); setSection(null) }}
+          onSelect={async (v) => {
+            const supabase = createClient()
+            await supabase
+              .from('user_preferences')
+              .update({ risk_profile: v })
+              .eq('user_id', userId)
+            setRiskProfile(v)
+            setSection(null)
+          }}
           onBack={() => setSection(null)}
         />
       </div>
