@@ -310,6 +310,13 @@ export default function ExposurePage() {
   const regimeLabel  = REGIME_LABELS[regime] ?? regime
   const isMisaligned = score < 40
 
+  // Total PnL — sum of usd_delta across holdings that have price_at_add set
+  const totalPnlUsd: number | null = (() => {
+    const holdings = snapshot?.enriched_holdings ?? []
+    const deltas = holdings.map((h: any) => h.usd_delta).filter((d: any) => d != null)
+    return deltas.length > 0 ? deltas.reduce((s: number, d: number) => s + d, 0) : null
+  })()
+
   // Build allocation rows for AllocationCard
   const allocations = buildAllocations(btcWeight, ethWeight, altWeight, stableWeight)
 
@@ -334,10 +341,26 @@ export default function ExposurePage() {
           }}>
             Your Exposure
           </h1>
-          <p style={{ fontSize: 12, color: M.textSecondary, margin: 0 }}>
+          <p style={{ fontSize: 12, color: M.textSecondary, margin: 0, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
             {snapshot && !isEmpty
-              ? `${holdingCount} holding${holdingCount !== 1 ? 's' : ''} · ${hidden ? '$••••' : formatUsd(totalValueAll)} · ${regimeLabel} regime`
-              : `${regimeLabel} regime`
+              ? <>
+                  <span>{holdingCount} holding{holdingCount !== 1 ? 's' : ''} · {hidden ? '$••••' : formatUsd(totalValueAll)}</span>
+                  {!hidden && totalPnlUsd != null && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: totalPnlUsd >= 0 ? M.accent : M.volatility,
+                      background: totalPnlUsd >= 0 ? M.accentMuted : M.volatilityDim,
+                      padding: '1px 7px',
+                      borderRadius: 6,
+                      fontFamily: FONT_BODY,
+                      letterSpacing: '0.01em',
+                    }}>
+                      {totalPnlUsd >= 0 ? '+' : ''}{formatUsd(totalPnlUsd)}
+                    </span>
+                  )}
+                </>
+              : null
             }
           </p>
         </div>
