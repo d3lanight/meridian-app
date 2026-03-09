@@ -307,13 +307,13 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
   // Part 3: Price Vol colour + label thresholds
   const pvColor = priceVol !== null
     ? priceVol > 0.05 ? M.negative
-    : priceVol > 0.03 ? M.volatility
+    : priceVol > 0.04 ? M.volatility
     : priceVol > 0.015 ? M.positive
     : M.textMuted
     : M.textMuted
   const pvLabel = priceVol !== null
     ? priceVol > 0.05 ? 'Extreme'
-    : priceVol > 0.03 ? 'Elevated'
+    : priceVol > 0.04 ? 'Elevated'
     : priceVol > 0.015 ? 'Normal'
     : 'Calm'
     : '—'
@@ -380,7 +380,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
             </div>
             {priceVol !== null && (
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>Price Vol</div>
+                <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC Vol 7d</div>
                 <div style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO, color: pvColor }}>
                   {(priceVol * 100).toFixed(1)}%
                 </div>
