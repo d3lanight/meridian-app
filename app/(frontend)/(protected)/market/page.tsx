@@ -1,25 +1,26 @@
 // ━━━ Market Pulse Page ━━━
-// v4.8.0 · S176 · Sprint 36
+// v5.0.0 · Sprint 36
 // Changelog:
-//   v4.8.0 — S176 Part 5: isVolatile state added; wired from market-context is_volatile;
-//             passed to RegimeHero — renders "· Volatile" amber badge when true.
-//             Defaults false until Console lands DB + n8n + API (Parts 1–3).
-//   v4.7.0 — S175 Parts 2+3:
-//             Part 2: deriveVolumeProfile() thresholds tightened — Low <$60B, Moderate $60–120B, High >$120B
-//             Part 3: priceVol state added; vol_7d wired from market-context regimes[0];
-//                     Price Vol tile added to MarketSignals expanded drawer (3-tile row: BTC Dom · ALT Season · Price Vol)
-//                     Mkt Cap tile removed (pipeline not built yet)
-//   v4.6.0 — Fix intraday live dot alignment: dot moved to fixed-width 12px right column so
-//             confidence % numbers stay vertically aligned across all rows. — range→steel blue, volatile→burnt orange
-// "The market now, alive" — prices, regime history, market signals, movers, intraday
-//
-// Changelog:
-//   v4.2.0 — S173: EthConfirmationCard added between RegimeHero and PriceCards.
-//   v4.1.0 — S172: RegimeHero gains collapsible regime history drawer (7d/30d/90d).
-//            MarketSignals replaces StatPills + VolumeProfile + Indicator cards.
-//            ExpandableCard added to barrel.
-//            Dead code after this story: VolumeProfile, StatPill (pulse/), Indicator.
-//   v4.0.0 — S162: Full page rewrite, 8 components.
+//   v5.0.0 — Signal hierarchy overhaul + accent branding restoration:
+//             Neutral/normal states → M.accent (indigo) — brand color, not green
+//             Only genuine positive signals → M.positive (teal)
+//             Only genuine negative signals → M.negative (coral)
+//             Elevated/watch signals → M.volatility (amber)
+//             Mkt Volume tile: shows raw $B number + pill inline
+//             Collapsed tile 3: F&G replaced with BTC 7d (r_7d, directionally colored)
+//             F&G in expanded drawer: label row removed, bar only
+//             ALT Season: Mixed/BTC-led → accent; Alt Season → teal; BTC Dom → amber
+//             F&G Neutral → accent; Fear → amber; Extreme Fear → coral
+//             Vol profile Normal/Low → accent dot + pill
+//             BTC Vol 7d Normal/Calm → accent pill
+//             btcR7d state added, wired from regimes[0].r_7d
+//   v4.9.0 — MarketSignals restructure: visible/collapsed row split.
+//   v4.8.0 — S176: isVolatile state + volatile badge on RegimeHero.
+//   v4.7.0 — S175: deriveVolumeProfile thresholds; priceVol/vol_7d wired.
+//   v4.6.0 — Intraday dot alignment; range→steel blue, volatile→burnt orange.
+//   v4.2.0 — S173: EthConfirmationCard added.
+//   v4.1.0 — S172: MarketSignals introduced.
+//   v4.0.0 — S162: Full page rewrite.
 //   v3.0.0 — S147: IntradaySignals wired to live API data.
 'use client'
 
@@ -42,9 +43,9 @@ import type { RegimeRow } from '@/lib/regime-utils'
 
 // ── Local intraday type ────────────────────────
 interface IntradaySignal {
-  time:           string
-  regime:         string
-  confidence:     number
+  time:            string
+  regime:          string
+  confidence:      number
   eth_confirming?: boolean
 }
 const FONT_DISPLAY = "'Outfit', sans-serif"
@@ -60,28 +61,14 @@ function formatVolume(vol: number | null): string {
   return `$${Math.round(b)}B`
 }
 
-function formatMarketCap(cap: number | null): string {
-  if (!cap) return '—'
-  const t = cap / 1e12
-  if (t >= 1) return `$${t.toFixed(1)}T`
-  return `$${Math.round(cap / 1e9)}B`
-}
-
-function deriveFearGreedLabel(value: number): string {
-  if (value <= 25) return 'Extreme fear'
-  if (value <= 45) return 'Fear'
-  if (value <= 55) return 'Neutral'
-  if (value <= 75) return 'Greed'
-  return 'Extreme greed'
-}
-
-// Part 2: Tightened thresholds — Low <$60B, Moderate $60–120B, High >$120B
+// Low/Normal/High
+// Normal/Low → accent (business as usual); High → coral (notable)
 function deriveVolumeProfile(vol: number | null): { label: string; color: string } {
   if (!vol) return { label: '—', color: M.textMuted }
   const b = vol / 1e9
-  if (b < 60)  return { label: 'Low',      color: M.textMuted }
-  if (b < 120) return { label: 'Moderate', color: M.positive }
-  return              { label: 'High',     color: M.negative }
+  if (b < 60)  return { label: 'Low',    color: M.accent }
+  if (b < 120) return { label: 'Normal', color: M.accent }
+  return              { label: 'High',   color: M.negative }
 }
 
 function buildCoherence(regime: string, fearGreed: number, altSeason: number): string {
@@ -96,7 +83,6 @@ function buildCoherence(regime: string, fearGreed: number, altSeason: number): s
   return `${regimeLabel} regime. ${fgDesc}. Mixed signals suggest patience.`
 }
 
-/** Format ISO timestamp → "HH:MM" */
 function formatIntradayTime(iso: string): string {
   try {
     const d = new Date(iso)
@@ -107,9 +93,6 @@ function formatIntradayTime(iso: string): string {
   }
 }
 
-/** Map API intraday_signals → component props.
- *  API returns newest-first; IntradaySignals treats last item as "now" → reverse to oldest-first.
- *  API confidence is 0–1 decimal; component expects 0–100 integer. */
 function mapIntradaySignals(raw: any[] | undefined): IntradaySignal[] {
   if (!raw || raw.length === 0) return []
   return [...raw].reverse().map(s => ({
@@ -120,19 +103,16 @@ function mapIntradaySignals(raw: any[] | undefined): IntradaySignal[] {
   }))
 }
 
-/** Map raw API regime rows → RegimeRow[] for regime-utils */
 function toRegimeRows(raw: any[]): RegimeRow[] {
   return raw.map(r => ({
-    timestamp: r.timestamp || r.market_timestamp || r.created_at || '',
-    regime:    r.regime || r.regime_type || 'range',
+    timestamp:  r.timestamp || r.market_timestamp || r.created_at || '',
+    regime:     r.regime || r.regime_type || 'range',
     confidence: r.confidence ?? 0,
     price_now:  r.price_now ?? 0,
   }))
 }
 
 // ── Regime Icons (SVG, no emoji) ────────────────
-// Bull/Bear reuse Lucide. Range/Volatility are custom SVGs
-// to avoid emoji rendering on Safari/Chrome mobile.
 function RegimeIcon({ regime, size = 20, color = 'white' }: { regime: string; size?: number; color?: string }) {
   if (regime === 'bull') return <TrendingUp size={size} color={color} strokeWidth={2.5} />
   if (regime === 'bear') return <TrendingDown size={size} color={color} strokeWidth={2.5} />
@@ -149,21 +129,12 @@ function RegimeIcon({ regime, size = 20, color = 'white' }: { regime: string; si
   return null
 }
 
-function ProIcon({ size = 14, color = M.accent }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="none">
-      <rect x="1" y="1" width="12" height="12" rx="3" stroke={color} strokeWidth="1.2" fill={color} fillOpacity="0.1"/>
-      <path d="M3.5 10.5V3.5L7 8L10.5 3.5V10.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-// ── Intraday Block — newest on top ────────────
+// ── Intraday Block ─────────────────────────────
 const RC_INTRA: Record<string, { label: string; color: string; dim: string; bg: string }> = {
-  bull:       { label: 'Bull',     color: M.positive,   dim: M.positiveDim,          bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
-  bear:       { label: 'Bear',     color: M.negative,   dim: M.negativeDim,          bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
-  range:      { label: 'Range',    color: '#5B7FA6',  dim: 'rgba(91,127,166,0.12)',  bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)' },
-  volatility: { label: 'Volatile', color: '#C8782A',  dim: 'rgba(200,120,42,0.12)',  bg: 'linear-gradient(135deg,#C8782A,#D9904A)' },
+  bull:       { label: 'Bull',     color: M.positive,  dim: M.positiveDim,         bg: 'linear-gradient(135deg,#2A9D8F,#3DB8A9)' },
+  bear:       { label: 'Bear',     color: M.negative,  dim: M.negativeDim,         bg: 'linear-gradient(135deg,#E76F51,#F08C70)' },
+  range:      { label: 'Range',    color: '#5B7FA6', dim: 'rgba(91,127,166,0.12)', bg: 'linear-gradient(135deg,#5B7FA6,#7299BE)' },
+  volatility: { label: 'Volatile', color: '#C8782A', dim: 'rgba(200,120,42,0.12)', bg: 'linear-gradient(135deg,#C8782A,#D9904A)' },
 }
 
 function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: boolean }) {
@@ -215,21 +186,39 @@ function IntradayBlock({ signals, isPro }: { signals: IntradaySignal[]; isPro: b
   )
 }
 
-// ── Skeleton ────────────────────────────────────
+// ── Status Pill ──────────────────────────────────
+function StatusPill({ label, color }: { label: string; color: string }) {
+  const bg = color === M.accent    ? M.accentMuted
+    : color === M.negative         ? M.negativeDim
+    : color === M.volatility       ? M.volatilityDim
+    : color === M.positive         ? M.positiveDim
+    : color === M.btcOrange        ? 'rgba(247,147,26,0.12)'
+    : 'rgba(139,117,101,0.1)'
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 600, color,
+      background: bg, padding: '2px 6px', borderRadius: 6,
+      letterSpacing: 0.2, fontFamily: FONT_BODY, lineHeight: 1,
+      flexShrink: 0,
+    }}>
+      {label}
+    </span>
+  )
+}
+
+// ── Skeleton ───────────────────────────────────
 
 function PulseSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {[90, 72, 52, 52].map((h, i) => (
-        <div key={i} className="animate-pulse" style={{
-          height: h, borderRadius: 24, background: M.surfaceLight,
-        }} />
+        <div key={i} className="animate-pulse" style={{ height: h, borderRadius: 24, background: M.surfaceLight }} />
       ))}
     </div>
   )
 }
 
-// ── Anon CTA ────────────────────────────────────
+// ── Anon CTA ───────────────────────────────────
 
 function AnonCTA({ onAuth }: { onAuth: (trigger: string) => void }) {
   return (
@@ -240,19 +229,12 @@ function AnonCTA({ onAuth }: { onAuth: (trigger: string) => void }) {
       display: 'flex', flexDirection: 'column', gap: 12,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 12, background: M.accentDim,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+        <div style={{ width: 36, height: 36, borderRadius: 12, background: M.accentDim, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <User size={16} color={M.accent} />
         </div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_BODY }}>
-            Track your exposure
-          </div>
-          <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>
-            See how your portfolio aligns with the current regime
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_BODY }}>Track your exposure</div>
+          <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>See how your portfolio aligns with the current regime</div>
         </div>
       </div>
       <button
@@ -270,55 +252,74 @@ function AnonCTA({ onAuth }: { onAuth: (trigger: string) => void }) {
   )
 }
 
-// ── MarketSignals ────────────────────────────────
+// ── MarketSignals ───────────────────────────────
+//
+// Visible row:   24h Vol | Mkt Volume ($+pill) | BTC Vol 7d (%+pill)
+// Collapsed row: BTC Dom | ALT Season          | BTC 7d (r_7d, directional)
+//
+// Signal hierarchy:
+//   M.accent     — neutral / business as usual (Normal, Mixed, Confirming)
+//   M.positive   — genuinely bullish (Alt Season active, Greed)
+//   M.negative   — worth noting (High vol, Extreme Fear)
+//   M.volatility — watch / elevated (Elevated vol, Fear, BTC Dom heavy)
+//   M.text       — raw numeric context (BTC Dom %, BTC 7d near-zero)
 
 interface MarketSignalsProps {
-  totalVolume:  number | null
-  fearGreed:    number
-  altSeason:    number
-  btcDom:       number
-  marketCap:    number | null
-  priceVol:     number | null   // Part 3: 7-day realised BTC price volatility (0–1 decimal)
-  mounted:      boolean
+  totalVolume: number | null
+  fearGreed:   number
+  altSeason:   number
+  btcDom:      number
+  marketCap:   number | null
+  priceVol:    number | null   // 7-day realised BTC price volatility (0–1 decimal)
+  btcR7d:      number | null   // BTC 7-day return (0–1 decimal, can be negative)
+  mounted:     boolean
 }
 
-function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, priceVol, mounted }: MarketSignalsProps) {
+function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, priceVol, btcR7d, mounted }: MarketSignalsProps) {
   const [open, setOpen] = useState(false)
 
+  // ── Mkt Volume ──
   const vp = deriveVolumeProfile(totalVolume)
 
-  const fgColor = fearGreed >= 75 ? M.positive
-    : fearGreed >= 55 ? '#3DB89A'
-    : fearGreed >= 45 ? M.neutral
-    : fearGreed >= 25 ? M.volatility
-    : M.negative
-  const fgLabel = fearGreed >= 75 ? 'Extreme Greed'
-    : fearGreed >= 55 ? 'Greed'
-    : fearGreed >= 45 ? 'Neutral'
-    : fearGreed >= 25 ? 'Fear'
-    : 'Extreme Fear'
+  // ── Fear & Greed (expanded bar only, no label row) ──
+  const fgColor = fearGreed >= 55 ? M.positive
+    : fearGreed >= 45 ? M.accent       // Neutral → accent
+    : fearGreed >= 25 ? M.volatility   // Fear → amber
+    : M.negative                       // Extreme Fear → coral
 
-  const asColor = altSeason >= 75 ? M.accent
-    : altSeason >= 50 ? M.positive
-    : altSeason >= 25 ? M.neutral
-    : M.btcOrange
+  // ── ALT Season ──
+  const asColor = altSeason >= 75 ? M.positive    // Alt Season → teal (bullish)
+    : altSeason >= 25 ? M.accent                  // Mixed / BTC-led → accent
+    : M.volatility                                // BTC Dom heavy → amber (watch)
   const asLabel = altSeason >= 75 ? 'Alt Season'
     : altSeason >= 50 ? 'Mixed'
     : altSeason >= 25 ? 'BTC-led'
     : 'BTC Dom'
 
-  // Part 3: Price Vol colour + label thresholds
-  const pvColor = priceVol !== null
+  // ── BTC Volatility 7d (visible row) ──
+  // % number: always M.text (metric, not directional)
+  // Pill: accent for calm/normal, amber for elevated, coral for extreme
+  const pvPillColor = priceVol !== null
     ? priceVol > 0.05 ? M.negative
     : priceVol > 0.04 ? M.volatility
-    : priceVol > 0.015 ? M.positive
-    : M.textMuted
+    : M.accent   // Normal + Calm → accent
     : M.textMuted
   const pvLabel = priceVol !== null
     ? priceVol > 0.05 ? 'Extreme'
     : priceVol > 0.04 ? 'Elevated'
     : priceVol > 0.015 ? 'Normal'
     : 'Calm'
+    : '—'
+
+  // ── BTC 7d return (collapsed tile 3) ──
+  // Directional color is valid here — it's a price return
+  const r7dPct = btcR7d !== null ? btcR7d * 100 : null
+  const r7dColor = r7dPct === null ? M.textMuted
+    : r7dPct > 2  ? M.positive
+    : r7dPct < -2 ? M.negative
+    : M.accent   // Near-zero → accent
+  const r7dDisplay = r7dPct !== null
+    ? `${r7dPct >= 0 ? '+' : ''}${r7dPct.toFixed(1)}%`
     : '—'
 
   return (
@@ -331,69 +332,78 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
       marginBottom: 12,
       boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
     }}>
+      {/* ── Visible row ── */}
       <div
         onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', userSelect: 'none' }}
       >
+        {/* 24h Vol */}
         <div style={{ flex: 1, padding: '10px 14px', borderRight: `1px solid ${M.borderSubtle}` }}>
           <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>24h Vol</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{formatVolume(totalVolume)}</div>
         </div>
+
+        {/* Mkt Volume — number + pill inline */}
         <div style={{ flex: 1, padding: '10px 14px', borderRight: `1px solid ${M.borderSubtle}` }}>
-          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Vol Profile</div>
+          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Mkt Volume</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: vp.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: vp.color, fontFamily: FONT_MONO }}>{vp.label}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{formatVolume(totalVolume)}</span>
+            <StatusPill label={vp.label} color={vp.color} />
           </div>
         </div>
+
+        {/* BTC Vol 7d — % number + pill inline */}
         <div style={{ flex: 1, padding: '10px 14px' }}>
-          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Fear &amp; Greed</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: fgColor, flexShrink: 0 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: fgColor, fontFamily: FONT_MONO }}>{fearGreed}</span>
-            <span style={{ fontSize: 9, fontWeight: 500, color: fgColor, opacity: 0.8, marginLeft: 2, whiteSpace: 'nowrap' }}>{fgLabel}</span>
-          </div>
+          <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>BTC Volatility 7d</div>
+          {priceVol !== null ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>
+                {(priceVol * 100).toFixed(1)}%
+              </span>
+              <StatusPill label={pvLabel} color={pvPillColor} />
+            </div>
+          ) : (
+            <span style={{ fontSize: 13, fontWeight: 700, color: M.textMuted, fontFamily: FONT_BODY }}>—</span>
+          )}
         </div>
       </div>
 
+      {/* ── Chevron toggle ── */}
       {!open && (
         <div onClick={() => setOpen(true)} style={{ borderTop: `1px solid ${M.borderSubtle}`, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', userSelect: 'none', background: 'rgba(255,255,255,0.3)' }}>
           <ChevronDown size={12} color={M.textMuted} style={{ opacity: 0.4 }} />
         </div>
       )}
 
+      {/* ── Collapsed row ── */}
       {open && (
         <div style={{ borderTop: `1px solid ${M.borderSubtle}`, padding: '12px 14px 14px' }}>
           <div onClick={() => setOpen(false)} style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
             <ChevronUp size={12} color={M.textMuted} style={{ opacity: 0.4 }} />
           </div>
 
-          {/* Part 3: 3-tile stat row — BTC Dom · ALT Season · Price Vol. Mkt Cap removed (pipeline not built). */}
+          {/* BTC Dom · ALT Season · BTC 7d */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
               <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC Dom</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_MONO }}>{btcDom.toFixed(1)}%</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{btcDom.toFixed(1)}%</div>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
               <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>ALT Season</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: asColor, fontFamily: FONT_MONO }}>{altSeason}</span>
-                <span style={{ fontSize: 9, fontWeight: 500, color: asColor, opacity: 0.85 }}>{asLabel}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: asColor, fontFamily: FONT_BODY }}>{altSeason}</span>
+                <StatusPill label={asLabel} color={asColor} />
               </div>
             </div>
-            {priceVol !== null && (
-              <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
-                <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC Vol 7d</div>
-                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: FONT_MONO, color: pvColor }}>
-                  {(priceVol * 100).toFixed(1)}%
-                </div>
-                <div style={{ fontSize: 9, fontWeight: 500, color: pvColor, opacity: 0.85, marginTop: 1 }}>
-                  {pvLabel}
-                </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.5)', borderRadius: 10, padding: '8px 10px' }}>
+              <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>BTC 7d</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: r7dColor, fontFamily: FONT_BODY }}>
+                {r7dDisplay}
               </div>
-            )}
+            </div>
           </div>
 
+          {/* ALT Season bar */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ height: 5, borderRadius: 5, background: M.surfaceLight, overflow: 'hidden', marginBottom: 3 }}>
               <div style={{ height: '100%', width: `${altSeason}%`, background: `linear-gradient(90deg, ${M.btcOrange}, ${M.accent} 50%, #14F195)`, transition: 'width 0.5s ease' }} />
@@ -404,21 +414,16 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
               <span style={{ fontSize: 8, color: '#14F195', fontFamily: FONT_BODY }}>Alts</span>
             </div>
           </div>
+
+          {/* Fear & Greed — bar only, no label row */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
-              <span style={{ fontSize: 10, color: M.textSecondary, fontWeight: 500, fontFamily: FONT_BODY }}>Fear &amp; Greed</span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: fgColor, fontFamily: FONT_MONO }}>{fearGreed}</span>
-                <span style={{ fontSize: 9, color: fgColor, fontWeight: 600, fontFamily: FONT_BODY }}>{fgLabel}</span>
-              </div>
-            </div>
             <div style={{ position: 'relative', height: 5, borderRadius: 5, background: `linear-gradient(90deg, ${M.negative}, ${M.volatility} 35%, #3DB89A 65%, ${M.positive})`, marginBottom: 3 }}>
               <div style={{ position: 'absolute', left: `${fearGreed}%`, top: '50%', width: 11, height: 11, borderRadius: '50%', background: 'white', border: `2px solid ${fgColor}`, transform: 'translate(-50%, -50%)', boxShadow: `0 1px 4px ${fgColor}55` }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 8, color: M.positive, fontFamily: FONT_BODY }}>Fear</span>
+              <span style={{ fontSize: 8, color: M.negative, fontFamily: FONT_BODY }}>Fear</span>
               <span style={{ fontSize: 8, color: M.textMuted, fontFamily: FONT_BODY }}>Neutral</span>
-              <span style={{ fontSize: 8, color: M.negative, fontFamily: FONT_BODY }}>Greed</span>
+              <span style={{ fontSize: 8, color: M.positive, fontFamily: FONT_BODY }}>Greed</span>
             </div>
           </div>
         </div>
@@ -427,30 +432,31 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
   )
 }
 
-// ── Page ────────────────────────────────────────
+// ── Page ───────────────────────────────────────
 
 export default function PulsePage() {
-  const [mounted, setMounted]             = useState(false)
-  const [loading, setLoading]             = useState(true)
-  const [regime, setRegime]               = useState('range')
-  const [confidence, setConfidence]       = useState(0)
-  const [persistence, setPersistence]     = useState(1)
-  const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
-  const [btcPrice, setBtcPrice]           = useState(0)
-  const [btcChange, setBtcChange]         = useState(0)
-  const [ethPrice, setEthPrice]           = useState(0)
-  const [ethChange, setEthChange]         = useState(0)
-  const [totalVolume, setTotalVolume]     = useState<number | null>(null)
-  const [fearGreed, setFearGreed]         = useState(50)
-  const [altSeason, setAltSeason]         = useState(30)
-  const [btcDom, setBtcDom]               = useState(50)
-  const [marketCap, setMarketCap]         = useState<number | null>(null)
-  const [priceVol, setPriceVol]           = useState<number | null>(null)   // S175 Part 3: vol_7d
-  const [isVolatile, setIsVolatile]       = useState(false)                 // S176 Part 5: volatile modifier
-  const [btcIcon, setBtcIcon]             = useState<string | null>(null)
-  const [ethIcon, setEthIcon]             = useState<string | null>(null)
-  const [isAnon, setIsAnon]               = useState(true)
-  const [isPro, setIsPro]                 = useState(false)
+  const [mounted, setMounted]               = useState(false)
+  const [loading, setLoading]               = useState(true)
+  const [regime, setRegime]                 = useState('range')
+  const [confidence, setConfidence]         = useState(0)
+  const [persistence, setPersistence]       = useState(1)
+  const [regimeHistory, setRegimeHistory]   = useState<RegimeRow[]>([])
+  const [btcPrice, setBtcPrice]             = useState(0)
+  const [btcChange, setBtcChange]           = useState(0)
+  const [ethPrice, setEthPrice]             = useState(0)
+  const [ethChange, setEthChange]           = useState(0)
+  const [totalVolume, setTotalVolume]       = useState<number | null>(null)
+  const [fearGreed, setFearGreed]           = useState(50)
+  const [altSeason, setAltSeason]           = useState(30)
+  const [btcDom, setBtcDom]                 = useState(50)
+  const [marketCap, setMarketCap]           = useState<number | null>(null)
+  const [priceVol, setPriceVol]             = useState<number | null>(null)
+  const [btcR7d, setBtcR7d]                 = useState<number | null>(null)   // BTC 7d return
+  const [isVolatile, setIsVolatile]         = useState(false)
+  const [btcIcon, setBtcIcon]               = useState<string | null>(null)
+  const [ethIcon, setEthIcon]               = useState<string | null>(null)
+  const [isAnon, setIsAnon]                 = useState(true)
+  const [isPro, setIsPro]                   = useState(false)
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([])
   const { openAuth } = useAuthSheet()
 
@@ -475,8 +481,9 @@ export default function PulsePage() {
             const latest = regimes[0]
             setRegime(latest.regime || 'range')
             setConfidence(Math.round((latest.confidence || 0) * 100))
-            setPriceVol(latest.vol_7d ?? null)   // S175 Part 3: wire vol_7d
-            setIsVolatile(latest.is_volatile ?? false)  // S176 Part 5: wire volatile modifier
+            setPriceVol(latest.vol_7d ?? null)
+            setBtcR7d(latest.r_7d ?? null)           // Wire BTC 7d return
+            setIsVolatile(latest.is_volatile ?? false)
 
             let days = 1
             for (let i = 1; i < regimes.length; i++) {
@@ -552,7 +559,7 @@ export default function PulsePage() {
             <p style={{ fontSize: 12, color: M.textSecondary, margin: 0, fontFamily: FONT_BODY }}>Live market snapshot</p>
           </div>
 
-          {/* Regime Hero — with history drawer */}
+          {/* Regime Hero */}
           <div style={anim(mounted, 1)}>
             <RegimeHero
               regime={regime}
@@ -566,8 +573,8 @@ export default function PulsePage() {
 
           {/* BTC + ETH prices */}
           <div style={{ ...anim(mounted, 2), display: 'flex', gap: 10, marginBottom: 12 }}>
-            <PriceCard symbol="BTC" name="Bitcoin"   price={btcPrice} change={btcChange} iconUrl={btcIcon} />
-            <PriceCard symbol="ETH" name="Ethereum"  price={ethPrice} change={ethChange} iconUrl={ethIcon} />
+            <PriceCard symbol="BTC" name="Bitcoin"  price={btcPrice} change={btcChange} iconUrl={btcIcon} />
+            <PriceCard symbol="ETH" name="Ethereum" price={ethPrice} change={ethChange} iconUrl={ethIcon} />
           </div>
 
           {/* Market Signals */}
@@ -578,6 +585,7 @@ export default function PulsePage() {
             btcDom={btcDom}
             marketCap={marketCap}
             priceVol={priceVol}
+            btcR7d={btcR7d}
             mounted={mounted}
           />
 
@@ -591,7 +599,7 @@ export default function PulsePage() {
             <MoversCard />
           </div>
 
-          {/* Intraday Signals — newest on top */}
+          {/* Intraday Signals */}
           {intradaySignals.length > 0 && (
             <div style={anim(mounted, 5)}>
               <IntradayBlock signals={intradaySignals} isPro={isPro} />
