@@ -570,7 +570,7 @@ export default function ExposurePage() {
             holding={h}
             onUpdate={async (id, updates) => {
               const ok = await updateHolding(id, updates)
-              if (ok) refresh()
+              if (ok) { refresh(); fetchSnapshot() }
               return ok
             }}
             onRemove={async (id) => {
