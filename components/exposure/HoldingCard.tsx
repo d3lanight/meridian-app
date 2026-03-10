@@ -16,8 +16,10 @@ import BetaBadge from '@/components/portfolio/BetaBadge'
 
 const fU = (n: number) =>
   `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const fPrice = (p: number) =>
-  `$${Number(p).toLocaleString('en-US', { maximumFractionDigits: p >= 1 ? 2 : p >= 0.01 ? 4 : 8 })}`
+const fPrice = (p: number) => {
+  const d = p >= 1 ? 2 : p >= 0.01 ? 4 : 8
+  return `$${Number(p).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`
+}
 const fP = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
 
 // ─── PosturePill (from design) ────────────────────────────────────────────────
