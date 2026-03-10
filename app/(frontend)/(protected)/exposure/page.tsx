@@ -1,6 +1,7 @@
 // ━━━ Exposure Page ━━━
-//   v3.4.0 — S177 · Sprint 36
+//   v3.5.0 — S178 · Sprint 36
 // Changelog:
+//   v3.5.0 — S178: fetchSnapshot() added to onRemove handler — snapshot refreshes after coin deletion.
 //   v3.4.0 — S177: Replace inline sheet wrappers with shared BottomSheet component.
 //   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
 //   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
@@ -598,7 +599,7 @@ export default function ExposurePage() {
             }}
             onRemove={async (id) => {
               const ok = await removeHolding(id)
-              if (ok) { refresh(); setSheet(null) }
+              if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
               return ok
             }}
             onClose={() => setSheet(null)}

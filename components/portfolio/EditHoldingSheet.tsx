@@ -1,6 +1,7 @@
 // ━━━ Edit Holding Sheet — Update quantity, cost basis, exposure toggle, remove ━━━
-// v1.4.0 · S177 · Sprint 36
+// v1.5.0 · S178 · Sprint 36
 // Changelog:
+//   v1.5.0 — S178: scrollable=true (was false) — confirmation panel no longer clipped when confirmDelete=true.
 //   v1.4.0 — S177: Refactored to use shared BottomSheet (scrollable=false). Removes back-page scroll bleed.
 //   v1.3.0 — S169: CryptoIcon for asset identity; scroll lock useEffect.
 //   v1.2.0 · ca-story-design-refresh · Sprint 24
@@ -82,8 +83,8 @@ export default function EditHoldingSheet({ isOpen, holding, onUpdate, onRemove, 
   const isValid = qty && parseFloat(qty) > 0 && (!costBasis || parseFloat(costBasis) >= 0);
 
   return (
-    // scrollable=false: content is fixed, no scroll, no back-page bleed
-    <BottomSheet isOpen={isOpen} onClose={onClose} scrollable={false}>
+    // scrollable=true: allows confirmation panel to be reachable when confirmDelete expands content
+    <BottomSheet isOpen={isOpen} onClose={onClose} scrollable={true}>
       <div style={{ padding: '0 20px 28px', display: 'flex', flexDirection: 'column', height: '100%' }}>
 
         {/* Header */}
