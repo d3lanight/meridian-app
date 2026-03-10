@@ -1,9 +1,10 @@
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.4 — Polish fixes
+// Profile v4.0.5 — UX: risk profile sub-view stays open after selection
 // Sprint: 36
 // Changelog:
+//   4.0.5 - RiskProfileDetail onSelect no longer auto-closes sub-view. User stays to review
+//           selection and closes manually via X. Saves to DB immediately on tap (instant feedback).
 //   4.0.4 - Display MenuRow: removed onClick (not wired), added coming prop.
-//           About card version bump: v0.9 → v0.9.1.
 //   4.0.3 - subViewWrapper changed to position:fixed inset:0 zIndex:20. Escapes layout
 //           pb-[88px] so sub-views are truly full-screen. Eliminates phantom scroll on
 //           short content (Risk Profile 3 items). Sticky header now works in all sub-views
@@ -387,7 +388,7 @@ export default function ProfilePage() {
               .update({ risk_profile: v })
               .eq('user_id', userId)
             setRiskProfile(v)
-            setSection(null)
+            // intentionally NOT closing — user stays to review, closes via X
           }}
           onBack={() => setSection(null)}
         />
