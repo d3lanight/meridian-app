@@ -9,6 +9,8 @@ import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 import CryptoIcon from '@/components/shared/CryptoIcon'
 
+function getPriceDecimals(p: number) { return p >= 1 ? 2 : p >= 0.01 ? 4 : p >= 0.0001 ? 6 : 8 }
+
 const NUM_STYLE = { fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }
 
 interface Mover { symbol: string; name: string; price: number; change_24h: number; icon_url?: string | null }
@@ -24,7 +26,7 @@ function MoverRow({ symbol, name, price, change_24h, icon_url }: Mover) {
         <div style={{ fontSize: 10, color: M.textMuted }}>{symbol}</div>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: M.text, ...NUM_STYLE }}>${price.toLocaleString('en-US', { maximumFractionDigits: price < 1 ? 4 : 2 })}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: M.text, ...NUM_STYLE }}>${price.toLocaleString('en-US', { maximumFractionDigits: getPriceDecimals(price) })}</div>
         <span style={{ fontSize: 11, fontWeight: 600, color: cc, ...NUM_STYLE }}>{up ? '+' : ''}{change_24h.toFixed(1)}%</span>
       </div>
     </div>
