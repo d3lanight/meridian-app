@@ -1,7 +1,6 @@
 // components/exposure/HoldingCard.tsx
-// v2.5.0 · S173 · Sprint 35
-// Fix: P&L row alignItems flex-start (was baseline — caused value misalignment)
-// Replaces v1.0.0 flat row.
+// v2.5.1 · fix: dynamic price decimals for micro-price assets
+// Replaces v2.5.0
 
 'use client'
 
@@ -17,6 +16,8 @@ import BetaBadge from '@/components/portfolio/BetaBadge'
 
 const fU = (n: number) =>
   `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fPrice = (p: number) =>
+  `$${Number(p).toLocaleString('en-US', { maximumFractionDigits: p >= 1 ? 2 : p >= 0.01 ? 4 : p >= 0.0001 ? 6 : 8 })}`
 const fP = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
 
 // ─── PosturePill (from design) ────────────────────────────────────────────────
@@ -213,13 +214,13 @@ export default function HoldingCard({
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Added at</div>
                   <span style={{ fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", color: M.textSecondary }}>
-                    {hidden ? '$••••' : fU(addedPrice)}
+                    {hidden ? '$••••' : fPrice(addedPrice)}
                   </span>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 9, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Current</div>
                   <span style={{ fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", color: M.text }}>
-                    {hidden ? '$••••' : fU(price)}
+                    {hidden ? '$••••' : fPrice(price)}
                   </span>
                 </div>
                 <div style={{ flex: 1, textAlign: 'right' }}>
