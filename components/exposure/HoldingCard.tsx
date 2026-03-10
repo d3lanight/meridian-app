@@ -1,5 +1,5 @@
 // components/exposure/HoldingCard.tsx
-// v2.5.1 · fix: dynamic price decimals for micro-price assets
+// v2.5.2 · fix: dynamic price decimals across all value displays (value, pnl, 30d range)
 // Replaces v2.5.0
 
 'use client'
@@ -17,7 +17,7 @@ import BetaBadge from '@/components/portfolio/BetaBadge'
 const fU = (n: number) =>
   `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fPrice = (p: number) =>
-  `$${Number(p).toLocaleString('en-US', { maximumFractionDigits: p >= 1 ? 2 : p >= 0.01 ? 4 : p >= 0.0001 ? 6 : 8 })}`
+  `$${Number(p).toLocaleString('en-US', { maximumFractionDigits: p >= 1 ? 2 : p >= 0.01 ? 4 : 8 })}`
 const fP = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
 
 // ─── PosturePill (from design) ────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export default function HoldingCard({
             <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'Outfit', sans-serif" }}>{name}</span>
           </div>
           <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", flexShrink: 0 }}>
-            {hidden ? '$••••' : fU(value)}
+            {hidden ? '$••••' : fPrice(value)}
           </span>
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: expanded ? M.accentDim : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 2, transition: 'background 0.2s ease' }}>
             {expanded ? <ChevronUp size={13} color={M.accent} /> : <ChevronDown size={13} color={M.textMuted} />}
@@ -183,7 +183,7 @@ export default function HoldingCard({
               {/* 30d range bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <span style={{ fontSize: 9, color: M.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
-                  {hidden ? '$••••' : `$${low30d.toLocaleString()}`}
+                  {hidden ? '$••••' : fPrice(low30d)}
                 </span>
                 <div style={{ flex: 1, height: 4, borderRadius: 4, background: M.surfaceLight, position: 'relative' }}>
                   {!hidden && (
@@ -191,7 +191,7 @@ export default function HoldingCard({
                   )}
                 </div>
                 <span style={{ fontSize: 9, color: M.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
-                  {hidden ? '$••••' : `$${high30d.toLocaleString()}`}
+                  {hidden ? '$••••' : fPrice(high30d)}
                 </span>
               </div>
 
@@ -229,7 +229,7 @@ export default function HoldingCard({
                     <span style={{ fontSize: 12, fontWeight: 600, color: M.textMuted, fontFamily: "'DM Sans', sans-serif" }}>$••••</span>
                   ) : (
                     <span style={{ fontSize: 12, fontWeight: 700, color: pnlUp ? M.positive : M.negative, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>
-                      {pnlUp ? '+' : ''}{fU(pnl)}{' '}
+                      {pnlUp ? '+' : ''}{fPrice(pnl)}{' '}
                       <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>{fP(pnlPct)}</span>
                     </span>
                   )}
