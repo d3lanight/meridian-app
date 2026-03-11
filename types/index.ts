@@ -135,6 +135,7 @@ export interface AssetMapping {
   subcategory?: string | null;           // S101: L1, DeFi, Meme, etc.
   icon_url?: string | null;              // S101: CoinGecko icon URL
   rank?: number | null;                  // S101: market cap rank
+  decimals?: number | null;              // S189: display + input precision
   active: boolean;
 }
 
