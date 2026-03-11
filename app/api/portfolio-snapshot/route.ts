@@ -44,18 +44,20 @@ function toRegimeKey(regime: string | null): RegimeKey {
 }
 
 // S151: Band-relative alignment score (0-100)
-// Deviation measured relative to band width — narrow bands penalize harder.
-// Clamped at 1.0 per bucket, averaged across 4. No single-bucket cap.
+// Only scores buckets that have active in-posture holdings.
+// Excluded coins are removed from scoring — their gap doesn't count as misalignment.
 function computeRiskScore(
   weights: { btc: number; eth: number; alt: number; stable: number },
   bands: ReturnType<typeof getTargetBands>
 ): number {
-  const buckets: Array<{ actual: number; min: number; max: number }> = [
+  const buckets = [
     { actual: weights.btc * 100,    min: bands.btc[0],    max: bands.btc[1] },
     { actual: weights.eth * 100,    min: bands.eth[0],    max: bands.eth[1] },
     { actual: weights.alt * 100,    min: bands.alt[0],    max: bands.alt[1] },
     { actual: weights.stable * 100, min: bands.stable[0], max: bands.stable[1] },
-  ]
+  ].filter(b => b.actual > 0)  // skip empty buckets
+
+  if (!buckets.length) return 0
 
   let totalRelDev = 0
   for (const b of buckets) {
@@ -69,8 +71,7 @@ function computeRiskScore(
     totalRelDev += relDev
   }
 
-  const avgDev = totalRelDev / buckets.length
-  return Math.round(Math.max(0, Math.min(100, (1 - avgDev) * 100)))
+  return Math.round(Math.max(0, Math.min(100, (1 - totalRelDev / buckets.length) * 100)))
 }
 
 export async function GET() {

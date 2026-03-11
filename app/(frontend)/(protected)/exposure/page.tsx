@@ -365,7 +365,8 @@ export default function ExposurePage() {
     }
   }
 
-  // Replicate server computeRiskScore exactly
+  // Replicate server computeRiskScore — only score buckets with active in-posture holdings.
+  // Excluding a coin removes its bucket from scoring; the gap doesn't count as misalignment.
   const score = (() => {
     if (!targetBands || postureTotal === 0) return snapshot?.risk_score ?? 0
     const buckets = [
@@ -373,14 +374,15 @@ export default function ExposurePage() {
       { actual: ethWeight * 100,    min: targetBands.eth[0],    max: targetBands.eth[1] },
       { actual: altWeight * 100,    min: targetBands.alt[0],    max: targetBands.alt[1] },
       { actual: stableWeight * 100, min: targetBands.stable[0], max: targetBands.stable[1] },
-    ]
+    ].filter(b => b.actual > 0)  // skip empty buckets — excluded coins don't penalise score
+    if (!buckets.length) return snapshot?.risk_score ?? 0
     let totalRelDev = 0
     for (const b of buckets) {
       const overshoot = b.actual < b.min ? b.min - b.actual : b.actual > b.max ? b.actual - b.max : 0
       const bandWidth = b.max - b.min
       totalRelDev += bandWidth > 0 ? Math.min(1, overshoot / (bandWidth * 2)) : 0
     }
-    return Math.round(Math.max(0, Math.min(100, (1 - totalRelDev / 4) * 100)))
+    return Math.round(Math.max(0, Math.min(100, (1 - totalRelDev / buckets.length) * 100)))
   })()
 
   const label         = scoreToLabel(score)
