@@ -320,6 +320,13 @@ export default function ExposurePage() {
   }, [])
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
+
+  // Build holdingIdMap from the single source of truth (parent's usePortfolio)
+  // Passed to HoldingsSection so edit button uses the same id space as EditHoldingSheet lookup
+  const holdingIdMap: Record<string, string> = {}
+  for (const h of portfolioHoldings) {
+    if (h?.asset) holdingIdMap[h.asset.toUpperCase()] = h.id
+  }
   const score         = snapshot?.risk_score ?? 0
   const label         = scoreToLabel(score)
   const isEmpty       = snapshot?.isEmpty === true
@@ -536,6 +543,7 @@ export default function ExposurePage() {
                 enrichedHoldings={snapshot?.enriched_holdings ?? []}
                 currentPrices={currentPrices}
                 coinContext={coinContext}
+                holdingIdMap={holdingIdMap}
                 onEdit={(id) => setSheet({ type: 'edit', holdingId: id })}
               />
             </div>

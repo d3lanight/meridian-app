@@ -15,7 +15,6 @@ import { card, anim } from '@/lib/ui-helpers'
 import HoldingCard from '@/components/exposure/HoldingCard'
 import type { AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
-import { usePortfolio } from '@/hooks/usePortfolio'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +39,7 @@ interface HoldingsSectionProps {
   enrichedHoldings?: any[]
   currentPrices?: Record<string, { price: number; change_24h: number }>
   coinContext?: Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>
+  holdingIdMap?: Record<string, string>   // symbol → DB id, provided by parent
   onEdit?: (id: string) => void
 }
 
@@ -119,17 +119,11 @@ export default function HoldingsSection({
   enrichedHoldings = [],
   currentPrices = {},
   coinContext = {},
+  holdingIdMap = {},
   onEdit,
 }: HoldingsSectionProps) {
   const bands = targetBands ?? FALLBACK_BANDS
   const isMisaligned = score < 40
-
-  // Build id map from live portfolio holdings
-  const { holdings: portfolioHoldings } = usePortfolio()
-  const holdingIdMap: Record<string, string> = {}
-  for (const h of portfolioHoldings) {
-    if (h?.asset) holdingIdMap[h.asset.toUpperCase()] = h.id
-  }
 
   // Build rows directly from enrichedHoldings (all holdings, incl. stables)
   // Only holdings with a value are shown; unpriced holdings still appear with $0
