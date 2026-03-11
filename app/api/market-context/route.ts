@@ -1,4 +1,5 @@
 // ━━━ Market Context API ━━━
+// v3.6.0 · S187 · Sprint 38 — window param added; market_regimes filtered by ?window= (default 30)
 // v3.5.0 · S176 · Sprint 36 — is_volatile added to market_regimes select and regimes map
 // v3.4.0 · S173 · Sprint 35 — current_prices for ALL symbols (not just BTC/ETH); change_24h rounded to 2dp
 // Fetches regime history + price history + duration patterns + transitions + intraday signals
@@ -17,6 +18,17 @@ function parseDays(param: string | null): ValidDays {
   const n = Number(param);
   if (VALID_DAYS.includes(n as ValidDays)) return n as ValidDays;
   return 7;
+}
+
+// Valid regime windows — must exist as rows in market_regimes."window"
+const VALID_WINDOWS = [7, 30, 90, 180, 360] as const;
+type ValidWindow = (typeof VALID_WINDOWS)[number];
+
+function parseWindow(param: string | null): ValidWindow | null {
+  if (param === null) return 30; // default
+  const n = parseInt(param, 10);
+  if (VALID_WINDOWS.includes(n as ValidWindow)) return n as ValidWindow;
+  return null; // invalid — caller returns 400
 }
 
 interface Transition {
@@ -62,6 +74,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const days = parseDays(searchParams.get('days'));
 
+    // Window param — filters market_regimes by the "window" column
+    // Default: 30. Valid: 30 | 90. Others: 400.
+    const window = parseWindow(searchParams.get('window'));
+    if (window === null) {
+      return NextResponse.json(
+        { error: 'Invalid window parameter. Valid values: 7, 30, 90, 180, 360' },
+        { status: 400 }
+      );
+    }
+
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffISO = cutoff.toISOString();
@@ -69,7 +91,8 @@ export async function GET(request: NextRequest) {
     const [regimeResult, priceResult, durationResult, livePriceResult, intradayResult] = await Promise.all([
       supabase
         .from('market_regimes')
-        .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, is_volatile, eth_price_now, eth_r_7d, eth_vol_7d')
+        .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, is_volatile, eth_price_now, eth_r_7d, eth_vol_7d, window')
+        .eq('window', window)                            // filter by requested window
         .gte('created_at', cutoffISO)
         .order('created_at', { ascending: false }),
       supabase
@@ -114,6 +137,9 @@ export async function GET(request: NextRequest) {
       console.error('regime_duration_stats error:', durationResult.error);
     }
 
+    // Graceful empty: if the requested window has no rows, signal unavailable
+    const available = (regimeResult.data ?? []).length > 0;
+
     const regimes = (regimeResult.data ?? []).map((r: any) => ({
       timestamp: r.market_timestamp,
       regime: r.regime,
@@ -128,6 +154,7 @@ export async function GET(request: NextRequest) {
       eth_r_7d: r.eth_r_7d,
       eth_vol_7d: r.eth_vol_7d,
       is_volatile: r.is_volatile ?? false,
+      window: r.window,
     }));
 
     const transitions = aggregateTransitions(regimeResult.data ?? []);
@@ -149,6 +176,8 @@ export async function GET(request: NextRequest) {
       transition_count: transitions.reduce((sum, t) => sum + t.count, 0),
       row_count: regimes.length,
       days_requested: days,
+      window,                          // which window was served
+      available,                       // false if no rows for requested window
       generated_at: new Date().toISOString(),
       current_prices: currentPrices,
       intraday_signals: intradaySignals,
