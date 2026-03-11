@@ -1,11 +1,11 @@
 // ━━━ Exposure Page ━━━
-//   v3.6.0 — S189
+//   v3.7.0 — S189f
 // Changelog:
-//   v3.6.0 — S189: Optimistic snapshot patch after edit — qty/value updates immediately
-//            without waiting for server snapshot re-fetch. fetchSnapshot still runs after
-//            to get accurate server state.
-//   v3.5.0 — S178 · Sprint 36
-// Changelog:
+//   v3.7.0 — S189f: Weights + score derived from enriched_holdings directly (not snapshot
+//            server fields). Reacts instantly to patchSnapshotHolding — posture toggle,
+//            qty edit, add all recalculate score/AllocationCard/sectionHeader immediately.
+//            computeRiskScore replicated client-side from route.ts logic.
+//   v3.6.0 — S189: Optimistic snapshot patch after edit.
 //   v3.5.0 — S178: fetchSnapshot() added to onRemove handler — snapshot refreshes after coin deletion.
 //   v3.4.0 — S177: Replace inline sheet wrappers with shared BottomSheet component.
 //   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
@@ -333,27 +333,58 @@ export default function ExposurePage() {
   for (const h of portfolioHoldings) {
     if (h?.asset) holdingIdMap[h.asset.toUpperCase()] = h.id
   }
-  const score         = snapshot?.risk_score ?? 0
-  const label         = scoreToLabel(score)
-  const isEmpty       = snapshot?.isEmpty === true
 
-  // 4-bucket weights
-  const btcWeight    = snapshot?.btc_weight_all ?? 0
-  const ethWeight    = snapshot?.eth_weight_all ?? 0
-  const altWeight    = snapshot?.alt_weight_all ?? 0
-  const stableWeight = Math.max(0, 1 - btcWeight - ethWeight - altWeight)
+  const isEmpty       = snapshot?.isEmpty === true
   const targetBands  = snapshot?.target_bands ?? null
-  const btcValueUsd    = snapshot?.btc_value_usd ?? 0
-  const ethValueUsd    = snapshot?.eth_value_usd ?? 0
-  const altValueUsd    = snapshot?.alt_value_usd ?? 0
+  const riskProfile    = snapshot?.risk_profile ?? null
   const btcIconUrl     = snapshot?.btc_icon_url ?? null
   const ethIconUrl     = snapshot?.eth_icon_url ?? null
-  const totalValueAll  = snapshot?.total_value_usd_all ?? 0
   const altBreakdown   = snapshot?.alt_breakdown ?? []
-  const riskProfile    = snapshot?.risk_profile ?? null
 
-  const regimeLabel  = REGIME_LABELS[regime] ?? regime
-  const isMisaligned = score < 40
+  // ── Derive weights + score from enriched_holdings (live, post-patch) ──
+  // This recalculates instantly after any patchSnapshotHolding call,
+  // so posture toggles, qty edits, and adds all reflect immediately.
+  const enrichedHoldings = snapshot?.enriched_holdings ?? []
+  const inPostureHoldings = enrichedHoldings.filter((h: any) => h.include_in_exposure !== false)
+  const postureTotal = inPostureHoldings.reduce((s: number, h: any) => s + (h.value_usd ?? 0), 0)
+  const totalValueAll = enrichedHoldings.reduce((s: number, h: any) => s + (h.value_usd ?? 0), 0)
+
+  let btcWeight = 0, ethWeight = 0, altWeight = 0, stableWeight = 0
+  let btcValueUsd = 0, ethValueUsd = 0, altValueUsd = 0
+  if (postureTotal > 0) {
+    for (const h of inPostureHoldings as any[]) {
+      const sym = (h.asset ?? '') as string
+      const cat = h.category ?? 'alt'
+      const v = h.value_usd ?? 0
+      const w = v / postureTotal
+      // Mirror server logic exactly: symbol-first for BTC/ETH, then category for stable, else alt
+      if (sym === 'BTC')          { btcWeight    += w; btcValueUsd    += v }
+      else if (sym === 'ETH')     { ethWeight    += w; ethValueUsd    += v }
+      else if (cat === 'stable')  { stableWeight += w                      }
+      else                        { altWeight    += w; altValueUsd    += v }
+    }
+  }
+
+  // Replicate server computeRiskScore exactly
+  const score = (() => {
+    if (!targetBands || postureTotal === 0) return snapshot?.risk_score ?? 0
+    const buckets = [
+      { actual: btcWeight * 100,    min: targetBands.btc[0],    max: targetBands.btc[1] },
+      { actual: ethWeight * 100,    min: targetBands.eth[0],    max: targetBands.eth[1] },
+      { actual: altWeight * 100,    min: targetBands.alt[0],    max: targetBands.alt[1] },
+      { actual: stableWeight * 100, min: targetBands.stable[0], max: targetBands.stable[1] },
+    ]
+    let totalRelDev = 0
+    for (const b of buckets) {
+      const overshoot = b.actual < b.min ? b.min - b.actual : b.actual > b.max ? b.actual - b.max : 0
+      const bandWidth = b.max - b.min
+      totalRelDev += bandWidth > 0 ? Math.min(1, overshoot / (bandWidth * 2)) : 0
+    }
+    return Math.round(Math.max(0, Math.min(100, (1 - totalRelDev / 4) * 100)))
+  })()
+
+  const label         = scoreToLabel(score)
+  const isMisaligned  = score < 40
 
   // Total PnL — sum of usd_delta across holdings that have price_at_add set
   const totalPnlUsd: number | null = (() => {
@@ -546,7 +577,7 @@ export default function ExposurePage() {
                 mounted={mounted}
                 hidden={hidden}
                 isPro={isPro}
-                enrichedHoldings={snapshot?.enriched_holdings ?? []}
+                enrichedHoldings={enrichedHoldings}
                 currentPrices={currentPrices}
                 coinContext={coinContext}
                 holdingIdMap={holdingIdMap}
