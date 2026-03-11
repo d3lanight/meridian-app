@@ -1,4 +1,9 @@
 // ━━━ Exposure Page ━━━
+//   v3.6.0 — S189
+// Changelog:
+//   v3.6.0 — S189: Optimistic snapshot patch after edit — qty/value updates immediately
+//            without waiting for server snapshot re-fetch. fetchSnapshot still runs after
+//            to get accurate server state.
 //   v3.5.0 — S178 · Sprint 36
 // Changelog:
 //   v3.5.0 — S178: fetchSnapshot() added to onRemove handler — snapshot refreshes after coin deletion.
@@ -226,6 +231,32 @@ export default function ExposurePage() {
       .then(r => r.ok ? r.json() : null)
       .then((data: SnapshotWithPosture | null) => { if (data) setSnapshot(data) })
       .catch(() => {})
+  }
+
+  // Optimistically patch enriched_holdings qty/value so UI updates immediately
+  // The server re-fetch will correct any inaccuracy after it completes
+  const patchSnapshotHolding = (id: string, updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }) => {
+    setSnapshot(prev => {
+      if (!prev?.enriched_holdings) return prev
+      const holdings = prev.enriched_holdings.map((h: any) => {
+        const matchingPortfolioHolding = portfolioHoldings.find(p => p.id === id)
+        if (!matchingPortfolioHolding || h.asset !== matchingPortfolioHolding.asset) return h
+        const newQty = updates.quantity ?? h.quantity
+        const newPrice = h.price_usd ?? 0
+        const newValue = newPrice * newQty
+        const newPriceAtAdd = h.price_at_add
+        const newUsdDelta = newPriceAtAdd != null ? (newPrice - newPriceAtAdd) * newQty : null
+        return {
+          ...h,
+          quantity: newQty,
+          value_usd: newValue,
+          usd_delta: newUsdDelta,
+          include_in_exposure: updates.include_in_exposure ?? h.include_in_exposure,
+          cost_basis: 'cost_basis' in updates ? updates.cost_basis : h.cost_basis,
+        }
+      })
+      return { ...prev, enriched_holdings: holdings }
+    })
   }
 
   useEffect(() => {
@@ -593,6 +624,7 @@ export default function ExposurePage() {
             isOpen={true}
             holding={h}
             onUpdate={async (id, updates) => {
+              patchSnapshotHolding(id, updates)
               const ok = await updateHolding(id, updates)
               if (ok) { refresh(); fetchSnapshot() }
               return ok

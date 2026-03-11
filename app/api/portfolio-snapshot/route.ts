@@ -1,6 +1,8 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v3.0.0 · S158
+// v3.1.0 · S189
 // Changelog:
+//  v3.1.0 — S189: Stablecoins now included in alt_breakdown (with category tag) so HoldingsSection
+//           can render them. decimals added to enriched_holdings from asset_mapping.
 //  v3.0.0 — S158: Live weight computation from portfolio_holdings × asset_prices (removes latest_exposure dependency)
 //  v2.4.0 — S151: Band-relative alignment score (replaces maxOver formula)
 //  v2.3.0 — S144: Compute and return risk_score (0–100) from weights vs target bands
@@ -88,7 +90,7 @@ export async function GET() {
         .order('asset', { ascending: true }),
       supabase
         .from('asset_mapping')
-        .select('symbol, category, icon_url, coingecko_id')
+        .select('symbol, category, icon_url, coingecko_id, decimals')
         .eq('active', true),
       supabase
         .from('asset_prices')
@@ -114,15 +116,17 @@ export async function GET() {
 
     // ── Build lookup maps ──
 
-    // symbol → category + icon_url + coingecko_id
+    // symbol → category + icon_url + coingecko_id + decimals
     const categoryMap: Record<string, string> = {}
     const iconMap: Record<string, string | null> = {}
     const coingeckoMap: Record<string, string | null> = {}
+    const decimalsMap: Record<string, number | null> = {}
     if (mappingsResult.data) {
       for (const m of mappingsResult.data) {
         categoryMap[m.symbol] = m.category
         iconMap[m.symbol] = m.icon_url ?? null
         coingeckoMap[m.symbol] = m.coingecko_id ?? null
+        decimalsMap[m.symbol] = m.decimals ?? null
       }
     }
 
@@ -147,7 +151,7 @@ export async function GET() {
     let totalValueAll = 0
     let altCount = 0
     const altUnpriced: string[] = []
-    const altBreakdownRaw: Array<{ asset: string; quantity: number; coingecko_id: string | null; usd_price: number | null; value_usd: number | null }> = []
+    const altBreakdownRaw: Array<{ asset: string; quantity: number; coingecko_id: string | null; usd_price: number | null; value_usd: number | null; category: string }> = []
 
     for (const h of exposureHoldings as any[]) {
       const symbol = h.asset as string
@@ -166,6 +170,15 @@ export async function GET() {
         ethValueUsd += valueUsd ?? 0
       } else if (category === 'stable') {
         stableValueUsd += valueUsd ?? 0
+        // Include stables in breakdown so HoldingsSection can render them
+        altBreakdownRaw.push({
+          asset: symbol,
+          quantity,
+          coingecko_id: coingeckoMap[symbol] ?? null,
+          usd_price: price,
+          value_usd: valueUsd,
+          category: 'stable',
+        })
       } else {
         // alt (includes anything not BTC/ETH/stable)
         altCount++
@@ -179,6 +192,7 @@ export async function GET() {
           coingecko_id: coingeckoMap[symbol] ?? null,
           usd_price: price,
           value_usd: valueUsd,
+          category: 'alt',
         })
       }
     }
@@ -225,6 +239,7 @@ export async function GET() {
         usd_delta:           usdDelta,
         created_at:          h.created_at ?? null,
         icon_url:            iconMap[h.asset] ?? null,
+        decimals:            decimalsMap[h.asset] ?? null,
       }
     })
 

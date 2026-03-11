@@ -253,7 +253,10 @@ function RiskProfileDetail({
 }
 
 // ══════════════════════════════════════════════
-// PROFILE PAGE v4.0.4
+// PROFILE PAGE v4.1.0 — S189
+// Changes:
+//   - Risk profile: update → upsert (fixes new users losing selection on nav)
+//   - Pro toggle: visible to all users (testing phase)
 // ══════════════════════════════════════════════
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
@@ -385,8 +388,7 @@ export default function ProfilePage() {
             const supabase = createClient()
             await supabase
               .from('user_preferences')
-              .update({ risk_profile: v })
-              .eq('user_id', userId)
+              .upsert({ user_id: userId, risk_profile: v }, { onConflict: 'user_id' })
             setRiskProfile(v)
             // intentionally NOT closing — user stays to review, closes via X
           }}
@@ -586,22 +588,21 @@ export default function ProfilePage() {
               desc="Download your portfolio history"
               coming
             />
-            {isAdmin && (
-              <MenuRow
-                icon={Crown}
-                label={`Tier: ${isPro ? 'PRO' : 'FREE'}`}
-                desc="Toggle Pro/Free for testing"
-                badge={isPro ? '✓ Pro' : 'Free'}
-                onClick={async () => {
-                  const newTier = isPro ? 'free' : 'pro'
-                  const supabase = createClient()
-                  const { data: { user } } = await supabase.auth.getUser()
-                  if (!user) return
-                  await supabase.from('profiles').update({ tier: newTier }).eq('id', user.id)
-                  window.location.reload()
-                }}
-              />
-            )}
+            {/* Tier toggle — visible to all during testing phase */}
+            <MenuRow
+              icon={Crown}
+              label={`Tier: ${isPro ? 'PRO' : 'FREE'}`}
+              desc="Toggle Pro/Free for testing"
+              badge={isPro ? '✓ Pro' : 'Free'}
+              onClick={async () => {
+                const newTier = isPro ? 'free' : 'pro'
+                const supabase = createClient()
+                const { data: { user } } = await supabase.auth.getUser()
+                if (!user) return
+                await supabase.from('profiles').update({ tier: newTier }).eq('id', user.id)
+                window.location.reload()
+              }}
+            />
             <MenuRow icon={LogOut} label="Sign out" danger onClick={handleSignOut} />
           </MenuCard>
         </div>

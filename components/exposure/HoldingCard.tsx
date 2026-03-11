@@ -1,6 +1,9 @@
 // components/exposure/HoldingCard.tsx
-// v2.5.2 · fix: dynamic price decimals across all value displays (value, pnl, 30d range)
-// Replaces v2.5.0
+// v2.6.0 · S189
+// Changelog:
+//   v2.6.0 — S189: decimals prop from asset_mapping (replaces hardcoded DEC map).
+//            Smart USD formatting: no unnecessary trailing zeros for large values.
+//            Coins with decimals=null fall back to sensible defaults by price range.
 
 'use client'
 
@@ -12,10 +15,19 @@ import CryptoIcon from '@/components/shared/CryptoIcon'
 import Sparkline from '@/components/shared/Sparkline'
 import BetaBadge from '@/components/portfolio/BetaBadge'
 
-// ─── Helpers (from design) ────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-const fU = (n: number) =>
-  `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// Smart USD formatter: avoids excessive trailing zeros for large values
+// $0–$0.01: 6dp | $0.01–$1: 4dp | $1–$100: 2dp | $100+: 0dp (whole dollars)
+const fU = (n: number) => {
+  if (n === 0) return '$0'
+  const abs = Math.abs(n)
+  if (abs < 0.01)   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`
+  if (abs < 1)      return `$${n.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+  if (abs < 100)    return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `$${Math.round(n).toLocaleString('en-US')}`
+}
+
 const fPrice = (p: number) => {
   const d = p >= 1 ? 2 : p >= 0.01 ? 4 : 8
   return `$${Number(p).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`
@@ -64,6 +76,7 @@ export interface HoldingCardProps {
   change30d:   number
   hidden:      boolean
   isPro:       boolean
+  decimals?:   number | null  // from asset_mapping — display precision for qty
   // optional wiring
   iconUrl?:    string | null
   holdingId?:  string | null
@@ -76,7 +89,7 @@ export default function HoldingCard({
   symbol, name, qty, price, addedPrice, addedDate,
   pctExposure, change24h, inPosture, offTarget,
   sparkline, beta, high30d, low30d, change30d,
-  hidden, isPro,
+  hidden, isPro, decimals,
   iconUrl, holdingId, onEdit,
 }: HoldingCardProps) {
 
@@ -104,8 +117,18 @@ export default function HoldingCard({
     USDC: 'linear-gradient(90deg, #2775CA, #5AA8E5)',
   } as Record<string, string>)[symbol] || M.accentGradient
 
-  const DEC: Record<string, number> = { BTC: 4, ETH: 3, SOL: 2, DOT: 1, DOGE: 0, USDC: 0, AAVE: 2 }
-  const qtyFmt = hidden ? '••••' : `${Number(qty).toFixed(DEC[symbol] ?? 2)} ${symbol}`
+  // Qty display precision:
+  // 1. Use decimals from asset_mapping if available (capped at 8)
+  // 2. Fall back to price-based heuristic for unknown assets
+  const qtyDecimals = (() => {
+    if (decimals != null) return Math.min(decimals, 8)
+    // Fallback: high-value coins (BTC-like) need more dp; cheap coins fewer
+    if (price >= 10_000) return 6   // BTC-range
+    if (price >= 100)    return 4   // ETH-range
+    if (price >= 1)      return 2
+    return 0                         // sub-dollar coins: show whole units
+  })()
+  const qtyFmt = hidden ? '••••' : `${Number(qty).toFixed(qtyDecimals)} ${symbol}`
 
   return (
     <div style={{
