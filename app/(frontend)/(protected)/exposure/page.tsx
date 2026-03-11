@@ -233,6 +233,21 @@ export default function ExposurePage() {
       .catch(() => {})
   }
 
+  // Fetches 30d/sparkline/beta context for all current holdings.
+  // Called on mount AND after add/remove so new coins get context immediately.
+  const fetchCoinContext = () => {
+    fetch('/api/portfolio-snapshot')
+      .then(r => r.ok ? r.json() : null)
+      .then((snap: any) => {
+        if (!snap?.enriched_holdings?.length) return null
+        const symbols = snap.enriched_holdings.map((h: any) => h.asset).join(',')
+        return fetch(`/api/coin-context?symbols=${symbols}`)
+      })
+      .then(r => r && r.ok ? r.json() : null)
+      .then((ctx: any) => { if (ctx) setCoinContext(ctx) })
+      .catch(() => {})
+  }
+
   // Optimistically patch enriched_holdings qty/value so UI updates immediately
   // The server re-fetch will correct any inaccuracy after it completes
   const patchSnapshotHolding = (id: string, updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }) => {
@@ -288,16 +303,7 @@ export default function ExposurePage() {
       .catch(() => {})
 
     // Coin context for sparklines/beta/30d range (Pro)
-    fetch('/api/portfolio-snapshot')
-      .then(r => r.ok ? r.json() : null)
-      .then((snap: any) => {
-        if (!snap?.enriched_holdings?.length) return null
-        const symbols = snap.enriched_holdings.map((h: any) => h.asset).join(',')
-        return fetch(`/api/coin-context?symbols=${symbols}`)
-      })
-      .then(r => r && r.ok ? r.json() : null)
-      .then((ctx: any) => { if (ctx) setCoinContext(ctx) })
-      .catch(() => {})
+    fetchCoinContext()
 
     // Auth + tier check
     ;(async () => {
@@ -617,7 +623,7 @@ export default function ExposurePage() {
         heldSymbols={portfolioHoldings.map(h => h.asset)}
         onAdd={async (asset, quantity, costBasis) => {
           const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
-          if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
+          if (ok) { refresh(); fetchSnapshot(); fetchCoinContext(); setSheet(null) }
           return ok
         }}
         onClose={() => setSheet(null)}
@@ -639,7 +645,7 @@ export default function ExposurePage() {
             }}
             onRemove={async (id) => {
               const ok = await removeHolding(id)
-              if (ok) { refresh(); fetchSnapshot(); setSheet(null) }
+              if (ok) { refresh(); fetchSnapshot(); fetchCoinContext(); setSheet(null) }
               return ok
             }}
             onClose={() => setSheet(null)}

@@ -1,5 +1,9 @@
 // ━━━ Add Holding Sheet — Asset select → Quantity → Confirm ━━━
-// v1.3.0 · S177 · Sprint 36
+// v1.4.0 · S189d
+// Changelog:
+//   v1.4.0 — S189d: Decimal-aware qty input (type=text, inputMode=decimal). Max decimals
+//            from asset_mapping.decimals (fallback 8). Hint shown in label.
+//            useEffect resets all state on isOpen→false. setSaving(false) in handleClose.
 // Changelog:
 //   v1.3.0 — S177: Refactored to use shared BottomSheet (scrollable=true). Removed inline scroll lock.
 //   v1.2.0 — S169: CryptoIcon for confirmation step; scroll lock useEffect.
@@ -7,7 +11,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, X, ChevronLeft } from 'lucide-react';
 import { M } from '@/lib/meridian';
 import AssetPicker from './AssetPicker';
@@ -30,6 +34,18 @@ export default function AddHoldingSheet({ isOpen, assets, heldSymbols, onAdd, on
   const [costBasis, setCostBasis] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset all state whenever sheet closes (covers programmatic close from parent, not just handleClose)
+  useEffect(() => {
+    if (!isOpen) {
+      setStep('select');
+      setSelected(null);
+      setQty('');
+      setCostBasis('');
+      setError(null);
+      setSaving(false);
+    }
+  }, [isOpen]);
 
   const handleSelect = (asset: AssetMapping) => {
     setSelected(asset);
@@ -59,6 +75,18 @@ export default function AddHoldingSheet({ isOpen, assets, heldSymbols, onAdd, on
     setError(null);
     onClose();
   };
+
+  // Max decimal places for the selected coin — from asset_mapping, fallback 8
+  const maxDecimals = selected?.decimals ?? 8
+
+  const handleQtyChange = (raw: string) => {
+    // Allow empty, integers, and decimals up to maxDecimals
+    if (raw === '' || raw === '.') { setQty(raw); return }
+    const dotIdx = raw.indexOf('.')
+    if (dotIdx !== -1 && raw.length - dotIdx - 1 > maxDecimals) return  // reject excess dp
+    if (!/^\d*\.?\d*$/.test(raw)) return  // reject non-numeric
+    setQty(raw)
+  }
 
   const isValid = qty && parseFloat(qty) > 0 && (!costBasis || parseFloat(costBasis) >= 0);
   const name = selected?.name || selected?.symbol || '';
@@ -138,14 +166,19 @@ export default function AddHoldingSheet({ isOpen, assets, heldSymbols, onAdd, on
         <div className="mb-4">
           <label className="text-xs block mb-2" style={{ color: M.textMuted }}>
             Quantity <span style={{ color: M.negative }}>*</span>
+            {maxDecimals > 0 && (
+              <span style={{ color: M.textMuted, marginLeft: 6 }}>
+                (up to {maxDecimals} decimal{maxDecimals !== 1 ? 's' : ''})
+              </span>
+            )}
           </label>
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputMode="decimal"
             min="0"
             value={qty}
-            onChange={e => setQty(e.target.value)}
-            placeholder="0.00"
+            onChange={e => handleQtyChange(e.target.value)}
+            placeholder="0"
             autoFocus
             className="w-full rounded-2xl px-5 py-4 border-none outline-none text-2xl font-light"
             style={{

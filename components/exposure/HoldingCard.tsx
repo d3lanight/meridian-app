@@ -1,9 +1,10 @@
 // components/exposure/HoldingCard.tsx
-// v2.6.0 · S189
+// v2.7.0 · S189d
 // Changelog:
+//   v2.7.0 — S189d: Smart fPrice (zero→$0, magnitude-aware, no unnecessary zeros).
+//            Trim trailing zeros from qty display (3.000000 SOL → 3 SOL).
+//            fU for collapsed value + P&L. All formatters handle $0 cleanly.
 //   v2.6.0 — S189: decimals prop from asset_mapping (replaces hardcoded DEC map).
-//            Smart USD formatting: no unnecessary trailing zeros for large values.
-//            Coins with decimals=null fall back to sensible defaults by price range.
 
 'use client'
 
@@ -29,8 +30,13 @@ const fU = (n: number) => {
 }
 
 const fPrice = (p: number) => {
-  const d = p >= 1 ? 2 : p >= 0.01 ? 4 : 8
-  return `$${Number(p).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`
+  const abs = Math.abs(p)
+  if (abs === 0)     return '$0'
+  if (abs < 0.0001)  return `$${p.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })}`
+  if (abs < 0.01)    return `$${p.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`
+  if (abs < 1)       return `$${p.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+  if (abs < 10000)   return `$${p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `$${p.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 const fP = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
 
@@ -128,7 +134,9 @@ export default function HoldingCard({
     if (price >= 1)      return 2
     return 0                         // sub-dollar coins: show whole units
   })()
-  const qtyFmt = hidden ? '••••' : `${Number(qty).toFixed(qtyDecimals)} ${symbol}`
+  // Trim trailing zeros: 3.000000 → 3, 0.50 → 0.5, 1.2500 → 1.25
+  const qtyStr = Number(qty).toFixed(qtyDecimals).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  const qtyFmt = hidden ? '••••' : `${qtyStr} ${symbol}`
 
   return (
     <div style={{
@@ -151,7 +159,7 @@ export default function HoldingCard({
             <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'Outfit', sans-serif" }}>{name}</span>
           </div>
           <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1", flexShrink: 0 }}>
-            {hidden ? '$••••' : fPrice(value)}
+            {hidden ? '$••••' : fU(value)}
           </span>
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: expanded ? M.accentDim : 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 2, transition: 'background 0.2s ease' }}>
             {expanded ? <ChevronUp size={13} color={M.accent} /> : <ChevronDown size={13} color={M.textMuted} />}
@@ -254,7 +262,7 @@ export default function HoldingCard({
                     <span style={{ fontSize: 12, fontWeight: 600, color: M.textMuted, fontFamily: "'DM Sans', sans-serif" }}>$••••</span>
                   ) : (
                     <span style={{ fontSize: 12, fontWeight: 700, color: pnlUp ? M.positive : M.negative, fontFamily: "'DM Sans', sans-serif", fontFeatureSettings: "'tnum' 1, 'lnum' 1" }}>
-                      {pnlUp ? '+' : ''}{fPrice(pnl)}{' '}
+                      {pnlUp ? '+' : ''}{fU(pnl)}{' '}
                       <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.75 }}>{fP(pnlPct)}</span>
                     </span>
                   )}
