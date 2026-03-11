@@ -1,6 +1,15 @@
 // ━━━ Exposure Page ━━━
-//   v3.7.0 — S189f
+//   v3.8.0 — S-fix-exposure
 // Changelog:
+//   v3.8.0 — S-fix-exposure: Regression fixes:
+//            1. patchSnapshotHolding now matches enriched_holdings by asset symbol
+//               directly (via EditHoldingSheet holding.asset), not via portfolioHoldings
+//               lookup — eliminates silent match failure when portfolioHoldings is stale.
+//            2. ExposureEmptyState CTA now calls setSheet({type:'add'}) instead of
+//               navigating to /portfolio (inactive route) which was causing page reload.
+//            3. onAdd sequences await refresh() before fetchSnapshot() to ensure
+//               portfolioHoldings is populated before snapshot resolves.
+//            4. onRemove/onUpdate patchSnapshotHolding call uses holding.asset directly.
 //   v3.7.0 — S189f: Weights + score derived from enriched_holdings directly (not snapshot
 //            server fields). Reacts instantly to patchSnapshotHolding — posture toggle,
 //            qty edit, add all recalculate score/AllocationCard/sectionHeader immediately.
@@ -11,16 +20,6 @@
 //   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
 //   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
 //   v3.0.0 — S163/S164: Full v4 redesign.
-//            - RegimeTimeline: collapsible, period tabs (7d/30d/90d), 90d pro-locked, rich blocks
-//            - AllocationCard: teal-tinted, regime badge, target zone bars, warning text
-//            - Empty state: regime-aware CTA with target preview
-//            - Header: subtitle with holdings/total/regime
-//            - HoldingCard: v4 style (card per holding, 24h change, flagText)
-//            - isPro from profiles.tier (not hardcoded)
-//            - ManageBar removed
-//            - Divider component between sections
-//   v2.0.0 — S163/S164: Initial v4 attempt (TimelineStrip + AggSection reuse — replaced)
-//   v1.0.0 — S159: Cross-screen consistency
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -122,11 +121,13 @@ function ExposureEmptyState({
   confidence,
   persistence,
   mounted,
+  onAddHolding,           // FIX: callback instead of /portfolio link
 }: {
   regime: string
   confidence: number
   persistence: number
   mounted: boolean
+  onAddHolding: () => void  // FIX: open AddHoldingSheet directly
 }) {
   const rc = getRegimeConfig(regime)
   const regimeKey = regime as import('@/lib/risk-profiles').RegimeKey
@@ -182,7 +183,7 @@ function ExposureEmptyState({
       </div>
 
       {/* Educational insight */}
-      <div >
+      <div>
         <InsightCard
           icon={BookOpen}
           variant="neutral"
@@ -191,15 +192,20 @@ function ExposureEmptyState({
         />
       </div>
 
-      {/* CTA */}
+      {/* CTA — FIX: was <Link href="/portfolio"> which navigated away and reloaded page */}
       <div style={{ marginTop: 24, textAlign: 'center' }}>
-        <Link href="/portfolio" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px',
-          background: M.accentGradient, borderRadius: 20, boxShadow: `0 4px 16px ${M.accentGlow}`,
-          textDecoration: 'none', fontSize: 14, fontWeight: 600, color: 'white', fontFamily: FONT_BODY,
-        }}>
+        <button
+          onClick={onAddHolding}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px',
+            background: M.accentGradient, borderRadius: 20, boxShadow: `0 4px 16px ${M.accentGlow}`,
+            border: 'none', cursor: 'pointer',
+            fontSize: 14, fontWeight: 600, color: 'white', fontFamily: FONT_BODY,
+          }}
+        >
+          <Plus size={16} color="white" strokeWidth={2.5} />
           Add your first holding
-        </Link>
+        </button>
         <p style={{ fontSize: 11, color: M.textMuted, marginTop: 10 }}>
           No wallet connection needed — just enter what you hold.
         </p>
@@ -233,8 +239,6 @@ export default function ExposurePage() {
       .catch(() => {})
   }
 
-  // Fetches 30d/sparkline/beta context for all current holdings.
-  // Called on mount AND after add/remove so new coins get context immediately.
   const fetchCoinContext = () => {
     fetch('/api/portfolio-snapshot')
       .then(r => r.ok ? r.json() : null)
@@ -248,26 +252,31 @@ export default function ExposurePage() {
       .catch(() => {})
   }
 
-  // Optimistically patch enriched_holdings qty/value so UI updates immediately
-  // The server re-fetch will correct any inaccuracy after it completes
-  const patchSnapshotHolding = (id: string, updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }) => {
+  // FIX: Match enriched holding by asset symbol directly.
+  // Previous version looked up portfolioHoldings by id to get the asset symbol,
+  // which silently failed if portfolioHoldings hadn't updated yet — leaving
+  // include_in_exposure unchanged and the coin still contributing to posture weights.
+  // Now asset is passed directly by the caller (EditHoldingSheet already has holding.asset).
+  const patchSnapshotHolding = (
+    assetSymbol: string,
+    updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }
+  ) => {
     setSnapshot(prev => {
       if (!prev?.enriched_holdings) return prev
       const holdings = prev.enriched_holdings.map((h: any) => {
-        const matchingPortfolioHolding = portfolioHoldings.find(p => p.id === id)
-        if (!matchingPortfolioHolding || h.asset !== matchingPortfolioHolding.asset) return h
-        const newQty = updates.quantity ?? h.quantity
+        if (h.asset !== assetSymbol) return h
+        const newQty   = updates.quantity ?? h.quantity
         const newPrice = h.price_usd ?? 0
         const newValue = newPrice * newQty
         const newPriceAtAdd = h.price_at_add
         const newUsdDelta = newPriceAtAdd != null ? (newPrice - newPriceAtAdd) * newQty : null
         return {
           ...h,
-          quantity: newQty,
-          value_usd: newValue,
-          usd_delta: newUsdDelta,
+          quantity:            newQty,
+          value_usd:           newValue,
+          usd_delta:           newUsdDelta,
           include_in_exposure: updates.include_in_exposure ?? h.include_in_exposure,
-          cost_basis: 'cost_basis' in updates ? updates.cost_basis : h.cost_basis,
+          cost_basis:          'cost_basis' in updates ? updates.cost_basis : h.cost_basis,
         }
       })
       return { ...prev, enriched_holdings: holdings }
@@ -277,10 +286,8 @@ export default function ExposurePage() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
 
-    // Portfolio snapshot (auth required — will 401 for anon, that's fine)
     fetchSnapshot()
 
-    // Market context (public)
     fetch('/api/market-context?days=90')
       .then(r => r.ok ? r.json() : null)
       .then((data: any) => {
@@ -288,8 +295,6 @@ export default function ExposurePage() {
         if (regimes.length > 0) {
           setRegime(regimes[0].regime || 'range')
           setRegimeConfidence(Math.round((regimes[0].confidence || 0) * 100))
-
-          // Persistence: count consecutive matching regime rows
           let days = 1
           for (let i = 1; i < regimes.length; i++) {
             if (regimes[i].regime === regimes[0].regime) days++
@@ -302,10 +307,8 @@ export default function ExposurePage() {
       })
       .catch(() => {})
 
-    // Coin context for sparklines/beta/30d range (Pro)
     fetchCoinContext()
 
-    // Auth + tier check
     ;(async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
@@ -327,8 +330,6 @@ export default function ExposurePage() {
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
 
-  // Build holdingIdMap from the single source of truth (parent's usePortfolio)
-  // Passed to HoldingsSection so edit button uses the same id space as EditHoldingSheet lookup
   const holdingIdMap: Record<string, string> = {}
   for (const h of portfolioHoldings) {
     if (h?.asset) holdingIdMap[h.asset.toUpperCase()] = h.id
@@ -342,8 +343,6 @@ export default function ExposurePage() {
   const altBreakdown   = snapshot?.alt_breakdown ?? []
 
   // ── Derive weights + score from enriched_holdings (live, post-patch) ──
-  // This recalculates instantly after any patchSnapshotHolding call,
-  // so posture toggles, qty edits, and adds all reflect immediately.
   const enrichedHoldings = snapshot?.enriched_holdings ?? []
   const inPostureHoldings = enrichedHoldings.filter((h: any) => h.include_in_exposure !== false)
   const postureTotal = inPostureHoldings.reduce((s: number, h: any) => s + (h.value_usd ?? 0), 0)
@@ -357,7 +356,6 @@ export default function ExposurePage() {
       const cat = h.category ?? 'alt'
       const v = h.value_usd ?? 0
       const w = v / postureTotal
-      // Mirror server logic exactly: symbol-first for BTC/ETH, then category for stable, else alt
       if (sym === 'BTC')          { btcWeight    += w; btcValueUsd    += v }
       else if (sym === 'ETH')     { ethWeight    += w; ethValueUsd    += v }
       else if (cat === 'stable')  { stableWeight += w                      }
@@ -365,8 +363,6 @@ export default function ExposurePage() {
     }
   }
 
-  // Replicate server computeRiskScore — only score buckets with active in-posture holdings.
-  // Excluding a coin removes its bucket from scoring; the gap doesn't count as misalignment.
   const score = (() => {
     if (!targetBands || postureTotal === 0) return snapshot?.risk_score ?? 0
     const buckets = [
@@ -374,7 +370,7 @@ export default function ExposurePage() {
       { actual: ethWeight * 100,    min: targetBands.eth[0],    max: targetBands.eth[1] },
       { actual: altWeight * 100,    min: targetBands.alt[0],    max: targetBands.alt[1] },
       { actual: stableWeight * 100, min: targetBands.stable[0], max: targetBands.stable[1] },
-    ].filter(b => b.actual > 0)  // skip empty buckets — excluded coins don't penalise score
+    ].filter(b => b.actual > 0)
     if (!buckets.length) return snapshot?.risk_score ?? 0
     let totalRelDev = 0
     for (const b of buckets) {
@@ -388,14 +384,12 @@ export default function ExposurePage() {
   const label         = scoreToLabel(score)
   const isMisaligned  = score < 40
 
-  // Total PnL — sum of usd_delta across holdings that have price_at_add set
   const totalPnlUsd: number | null = (() => {
     const holdings = snapshot?.enriched_holdings ?? []
     const deltas = holdings.map((h: any) => h.usd_delta).filter((d: any) => d != null)
     return deltas.length > 0 ? deltas.reduce((s: number, d: number) => s + d, 0) : null
   })()
 
-  // Build allocation rows for AllocationCard
   const allocations = buildAllocations(btcWeight, ethWeight, altWeight, stableWeight)
 
   return (
@@ -506,6 +500,7 @@ export default function ExposurePage() {
           confidence={regimeConfidence}
           persistence={regimePersistence}
           mounted={mounted}
+          onAddHolding={() => setSheet({ type: 'add' })}  // FIX: was Link to /portfolio
         />
       ) : (
         <>
@@ -656,7 +651,14 @@ export default function ExposurePage() {
         heldSymbols={portfolioHoldings.map(h => h.asset)}
         onAdd={async (asset, quantity, costBasis) => {
           const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
-          if (ok) { refresh(); fetchSnapshot(); fetchCoinContext(); setSheet(null) }
+          if (ok) {
+            // FIX: await refresh first so portfolioHoldings is populated
+            // before fetchSnapshot resolves, ensuring holdingIdMap has the new coin.
+            await refresh()
+            fetchSnapshot()
+            fetchCoinContext()
+            setSheet(null)
+          }
           return ok
         }}
         onClose={() => setSheet(null)}
@@ -671,14 +673,21 @@ export default function ExposurePage() {
             isOpen={true}
             holding={h}
             onUpdate={async (id, updates) => {
-              patchSnapshotHolding(id, updates)
+              // FIX: pass h.asset directly — no portfolioHoldings lookup needed
+              patchSnapshotHolding(h.asset, updates)
               const ok = await updateHolding(id, updates)
               if (ok) { refresh(); fetchSnapshot() }
               return ok
             }}
             onRemove={async (id) => {
               const ok = await removeHolding(id)
-              if (ok) { refresh(); fetchSnapshot(); fetchCoinContext(); setSheet(null) }
+              if (ok) {
+                // FIX: await refresh before fetchSnapshot on remove too
+                await refresh()
+                fetchSnapshot()
+                fetchCoinContext()
+                setSheet(null)
+              }
               return ok
             }}
             onClose={() => setSheet(null)}
