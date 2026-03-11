@@ -1,7 +1,12 @@
 // ━━━ HoldingsSection Component ━━━
-// v2.1.0 · S189e
+// v2.2.0 · S189i
 // Changelog:
-//   v2.1.0 — S189e: pctExposure now uses postureTotal (sum of in-posture holdings only)
+//   v2.2.0 — S189i: Two surgical fixes for "Most Exposed" false-positive:
+//            1. findFlaggedSymbol: inCategory filtered to weight > 0 only — excluded coins
+//               (weight=0) can no longer receive "Off target" pill.
+//            2. isMisaligned: only true if score < 40 AND at least one in-posture bucket
+//               genuinely exceeds its target band. Prevents "Most Exposed" header from
+//               appearing purely due to normalisation shift after excluding a coin.
 //            as denominator. Coins toggled off posture → 0%. Remaining coins
 //            re-normalise immediately without waiting for server round-trip.
 //   v2.0.0 — S189: Rows built from enrichedHoldings directly instead of
@@ -104,7 +109,8 @@ function findFlaggedSymbol(
 
   if (!mostOverweight) return null
 
-  const inCategory = rows.filter(r => r.category === mostOverweight!.cat)
+  // Only consider in-posture holdings (weight > 0) — excluded coins must never get "Off target" pill
+  const inCategory = rows.filter(r => r.category === mostOverweight!.cat && r.weight > 0)
   if (!inCategory.length) return null
   inCategory.sort((a, b) => b.valueUsd - a.valueUsd)
   return inCategory[0].symbol
@@ -126,7 +132,28 @@ export default function HoldingsSection({
   onEdit,
 }: HoldingsSectionProps) {
   const bands = targetBands ?? FALLBACK_BANDS
-  const isMisaligned = score < 40
+  // isMisaligned = score is low AND at least one in-posture bucket is overweight.
+  // Prevents "Most Exposed" from firing purely due to normalisation shift after excluding a coin.
+  const hasInPostureOverweight = (() => {
+    if (score >= 40) return false
+    const bucketWeight: Record<string, number> = {}
+    for (const h of enrichedHoldings) {
+      if (!h?.asset || h.include_in_exposure === false) continue
+      const sym = h.asset.toUpperCase()
+      const cat = sym === 'BTC' ? 'BTC' : sym === 'ETH' ? 'ETH' : h.category === 'stable' ? 'STABLE' : 'ALT'
+      bucketWeight[cat] = (bucketWeight[cat] ?? 0) + (h.value_usd ?? 0)
+    }
+    const postTotal = Object.values(bucketWeight).reduce((s, v) => s + v, 0)
+    if (postTotal === 0) return false
+    const checks = [
+      { cat: 'BTC', band: bands.btc },
+      { cat: 'ETH', band: bands.eth },
+      { cat: 'ALT', band: bands.alt },
+      { cat: 'STABLE', band: bands.stable },
+    ]
+    return checks.some(({ cat, band }) => ((bucketWeight[cat] ?? 0) / postTotal) * 100 > band[1])
+  })()
+  const isMisaligned = score < 40 && hasInPostureOverweight
 
   // Build rows directly from enrichedHoldings (all holdings, incl. stables)
   // Only holdings with a value are shown; unpriced holdings still appear with $0
