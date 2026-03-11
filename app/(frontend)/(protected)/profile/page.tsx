@@ -1,7 +1,10 @@
 // app/(frontend)/(protected)/profile/page.tsx
-// Profile v4.0.5 — UX: risk profile sub-view stays open after selection
-// Sprint: 36
+// Profile v4.2.0 — S188: regime_display_window preference — selector in Portfolio section
+// Sprint: 38
 // Changelog:
+//   4.2.0 - S188: RegimeWindowDetail sub-view added. Reads/writes regime_display_window KV row.
+//           Pro-gated: only window=30 available to free users. Downgrade guard at read time.
+//           Immediate-save toggle pattern (stays open after selection).
 //   4.0.5 - RiskProfileDetail onSelect no longer auto-closes sub-view. User stays to review
 //           selection and closes manually via X. Saves to DB immediately on tap (instant feedback).
 //   4.0.4 - Display MenuRow: removed onClick (not wired), added coming prop.
@@ -252,8 +255,95 @@ function RiskProfileDetail({
   )
 }
 
-// ══════════════════════════════════════════════
-// PROFILE PAGE v4.1.1 — S190
+// ── Regime window detail sub-view ────────────
+function RegimeWindowDetail({
+  current,
+  isPro,
+  onSelect,
+  onBack,
+}: {
+  current: string
+  isPro: boolean
+  onSelect: (v: string) => void
+  onBack: () => void
+}) {
+  const opts = [
+    { value: '30',  label: 'Mid (30d)',    desc: 'Standard view — default for all users', proRequired: false },
+    { value: '90',  label: 'Macro (90d)',  desc: 'Broader trend — smooths short-term noise', proRequired: true },
+    { value: '180', label: 'Cycle (180d)', desc: 'Half-cycle view — major regime shifts', proRequired: true },
+    { value: '360', label: 'Annual (360d)', desc: 'Full-year perspective — long trend baseline', proRequired: true },
+  ]
+
+  return (
+    <>
+      <SubViewHeader title="Regime View" onClose={onBack} />
+      <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
+        <p style={{ fontSize: 13, color: M.textSecondary, marginBottom: 16, marginTop: 0 }}>
+          Controls which regime window drives Today, Pulse, and Exposure
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {opts.map((opt) => {
+            const sel = current === opt.value
+            const locked = opt.proRequired && !isPro
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { if (!locked) onSelect(opt.value) }}
+                style={{
+                  ...card({ padding: 16 }),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  border: sel ? `1.5px solid ${M.accentDeep}` : `1px solid ${M.border}`,
+                  background: sel ? `linear-gradient(135deg, ${M.accentMuted}, rgba(90,77,138,0.08))` : M.surface,
+                  cursor: locked ? 'default' : 'pointer',
+                  opacity: locked ? 0.55 : 1,
+                  textAlign: 'left',
+                  width: '100%',
+                }}
+              >
+                <div
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    border: `2px solid ${sel ? M.accentDeep : M.borderSubtle}`,
+                    background: sel ? M.accentGradient : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {sel && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: sel ? 600 : 500, color: sel ? M.accentDeep : M.text, fontFamily: FONT_BODY }}>
+                      {opt.label}
+                    </span>
+                    {opt.proRequired && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+                        color: M.accent, background: 'rgba(123,111,168,0.12)',
+                        padding: '2px 6px', borderRadius: 6,
+                      }}>PRO</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: M.textMuted, marginTop: 2 }}>{opt.desc}</div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {!isPro && (
+          <p style={{ fontSize: 12, color: M.textMuted, marginTop: 16, textAlign: 'center' as const }}>
+            Upgrade to Pro to unlock Macro, Cycle, and Annual views
+          </p>
+        )}
+      </div>
+    </>
+  )
+}
+
+
 // Changes:
 //   - Risk profile read/write: removed use of spurious risk_profile column (dropped in
 //     migration). Now reads/writes the name='risk_profile' KV row value field, which
@@ -270,6 +360,7 @@ export default function ProfilePage() {
   const [memberSince, setMemberSince] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
   const [riskProfile, setRiskProfile] = useState<string | null>(null)
+  const [regimeWindow, setRegimeWindow] = useState<string>('30')
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -291,7 +382,7 @@ export default function ProfilePage() {
       setEmail(user.email ?? '')
 
       // Fetch profile + preferences in parallel
-      const [profileRes, prefRes] = await Promise.all([
+      const [profileRes, prefRes, winRes] = await Promise.all([
         supabase
           .from('profiles')
           .select('display_name, tier, is_admin, created_at')
@@ -302,6 +393,12 @@ export default function ProfilePage() {
           .select('value')
           .eq('user_id', user.id)
           .eq('name', 'risk_profile')
+          .maybeSingle(),
+        supabase
+          .from('user_preferences')
+          .select('value')
+          .eq('user_id', user.id)
+          .eq('name', 'regime_display_window')
           .maybeSingle(),
       ])
 
@@ -319,6 +416,20 @@ export default function ProfilePage() {
 
       if (prefRes.data) {
         setRiskProfile(prefRes.data.value ?? null)
+      }
+
+      if (winRes.data) {
+        const parsed = winRes.data.value ?? '30'
+        // Downgrade guard: non-30 requires Pro
+        const isPro_ = profileRes.data?.tier === 'pro'
+        setRegimeWindow((!isPro_ && parsed !== '30') ? '30' : parsed)
+      } else {
+        // Seed default row for new/existing users who don't have this pref yet
+        supabase
+          .from('user_preferences')
+          .insert({ user_id: user.id, name: 'regime_display_window', value: '30' })
+          .then(() => {}) // fire-and-forget: non-critical seed, read already defaults to '30'
+        setRegimeWindow('30')
       }
 
       setLoading(false)
@@ -409,6 +520,36 @@ export default function ProfilePage() {
           }}
           onBack={() => setSection(null)}
         />
+      </div>
+    )
+
+  if (section === 'regime-window')
+    return (
+      <div style={subViewWrapper}>
+        <link href={FONTS_LINK} rel="stylesheet" />
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${M.accent}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : (
+          <RegimeWindowDetail
+            current={regimeWindow}
+            isPro={isPro}
+            onSelect={async (v) => {
+              const supabase = createClient()
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+              await supabase
+                .from('user_preferences')
+                .update({ value: v })
+                .eq('user_id', user.id)
+                .eq('name', 'regime_display_window')
+              setRegimeWindow(v)
+              // intentionally NOT closing — user stays to review, closes via X
+            }}
+            onBack={() => setSection(null)}
+          />
+        )}
       </div>
     )
 
@@ -569,6 +710,17 @@ export default function ProfilePage() {
                   : 'Neutral (default)'
               }
               onClick={() => setSection('risk-profile')}
+            />
+            <MenuRow
+              icon={SlidersHorizontal}
+              label="Regime view"
+              desc={
+                regimeWindow === '30' ? 'Mid (30d)' :
+                regimeWindow === '90' ? 'Macro (90d)' :
+                regimeWindow === '180' ? 'Cycle (180d)' :
+                regimeWindow === '360' ? 'Annual (360d)' : 'Mid (30d)'
+              }
+              onClick={() => setSection('regime-window')}
             />
             <MenuRow
               icon={SlidersHorizontal}

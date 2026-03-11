@@ -1,6 +1,8 @@
 // ━━━ Market Pulse Page ━━━
-// v5.0.0 · Sprint 36
+// v5.1.0 · S188 · Sprint 38
 // Changelog:
+//   v5.1.0 — S188: Reads regime_display_window from user_preferences KV, passes ?window= to
+//             /api/market-context. Anonymous users always use window=30.
 //   v5.0.0 — Signal hierarchy overhaul + accent branding restoration:
 //             Neutral/normal states → M.accent (indigo) — brand color, not green
 //             Only genuine positive signals → M.positive (teal)
@@ -471,8 +473,26 @@ export default function PulsePage() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Resolve user + regime window pref before fetching market-context
+        const { createClient: cc } = await import('@/lib/supabase/client')
+        const _supabase = cc()
+        const { data: { user: _user } } = await _supabase.auth.getUser()
+        let regimeWindow = 30
+        if (_user) {
+          const { data: winPref } = await _supabase
+            .from('user_preferences')
+            .select('value')
+            .eq('user_id', _user.id)
+            .eq('name', 'regime_display_window')
+            .maybeSingle()
+          const parsed = parseInt(winPref?.value ?? '30', 10)
+          // Downgrade guard: non-30 windows require Pro — enforce at read time
+          const isPro_ = (await _supabase.from('profiles').select('tier').eq('id', _user.id).maybeSingle()).data?.tier === 'pro'
+          regimeWindow = (!isPro_ && parsed !== 30) ? 30 : parsed
+        }
+
         const [mcRes, mRes] = await Promise.all([
-          fetch('/api/market-context?days=90'),
+          fetch(`/api/market-context?days=90&window=${regimeWindow}`),
           fetch('/api/market'),
         ])
 
@@ -526,15 +546,12 @@ export default function PulsePage() {
           }
         }
 
-        const { createClient } = await import('@/lib/supabase/client')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        setIsAnon(!user)
-        if (user) {
-          const { data: profile } = await supabase
+        setIsAnon(!_user)
+        if (_user) {
+          const { data: profile } = await _supabase
             .from('profiles')
             .select('tier')
-            .eq('id', user.id)
+            .eq('id', _user.id)
             .maybeSingle()
           setIsPro(profile?.tier === 'pro')
         }

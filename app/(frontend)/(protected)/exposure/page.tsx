@@ -1,6 +1,8 @@
 // ━━━ Exposure Page ━━━
-//   v3.8.0 — S-fix-exposure
+//   v3.9.0 — S188
 // Changelog:
+//   v3.9.0 — S188: Reads regime_display_window from user_preferences KV, passes ?window= to
+//             /api/market-context. Anonymous users always use window=30.
 //   v3.8.0 — S-fix-exposure: Regression fixes:
 //            1. patchSnapshotHolding now matches enriched_holdings by asset symbol
 //               directly (via EditHoldingSheet holding.asset), not via portfolioHoldings
@@ -288,42 +290,47 @@ export default function ExposurePage() {
 
     fetchSnapshot()
 
-    fetch('/api/market-context?days=90')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        const regimes = data?.regimes || []
-        if (regimes.length > 0) {
-          setRegime(regimes[0].regime || 'range')
-          setRegimeConfidence(Math.round((regimes[0].confidence || 0) * 100))
-          let days = 1
-          for (let i = 1; i < regimes.length; i++) {
-            if (regimes[i].regime === regimes[0].regime) days++
-            else break
-          }
-          setRegimePersistence(days)
-        }
-        setRegimeHistory(toRegimeRows(regimes))
-        if (data?.current_prices) setCurrentPrices(data.current_prices)
-      })
-      .catch(() => {})
-
-    fetchCoinContext()
-
     ;(async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
+
+        // Resolve regime display window (default 30, Pro-gated for non-30)
+        let regimeWindow = 30
         if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('tier')
-            .eq('id', user.id)
-            .maybeSingle()
-          setIsPro(profile?.tier === 'pro')
+          const [profileRes, winRes] = await Promise.all([
+            supabase.from('profiles').select('tier').eq('id', user.id).maybeSingle(),
+            supabase.from('user_preferences').select('value').eq('user_id', user.id).eq('name', 'regime_display_window').maybeSingle(),
+          ])
+          setIsPro(profileRes.data?.tier === 'pro')
+          const parsed = parseInt(winRes.data?.value ?? '30', 10)
+          // Downgrade guard: non-30 windows are Pro-only
+          regimeWindow = (profileRes.data?.tier !== 'pro' && parsed !== 30) ? 30 : parsed
         }
+
+        fetch(`/api/market-context?days=90&window=${regimeWindow}`)
+          .then(r => r.ok ? r.json() : null)
+          .then((data: any) => {
+            const regimes = data?.regimes || []
+            if (regimes.length > 0) {
+              setRegime(regimes[0].regime || 'range')
+              setRegimeConfidence(Math.round((regimes[0].confidence || 0) * 100))
+              let days = 1
+              for (let i = 1; i < regimes.length; i++) {
+                if (regimes[i].regime === regimes[0].regime) days++
+                else break
+              }
+              setRegimePersistence(days)
+            }
+            setRegimeHistory(toRegimeRows(regimes))
+            if (data?.current_prices) setCurrentPrices(data.current_prices)
+          })
+          .catch(() => {})
       } catch {}
     })()
+
+    fetchCoinContext()
 
     return () => clearTimeout(t)
   }, [])
