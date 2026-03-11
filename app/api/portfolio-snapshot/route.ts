@@ -1,6 +1,7 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v3.1.0 · S189
+// v3.2.0 · S190
 // Changelog:
+//  v3.2.0 — S190: Fix risk profile read — was selecting dropped risk_profile column with .single() on multi-row KV table. Now selects value WHERE name='risk_profile' + maybeSingle(). Risk profile now correctly applied to target_bands and score.
 //  v3.1.0 — S189: Stablecoins now included in alt_breakdown (with category tag) so HoldingsSection
 //           can render them. decimals added to enriched_holdings from asset_mapping.
 //  v3.0.0 — S158: Live weight computation from portfolio_holdings × asset_prices (removes latest_exposure dependency)
@@ -98,9 +99,10 @@ export async function GET() {
         .select('asset_id, price_usd, asset_mapping(symbol)'),
       supabase
         .from('user_preferences')
-        .select('risk_profile')
+        .select('value')
         .eq('user_id', user.id)
-        .single(),
+        .eq('name', 'risk_profile')
+        .maybeSingle(),
       supabase
         .from('latest_regime')
         .select('regime_type')
@@ -206,7 +208,7 @@ export async function GET() {
 
     // ── Risk profile + target bands ──
 
-    const rawProfile = (prefResult.data?.risk_profile ?? null) as RiskProfile | null
+    const rawProfile = (prefResult.data?.value ?? null) as RiskProfile | null
     const resolvedProfile = resolveProfile(rawProfile)
     const regimeKey = toRegimeKey(regimeResult.data?.regime_type ?? null)
     const targetBands = getTargetBands(rawProfile, regimeKey)
