@@ -1,7 +1,10 @@
 // ═══════════════════════════════════════════════
-// PrivacyContext v2.1.0 — App-wide privacy toggle
+// PrivacyContext v2.2.0 — App-wide privacy toggle
 // Story: ca-story148-global-privacy-toggle | Sprint 31
-// Persisted to user_preferences.privacy_mode
+// Persisted to user_preferences KV row name='privacy_mode'
+// v2.2.0 — S190: Migrated from boolean column to KV row (privacy_mode col dropped).
+//           Read: SELECT value WHERE name='privacy_mode' + maybeSingle()
+//           Write: UPDATE value WHERE user_id=? AND name='privacy_mode'
 // Default hidden until loaded (no flash of sensitive data)
 // ═══════════════════════════════════════════════
 'use client'
@@ -38,11 +41,12 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
 
       supabase
         .from('user_preferences')
-        .select('privacy_mode')
+        .select('value')
         .eq('user_id', user.id)
-        .limit(1)
+        .eq('name', 'privacy_mode')
+        .maybeSingle()
         .then(({ data }) => {
-          setHidden(data?.[0]?.privacy_mode ?? false)
+          setHidden(data?.value === 'true')
           setLoaded(true)
         })
     })
@@ -57,9 +61,9 @@ export function PrivacyProvider({ children }: { children: ReactNode }) {
       if (!user) return
       supabase
         .from('user_preferences')
-        .update({ privacy_mode: next })
+        .update({ value: next ? 'true' : 'false' })
         .eq('user_id', user.id)
-        .limit(1)
+        .eq('name', 'privacy_mode')
         .then(({ error }) => {
           if (error) {
             console.error('[privacy] Failed to persist:', error)
