@@ -1,6 +1,9 @@
 // ━━━ HoldingsSection Component ━━━
-// v2.0.0 · S189
+// v2.1.0 · S189e
 // Changelog:
+//   v2.1.0 — S189e: pctExposure now uses postureTotal (sum of in-posture holdings only)
+//            as denominator. Coins toggled off posture → 0%. Remaining coins
+//            re-normalise immediately without waiting for server round-trip.
 //   v2.0.0 — S189: Rows built from enrichedHoldings directly instead of
 //            weight-decomposed BTC/ETH/alt props. Fixes:
 //            - Stablecoins now appear as holding cards (category='stable')
@@ -132,17 +135,28 @@ export default function HoldingsSection({
     .map((h: any) => {
       const symbol = h.asset as string
       const valueUsd = h.value_usd ?? 0
-      const weight = totalValue > 0 ? valueUsd / totalValue : 0
       const bucketCat = toBucketCat(symbol, h.category)
       return {
         symbol,
         iconUrl: h.icon_url ?? null,
         valueUsd,
-        weight,
+        weight: 0,         // filled below after postureTotal is known
         category: bucketCat,
       }
     })
     .sort((a, b) => b.valueUsd - a.valueUsd)
+
+  // pctExposure = share of the IN-POSTURE portfolio only.
+  // Coins toggled off posture show 0%; remaining coins re-normalise to 100%.
+  const postureTotal = enrichedHoldings
+    .filter((h: any) => h?.asset && (h.include_in_exposure ?? true))
+    .reduce((sum: number, h: any) => sum + (h.value_usd ?? 0), 0)
+
+  rows.forEach(row => {
+    const enriched = enrichedHoldings.find((h: any) => h.asset === row.symbol)
+    const inPosture = enriched?.include_in_exposure ?? true
+    row.weight = (inPosture && postureTotal > 0) ? row.valueUsd / postureTotal : 0
+  })
 
   const flaggedSymbol = findFlaggedSymbol(rows, bands, score)
   const sectionHeader = isMisaligned ? 'Most Exposed' : 'Holdings'
