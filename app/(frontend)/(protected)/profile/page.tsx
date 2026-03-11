@@ -253,10 +253,13 @@ function RiskProfileDetail({
 }
 
 // ══════════════════════════════════════════════
-// PROFILE PAGE v4.1.0 — S189
+// PROFILE PAGE v4.1.1 — S190
 // Changes:
-//   - Risk profile: update → upsert (fixes new users losing selection on nav)
-//   - Pro toggle: visible to all users (testing phase)
+//   - Risk profile read/write: removed use of spurious risk_profile column (dropped in
+//     migration). Now reads/writes the name='risk_profile' KV row value field, which
+//     is the correct location in the user_preferences KV table structure.
+//     Read: SELECT value WHERE name='risk_profile' + maybeSingle()
+//     Write: UPDATE value WHERE user_id=? AND name='risk_profile'
 // ══════════════════════════════════════════════
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
@@ -296,9 +299,10 @@ export default function ProfilePage() {
           .single(),
         supabase
           .from('user_preferences')
-          .select('risk_profile')
+          .select('value')
           .eq('user_id', user.id)
-          .single(),
+          .eq('name', 'risk_profile')
+          .maybeSingle(),
       ])
 
       if (profileRes.data) {
@@ -314,7 +318,7 @@ export default function ProfilePage() {
       }
 
       if (prefRes.data) {
-        setRiskProfile(prefRes.data.risk_profile ?? null)
+        setRiskProfile(prefRes.data.value ?? null)
       }
 
       setLoading(false)
@@ -386,9 +390,20 @@ export default function ProfilePage() {
           current={riskProfile}
           onSelect={async (v) => {
             const supabase = createClient()
+            // FIX: fetch user inside handler — userId state may be '' if
+            // useEffect hasn't resolved yet when the sub-view first renders,
+            // causing upsert to silently fail with an empty user_id.
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            // FIX: upsert with onConflict:'user_id' was silently failing — user_id
+            // has no unique constraint so it always inserted a new row.
+            // .single() on read also failed with multiple rows → riskProfile always null.
+            // Solution: UPDATE the risk_profile column on existing row(s) for this user.
             await supabase
               .from('user_preferences')
-              .upsert({ user_id: userId, risk_profile: v }, { onConflict: 'user_id' })
+              .update({ value: v })
+              .eq('user_id', user.id)
+              .eq('name', 'risk_profile')
             setRiskProfile(v)
             // intentionally NOT closing — user stays to review, closes via X
           }}
