@@ -1,6 +1,8 @@
 // ━━━ Exposure Page ━━━
-//   v4.0.0 — S194
+//   v4.1.0 — S195
 // Changelog:
+//   v4.1.0 — S195-fix: initPage extracted + visibilitychange listener added.
+//             Exposure now re-reads regime_display_window when user returns from Profile.
 //   v4.0.0 — S194: Resolve regimeWindow before fetching snapshot.
 //             fetchSnapshot() now accepts optional window param and passes ?window= to
 //             /api/portfolio-snapshot. market-context and snapshot calls use the same
@@ -292,9 +294,9 @@ export default function ExposurePage() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
 
-    // S194: Resolve regimeWindow FIRST, then fire snapshot + market-context together
-    // using the same window value — ensures display and scoring are always consistent.
-    ;(async () => {
+    // S195-fix: extracted into named fn so visibilitychange can re-run it
+    // when user returns from Profile after changing regime_display_window.
+    const initPage = async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
@@ -309,13 +311,10 @@ export default function ExposurePage() {
           const isPro = profileRes.data?.tier === 'pro'
           setIsPro(isPro)
           const parsed = parseInt(winRes.data?.value ?? '30', 10)
-          // Downgrade guard: non-30 windows are Pro-only
           resolvedWindow = (!isPro && parsed !== 30) ? 30 : parsed
         }
 
         setRegimeWindow(resolvedWindow)
-
-        // Fire snapshot and market-context together with the same resolved window
         fetchSnapshot(resolvedWindow)
 
         fetch(`/api/market-context?days=90&window=${resolvedWindow}`)
@@ -337,11 +336,21 @@ export default function ExposurePage() {
           })
           .catch(() => {})
       } catch {}
-    })()
+    }
 
+    initPage()
     fetchCoinContext()
 
-    return () => clearTimeout(t)
+    // Re-init when user returns to this tab (e.g. after changing window in Profile)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') initPage()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [])
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0

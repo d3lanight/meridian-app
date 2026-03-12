@@ -1,6 +1,11 @@
 // ━━━ Portfolio Snapshot API ━━━
-// v3.2.0 · S190
+// v3.3.0 · S194
 // Changelog:
+//  v3.3.0 — S194: Fix regime_type column bug (was 'regime_type', column is 'regime').
+//           Accept ?window= param, read regime_display_window KV preference,
+//           query market_regimes directly (not latest_regime view) filtered by resolved window.
+//           Free users always resolve to window=30 (downgrade guard).
+//           Return regime_window in response payload.
 //  v3.2.0 — S190: Fix risk profile read — was selecting dropped risk_profile column with .single() on multi-row KV table. Now selects value WHERE name='risk_profile' + maybeSingle(). Risk profile now correctly applied to target_bands and score.
 //  v3.1.0 — S189: Stablecoins now included in alt_breakdown (with category tag) so HoldingsSection
 //           can render them. decimals added to enriched_holdings from asset_mapping.
@@ -15,10 +20,19 @@
 //  v1.1.0 — Enriched holdings with cost_basis + category
 
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import type { EnrichedHolding } from '@/types'
 import { getTargetBands, resolveProfile } from '@/lib/risk-profiles'
 import type { RiskProfile, RegimeKey } from '@/lib/risk-profiles'
+
+// Valid window values (days)
+const VALID_WINDOWS = [7, 30, 90, 180, 360] as const
+type WindowValue = typeof VALID_WINDOWS[number]
+
+function parseWindow(raw: string | null, defaultVal: WindowValue = 30): WindowValue {
+  const n = parseInt(raw ?? '', 10)
+  return (VALID_WINDOWS as readonly number[]).includes(n) ? (n as WindowValue) : defaultVal
+}
 
 const EMPTY = {
   isEmpty: true,
@@ -33,9 +47,10 @@ const EMPTY = {
   target_bands: null,
   current_prices: {},
   risk_score: 0,
+  regime_window: 30,
 }
 
-// Resolve regime string from latest_regime to RegimeKey
+// Resolve regime string from market_regimes to RegimeKey
 function toRegimeKey(regime: string | null): RegimeKey {
   const map: Record<string, RegimeKey> = {
     bull: 'bull', bear: 'bear', range: 'range',
@@ -75,7 +90,7 @@ function computeRiskScore(
   return Math.round(Math.max(0, Math.min(100, (1 - totalRelDev / buckets.length) * 100)))
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -83,8 +98,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Parallel fetch: holdings + asset mapping + asset prices + preferences + regime
-    const [holdingsResult, mappingsResult, assetPricesResult, prefResult, regimeResult] = await Promise.all([
+    // Parse ?window= from query string (pre-validation; will be resolved after KV + tier read)
+    const searchParams = request.nextUrl.searchParams
+    const requestedWindow = parseWindow(searchParams.get('window'))
+
+    // Parallel fetch: holdings + asset mapping + asset prices + risk profile pref + regime window pref + tier
+    const [holdingsResult, mappingsResult, assetPricesResult, prefResult, winPrefResult, profileResult] = await Promise.all([
       supabase
         .from('portfolio_holdings')
         .select('asset, quantity, cost_basis, include_in_exposure, price_at_add, created_at')
@@ -104,17 +123,40 @@ export async function GET() {
         .eq('name', 'risk_profile')
         .maybeSingle(),
       supabase
-        .from('latest_regime')
-        .select('regime_type')
-        .limit(1)
-        .single(),
+        .from('user_preferences')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('name', 'regime_display_window')
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', user.id)
+        .maybeSingle(),
     ])
+
+    // Resolve window: prefer KV pref, fall back to query param, default 30.
+    // Downgrade guard: non-Pro users are always clamped to window=30.
+    const isPro = profileResult.data?.tier === 'pro'
+    const kvWindow = parseWindow(winPrefResult.data?.value ?? null)
+    const resolvedWindow: WindowValue = (!isPro && kvWindow !== 30) ? 30 : kvWindow
+
+    // Query market_regimes directly filtered by resolved window (not latest_regime view).
+    // 'window' is a reserved word in Postgres but PostgREST / Supabase JS client
+    // handles it correctly via .eq() — no manual quoting needed here.
+    const regimeResult = await supabase
+      .from('market_regimes')
+      .select('regime')
+      .eq('window', resolvedWindow)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     const allHoldings = holdingsResult.data ?? []
 
     // No holdings at all → empty state
     if (allHoldings.length === 0) {
-      return NextResponse.json(EMPTY)
+      return NextResponse.json({ ...EMPTY, regime_window: resolvedWindow })
     }
 
     // ── Build lookup maps ──
@@ -210,7 +252,8 @@ export async function GET() {
 
     const rawProfile = (prefResult.data?.value ?? null) as RiskProfile | null
     const resolvedProfile = resolveProfile(rawProfile)
-    const regimeKey = toRegimeKey(regimeResult.data?.regime_type ?? null)
+    // S194: read 'regime' column (not 'regime_type' — that column does not exist)
+    const regimeKey = toRegimeKey(regimeResult.data?.regime ?? null)
     const targetBands = getTargetBands(rawProfile, regimeKey)
 
     // ── Enriched holdings (all holdings, not just exposure) ──
@@ -283,6 +326,7 @@ export async function GET() {
       risk_profile: resolvedProfile,
       target_bands: targetBands,
       current_prices: currentPrices,
+      regime_window: resolvedWindow,
     })
   } catch (err) {
     console.error('[portfolio-snapshot] Unexpected error:', err)
