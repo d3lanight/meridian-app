@@ -1,6 +1,9 @@
 // ━━━ Market Pulse Page ━━━
-// v5.1.0 · S188 · Sprint 38
+// v5.2.0 · S191 · Sprint 39
 // Changelog:
+//   v5.2.0 — S191: Lift regimeWindow to state. Pass regimeWindow + onWindowChange to RegimeHero.
+//             Tab selection in hero writes regime_display_window to user_preferences and
+//             re-fetches market-context with the new window so hero data updates immediately.
 //   v5.1.0 — S188: Reads regime_display_window from user_preferences KV, passes ?window= to
 //             /api/market-context. Anonymous users always use window=30.
 //   v5.0.0 — Signal hierarchy overhaul + accent branding restoration:
@@ -462,6 +465,7 @@ export default function PulsePage() {
   const [ethIcon, setEthIcon]               = useState<string | null>(null)
   const [isAnon, setIsAnon]                 = useState(true)
   const [isPro, setIsPro]                   = useState(false)
+  const [regimeWindowState, setRegimeWindowState] = useState(30)   // S191: lifted from local var
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([])
   const { openAuth } = useAuthSheet()
 
@@ -490,6 +494,7 @@ export default function PulsePage() {
           const isPro_ = (await _supabase.from('profiles').select('tier').eq('id', _user.id).maybeSingle()).data?.tier === 'pro'
           regimeWindow = (!isPro_ && parsed !== 30) ? 30 : parsed
         }
+        setRegimeWindowState(regimeWindow)   // S191: lift to state
 
         const [mcRes, mRes] = await Promise.all([
           fetch(`/api/market-context?days=90&window=${regimeWindow}`),
@@ -588,6 +593,32 @@ export default function PulsePage() {
               regimeHistory={regimeHistory}
               isPro={isPro}
               isVolatile={isVolatile}
+              regimeWindow={regimeWindowState}
+              onWindowChange={async (val) => {
+                // Write to user_preferences
+                const { createClient: cc } = await import('@/lib/supabase/client')
+                const _sb = cc()
+                const { data: { user: _u } } = await _sb.auth.getUser()
+                if (!_u) return
+                await _sb
+                  .from('user_preferences')
+                  .update({ value: val })
+                  .eq('user_id', _u.id)
+                  .eq('name', 'regime_display_window')
+                setRegimeWindowState(Number(val))
+                // Re-fetch market-context with new window
+                const mcRes = await fetch(`/api/market-context?days=90&window=${val}`)
+                if (mcRes.ok) {
+                  const mc = await mcRes.json()
+                  const history: RegimeRow[] = toRegimeRows(mc.regimes ?? [])
+                  setRegimeHistory(history)
+                  if (history.length > 0) {
+                    const latest = history[0]
+                    setRegime(latest.regime)
+                    setConfidence(Math.round((latest.confidence ?? 0) * 100))
+                  }
+                }
+              }}
             />
           </div>
 

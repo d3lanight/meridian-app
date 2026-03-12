@@ -1,6 +1,15 @@
 // ━━━ RegimeHero ━━━
-// v2.2.0 · S176 · Sprint 36
+// v2.4.0 · S191 · Sprint 39
 // Changelog:
+//   v2.4.0 — S191: Tab selection writes regime_display_window to user_preferences.
+//             New props: regimeWindow (current saved setting) + onWindowChange callback.
+//             Selecting a tab calls onWindowChange(val) — market/page.tsx owns the write.
+//             Tab default initialises from regimeWindow prop, not hardcoded 30.
+//   v2.3.0 — S191: Expand period tabs to 7d / 30d / 90d / 180d / 360d.
+//             7d is Pro-locked (intraday/short-term view).
+//             90d / 180d / 360d remain Pro-locked.
+//             Scroll direction: current (Now) always on the right — unchanged,
+//             compressToRuns already returns oldest-first.
 //   v2.2.0 — S176: Add isVolatile prop. Renders "· Volatile" amber badge inline
 //             with regime label when true. Badge sits in existing flex row (alignItems: baseline).
 //   v2.1.0 — S174: Remove local RC/gR. Import { RC, getRegime } from shared.
@@ -35,6 +44,8 @@ interface RegimeHeroProps {
   regimeHistory?: RegimeRow[]
   isPro: boolean
   isVolatile?: boolean   // S176: volatile modifier badge
+  regimeWindow?: number       // S191: current saved window from user_preferences
+  onWindowChange?: (val: string) => void  // S191: called when user taps a tab
 }
 
 // ── Component ──────────────────────────────────
@@ -46,9 +57,11 @@ export default function RegimeHero({
   regimeHistory,
   isPro,
   isVolatile = false,
+  regimeWindow = 30,
+  onWindowChange,
 }: RegimeHeroProps) {
   const [open, setOpen] = useState(false)
-  const [period, setPeriod] = useState(30)
+  const [period, setPeriod] = useState(regimeWindow)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rc = getRegime(regime)
 
@@ -66,6 +79,11 @@ export default function RegimeHero({
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth
     }
   }, [open, runs])
+
+  // Sync local period if parent regimeWindow changes after mount
+  useEffect(() => {
+    setPeriod(regimeWindow)
+  }, [regimeWindow])
 
   // Aggregate breakdown
   const agg = useMemo(() => {
@@ -185,15 +203,18 @@ export default function RegimeHero({
 
           {/* Period tabs */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            {([7, 30, 90] as const).map(p => {
-              const locked = p === 90 && !isPro
+            {([7, 30, 90, 180, 360] as const).map(p => {
+              const locked = (p === 7 || p === 90 || p === 180 || p === 360) && !isPro
               const active = period === p && !locked
               return (
                 <button
                   key={p}
                   onClick={e => {
                     e.stopPropagation()
-                    if (!locked) setPeriod(p)
+                    if (!locked) {
+                      setPeriod(p)
+                      onWindowChange?.(String(p))
+                    }
                   }}
                   style={{
                     flex: 1, padding: '7px 0', borderRadius: 12, border: 'none',
