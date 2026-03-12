@@ -1,6 +1,10 @@
 // ━━━ Market Pulse Page ━━━
-// v5.2.0 · S191 · Sprint 39
+// v5.3.0 · S191 · Sprint 39
 // Changelog:
+//   v5.3.0 — S191: onWindowChange re-fetch now updates full regime state: regime, confidence,
+//             persistence, isVolatile, btcR7d, priceVol from the new window's latest row.
+//             btcChange/ethChange always come from current_prices (live 24h) — window-invariant.
+//             EthConfirmationCard spread therefore always reflects live prices regardless of window.
 //   v5.2.0 — S191: Lift regimeWindow to state. Pass regimeWindow + onWindowChange to RegimeHero.
 //             Tab selection in hero writes regime_display_window to user_preferences and
 //             re-fetches market-context with the new window so hero data updates immediately.
@@ -606,16 +610,35 @@ export default function PulsePage() {
                   .eq('user_id', _u.id)
                   .eq('name', 'regime_display_window')
                 setRegimeWindowState(Number(val))
-                // Re-fetch market-context with new window
+                // Re-fetch market-context with new window — update full regime state.
+                // current_prices (btcChange/ethChange) are live 24h values, window-invariant.
+                // EthConfirmationCard spread always reflects live prices regardless of window.
                 const mcRes = await fetch(`/api/market-context?days=90&window=${val}`)
                 if (mcRes.ok) {
                   const mc = await mcRes.json()
-                  const history: RegimeRow[] = toRegimeRows(mc.regimes ?? [])
+                  const regimes: any[] = mc.regimes ?? []
+                  const history: RegimeRow[] = toRegimeRows(regimes)
                   setRegimeHistory(history)
-                  if (history.length > 0) {
-                    const latest = history[0]
+                  if (regimes.length > 0) {
+                    const latest = regimes[0]
                     setRegime(latest.regime)
                     setConfidence(Math.round((latest.confidence ?? 0) * 100))
+                    setPriceVol(latest.vol_7d ?? null)
+                    setBtcR7d(latest.r_7d ?? null)
+                    setIsVolatile(latest.is_volatile ?? false)
+                    let days = 1
+                    for (let i = 1; i < regimes.length; i++) {
+                      if (regimes[i].regime === regimes[0].regime) days++
+                      else break
+                    }
+                    setPersistence(days)
+                  }
+                  // current_prices are live — refresh on window switch too
+                  if (mc.current_prices) {
+                    const btc = mc.current_prices['BTC']
+                    const eth = mc.current_prices['ETH']
+                    if (btc) { setBtcPrice(btc.price); setBtcChange(btc.change_24h) }
+                    if (eth) { setEthPrice(eth.price); setEthChange(eth.change_24h) }
                   }
                 }
               }}

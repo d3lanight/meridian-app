@@ -1,6 +1,8 @@
 // ━━━ RegimeHero ━━━
-// v2.4.0 · S191 · Sprint 39
+// v2.5.0 · S191 · Sprint 39
 // Changelog:
+//   v2.5.0 — S191: "shifts in Xd" label uses period (selected tab value) not totalDays.
+//             totalDays is capped at history fetch limit (90d); period reflects true selection.
 //   v2.4.0 — S191: Tab selection writes regime_display_window to user_preferences.
 //             New props: regimeWindow (current saved setting) + onWindowChange callback.
 //             Selecting a tab calls onWindowChange(val) — market/page.tsx owns the write.
@@ -166,7 +168,7 @@ export default function RegimeHero({
             <span style={{ fontSize: 11, color: M.textMuted }}>confidence</span>
             {agg.tc > 0 && (
               <span style={{ fontSize: 11, color: M.textMuted }}>
-                · {agg.tc} shifts in {totalDays}d
+                · {agg.tc} shifts in {period}d
               </span>
             )}
           </div>

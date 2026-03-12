@@ -1,6 +1,9 @@
 // components/pulse/EthConfirmationCard.tsx
-// v1.4.0 · Sprint 36
+// v1.5.0 · S191 · Sprint 39
 // Changelog:
+//   v1.5.0 — S191: Remove spread value from subtitle text. Spread is a 24h metric
+//             but regime classification is window-based — showing a number creates
+//             misleading context. Can be revisited if recalculated per-window.
 //   v1.4.0 — Removed BTC/ETH/Spread tiles (redundant with PriceCards above).
 //             Header row only: icon + badge + subtitle with spread.
 //   v1.3.0 — Confirming → M.accent; Diverging → M.volatility; Spread → M.text.
@@ -37,7 +40,6 @@ export default function EthConfirmationCard({ btcChange, ethChange, regime, ethI
     regime === 'bear'  ? ethChange <= 0 :
     Math.abs(ethChange - btcChange) < 2
 
-  const divergence  = Math.abs(btcChange - ethChange).toFixed(1)
 
   const statusColor = confirming ? M.accent      : M.volatility
   const statusBg    = confirming ? M.accentMuted  : M.volatilityDim
@@ -56,7 +58,7 @@ export default function EthConfirmationCard({ btcChange, ethChange, regime, ethI
             </span>
           </div>
           <p style={{ fontSize: 10, color: M.textMuted, margin: '3px 0 0', lineHeight: 1.4, fontFamily: FONT_BODY }}>
-            ETH {confirming ? 'aligns with' : 'diverges from'} the {regimeLabel} regime — {divergence}% spread vs BTC
+            ETH {confirming ? 'aligns with' : 'diverges from'} the {regimeLabel} regime
           </p>
         </div>
       </div>
