@@ -1,6 +1,10 @@
 // ━━━ Exposure Page ━━━
-//   v3.9.0 — S188
+//   v4.0.0 — S194
 // Changelog:
+//   v4.0.0 — S194: Resolve regimeWindow before fetching snapshot.
+//             fetchSnapshot() now accepts optional window param and passes ?window= to
+//             /api/portfolio-snapshot. market-context and snapshot calls use the same
+//             resolved window. Free users always use window=30 (downgrade guard).
 //   v3.9.0 — S188: Reads regime_display_window from user_preferences KV, passes ?window= to
 //             /api/market-context. Anonymous users always use window=30.
 //   v3.8.0 — S-fix-exposure: Regression fixes:
@@ -70,6 +74,7 @@ interface SnapshotWithPosture extends PortfolioSnapshot {
   risk_profile?:        string | null
   enriched_holdings?:  any[]
   holdings_count?:     number
+  regime_window?:      number
 }
 
 
@@ -227,6 +232,7 @@ export default function ExposurePage() {
   const [regimePersistence, setRegimePersistence] = useState(1)
   const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
   const [isPro, setIsPro]       = useState(false)
+  const [regimeWindow, setRegimeWindow] = useState<number>(30)
   const [sheet, setSheet]       = useState<{ type: 'add' } | { type: 'edit'; holdingId: string } | null>(null)
   const [currentPrices, setCurrentPrices] = useState<Record<string, { price: number; change_24h: number }>>({})
   const [coinContext, setCoinContext]      = useState<Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>>({})
@@ -234,8 +240,10 @@ export default function ExposurePage() {
   const { holdings: portfolioHoldings, assets, addHolding, updateHolding, removeHolding, refresh } = usePortfolio()
 
 
-  const fetchSnapshot = () => {
-    fetch('/api/portfolio-snapshot')
+  // S194: fetchSnapshot accepts optional window param — both market-context and snapshot
+  // use the same resolved window so regime display and scoring are always consistent.
+  const fetchSnapshot = (window: number = 30) => {
+    fetch(`/api/portfolio-snapshot?window=${window}`)
       .then(r => r.ok ? r.json() : null)
       .then((data: SnapshotWithPosture | null) => { if (data) setSnapshot(data) })
       .catch(() => {})
@@ -255,10 +263,6 @@ export default function ExposurePage() {
   }
 
   // FIX: Match enriched holding by asset symbol directly.
-  // Previous version looked up portfolioHoldings by id to get the asset symbol,
-  // which silently failed if portfolioHoldings hadn't updated yet — leaving
-  // include_in_exposure unchanged and the coin still contributing to posture weights.
-  // Now asset is passed directly by the caller (EditHoldingSheet already has holding.asset).
   const patchSnapshotHolding = (
     assetSymbol: string,
     updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }
@@ -288,28 +292,33 @@ export default function ExposurePage() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
 
-    fetchSnapshot()
-
+    // S194: Resolve regimeWindow FIRST, then fire snapshot + market-context together
+    // using the same window value — ensures display and scoring are always consistent.
     ;(async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
-        // Resolve regime display window (default 30, Pro-gated for non-30)
-        let regimeWindow = 30
+        let resolvedWindow = 30
         if (user) {
           const [profileRes, winRes] = await Promise.all([
             supabase.from('profiles').select('tier').eq('id', user.id).maybeSingle(),
             supabase.from('user_preferences').select('value').eq('user_id', user.id).eq('name', 'regime_display_window').maybeSingle(),
           ])
-          setIsPro(profileRes.data?.tier === 'pro')
+          const isPro = profileRes.data?.tier === 'pro'
+          setIsPro(isPro)
           const parsed = parseInt(winRes.data?.value ?? '30', 10)
           // Downgrade guard: non-30 windows are Pro-only
-          regimeWindow = (profileRes.data?.tier !== 'pro' && parsed !== 30) ? 30 : parsed
+          resolvedWindow = (!isPro && parsed !== 30) ? 30 : parsed
         }
 
-        fetch(`/api/market-context?days=90&window=${regimeWindow}`)
+        setRegimeWindow(resolvedWindow)
+
+        // Fire snapshot and market-context together with the same resolved window
+        fetchSnapshot(resolvedWindow)
+
+        fetch(`/api/market-context?days=90&window=${resolvedWindow}`)
           .then(r => r.ok ? r.json() : null)
           .then((data: any) => {
             const regimes = data?.regimes || []
@@ -659,10 +668,8 @@ export default function ExposurePage() {
         onAdd={async (asset, quantity, costBasis) => {
           const ok = await addHolding({ asset, quantity, cost_basis: costBasis ?? null })
           if (ok) {
-            // FIX: await refresh first so portfolioHoldings is populated
-            // before fetchSnapshot resolves, ensuring holdingIdMap has the new coin.
             await refresh()
-            fetchSnapshot()
+            fetchSnapshot(regimeWindow)
             fetchCoinContext()
             setSheet(null)
           }
@@ -680,18 +687,16 @@ export default function ExposurePage() {
             isOpen={true}
             holding={h}
             onUpdate={async (id, updates) => {
-              // FIX: pass h.asset directly — no portfolioHoldings lookup needed
               patchSnapshotHolding(h.asset, updates)
               const ok = await updateHolding(id, updates)
-              if (ok) { refresh(); fetchSnapshot() }
+              if (ok) { refresh(); fetchSnapshot(regimeWindow) }
               return ok
             }}
             onRemove={async (id) => {
               const ok = await removeHolding(id)
               if (ok) {
-                // FIX: await refresh before fetchSnapshot on remove too
                 await refresh()
-                fetchSnapshot()
+                fetchSnapshot(regimeWindow)
                 fetchCoinContext()
                 setSheet(null)
               }
