@@ -1,14 +1,29 @@
 // ━━━ Top Movers API ━━━
-// v1.3.0 · S205 · Sprint 42 — Cache-Control header added (s-maxage=120, stale-while-revalidate=600)
+// v1.4.0 · Sprint 42 — Redis server-side cache (TTL 120s) + swap to createAnonClient
+// v1.3.0 · S205 · Sprint 42 — Cache-Control header added
 // v1.2.0 · S162 · Sprint 34
 // Returns top 5 gainers and 5 losers from asset_prices
 // icon_url from asset_mapping. Excludes stablecoins. No auth required.
-import { createClient } from '@/lib/supabase/server'
+
 import { NextResponse } from 'next/server'
+import { createAnonClient } from '@/lib/supabase/anon'
+import { cacheGet, cacheSet } from '@/lib/redis'
+
+const CACHE_KEY = 'api:top-movers'
+const CACHE_TTL = 120 // seconds — data refreshes every ~4h via pipeline
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    // Cache hit — return immediately
+    const cached = await cacheGet<object>(CACHE_KEY)
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
+      })
+    }
+
+    // Cache miss — fetch from Supabase
+    const supabase = createAnonClient()
 
     const { data, error } = await supabase
       .from('asset_prices')
@@ -31,11 +46,14 @@ export async function GET() {
         icon_url: row.asset_mapping.icon_url ?? null,
       }))
 
-    // Only positive changes are gainers, only negative are losers
     const gainers = rows.filter((r: any) => r.change_24h > 0).slice(0, 5)
     const losers = rows.filter((r: any) => r.change_24h < 0).sort((a: any, b: any) => a.change_24h - b.change_24h).slice(0, 5)
 
-    return NextResponse.json({ gainers, losers, total: rows.length }, {
+    const payload = { gainers, losers, total: rows.length }
+
+    await cacheSet(CACHE_KEY, payload, CACHE_TTL)
+
+    return NextResponse.json(payload, {
       headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
     })
   } catch {
