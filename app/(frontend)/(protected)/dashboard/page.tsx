@@ -1,7 +1,16 @@
 // ━━━ Today Page ━━━
-// v5.1.0 · S211 · Sprint 43
-// Purpose: Today dashboard — personalised header, regime block, prices trio.
+// v5.3.0 · S213 · Sprint 43
+// Purpose: Today dashboard — Sources carousel (coming-soon gate) + Signals section.
 // Changelog:
+//   v5.3.0 — S213: SOURCES_ENABLED flag. Sources carousel with frosted overlay gate.
+//             Signals wired to /api/market-user (auth-gated). Signal cards with coloured
+//             icon badge, label (asset), timestamp. Severity 0-100 thresholds corrected.
+//             Disclaimer footer. InsightCard replaced with inline signal card render.
+//   v5.2.0 — S212: Inline briefing block replaces <Briefing> component.
+//             Date separator (DM Mono + rule). Headline (Outfit 19px 500) clickable.
+//             Collapsed: italic preview + "Read more →". Expanded: full body +
+//             bullet list (ACCENT dots 0.4 opacity) + Collapse button.
+//             briefExpanded local state. Removes <Briefing> component import.
 //   v5.1.0 — S211: Personalised greeting header (display_name, first-token split).
 //             Date line (DM Mono). ActivityBadge with notification dot.
 //             Regime row: label + day count + gain % + window badge.
@@ -14,7 +23,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Home, Activity, Shield, User } from 'lucide-react'
+import { Home, Activity, Shield, User, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
@@ -23,7 +32,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
 import {
-  Briefing,
   AgentPrompt,
   ActivityBadge,
   InsightCard,
@@ -38,6 +46,10 @@ const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_BODY    = "'DM Sans', sans-serif"
 const FONT_MONO    = "'DM Mono', monospace"
 
+// ── Feature flags ──────────────────────────────────────────────────────────
+// Flip to true when sources backend is ready (S216+)
+const SOURCES_ENABLED = false
+
 // ── Regime gradient wash (top of page background) ─────────────────────────
 
 function regimeGradientWash(regimeCurrent: string): string {
@@ -47,6 +59,50 @@ function regimeGradientWash(regimeCurrent: string): string {
   if (r.includes('volat')) return 'linear-gradient(180deg,rgba(212,160,23,.13) 0%,transparent 100%)'   // amber
   return 'linear-gradient(180deg,rgba(91,127,166,.13) 0%,transparent 100%)'                            // steel blue (range)
 }
+
+// ── Briefing content parser ────────────────────────────────────────────────
+// Content is plain prose. Split into: headline (s[0]), preview (s[1]), bullets (s[2+]).
+
+interface ParsedBriefing {
+  headline: string
+  preview: string
+  bullets: string[]
+}
+
+function parseBriefing(content: string): ParsedBriefing {
+  const sentences = content
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+  return {
+    headline: sentences[0] ?? '',
+    preview:  sentences[1] ?? '',
+    bullets:  sentences.slice(2),
+  }
+}
+
+// ── Signal colour helper ───────────────────────────────────────────────────
+// severity is 0-100 (stored as 0-1 × 100 in mapSignals)
+
+function signalColor(severity: number): string {
+  if (severity >= 70) return '#E76F51'   // coral — high
+  if (severity >= 40) return '#D4A017'   // amber — medium
+  return '#2A9D8F'                        // teal — informational
+}
+
+function signalIcon(action: string) {
+  if (action === 'BUY')  return TrendingUp
+  if (action === 'SELL') return TrendingDown
+  return Minus
+}
+
+// ── Mock sources (shown beneath overlay until SOURCES_ENABLED = true) ──────
+
+const MOCK_SOURCES = [
+  { id: 1, dot: '#F4A261', source: 'COINDESK',   time: '14m ago', headline: 'Bitcoin ETF inflows hit $380M in a single session', tag: 'Market' },
+  { id: 2, dot: '#7B6FA8', source: 'THE BLOCK',  time: '1h ago',  headline: 'SEC signals softer stance on crypto ETF approvals for altcoins', tag: 'Regulation' },
+  { id: 3, dot: '#2A9D8F', source: 'DECRYPT',    time: '2h ago',  headline: 'Ethereum staking rate climbs to 28% ahead of next upgrade', tag: 'ETH' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -131,6 +187,7 @@ export default function DashboardPage() {
   // ── Briefing ───────────────────────────────────────────────────────────
   const [briefingContent,  setBriefingContent]  = useState<string | undefined>(undefined)
   const [briefingPending,  setBriefingPending]  = useState(true)
+  const [briefExpanded,    setBriefExpanded]    = useState(false)
 
   // ── Ask / AgentPrompt ──────────────────────────────────────────────────
   const [activeQuestion, setActiveQuestion] = useState<string | null>(null)
@@ -139,6 +196,9 @@ export default function DashboardPage() {
 
   // ── Posture ────────────────────────────────────────────────────────────
   const [postureLabel, setPostureLabel] = useState<string | null>(null)
+
+  // ── Sources sheet ──────────────────────────────────────────────────────
+  const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
 
   // ── Mount animation ────────────────────────────────────────────────────
   const [mounted, setMounted] = useState(false)
@@ -187,14 +247,22 @@ export default function DashboardPage() {
 
   // ── Fetch: metrics from /api/market (window-invariant) ────────────────
   useEffect(() => {
-    fetch('/api/market')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data) return
-        setMetrics(data.metrics ?? null)
+    const fetches: Promise<Response>[] = [fetch('/api/market')]
+    if (!isAnon) fetches.push(fetch('/api/market-user'))
+
+    Promise.all(fetches)
+      .then(async ([mRes, muRes]) => {
+        if (mRes?.ok) {
+          const data = await mRes.json()
+          setMetrics(data.metrics ?? null)
+        }
+        if (muRes?.ok) {
+          const data = await muRes.json()
+          setSignals(data.signals ?? [])
+        }
       })
       .catch(() => {})
-  }, [])
+  }, [isAnon])
 
   // ── Fetch: briefing (auth only) ────────────────────────────────────────
   useEffect(() => {
@@ -487,30 +555,180 @@ export default function DashboardPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            BRIEFING — existing Briefing component (unchanged)
+            BRIEFING — S212 inline expandable block
         ════════════════════════════════════════════════════════════════ */}
         {!isAnon && (
-          <div style={{ padding: '0 16px 16px', ...anim(mounted, 3) }}>
-            <Briefing
-              content={briefingContent}
-              isPending={briefingPending}
-            />
+          <div style={{ padding: '0 20px 20px', ...anim(mounted, 3) }}>
+
+            {/* Date separator */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 14,
+            }}>
+              <span style={{
+                fontSize: 10,
+                fontFamily: FONT_MONO,
+                fontWeight: 500,
+                color: M.textMuted,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase' as const,
+                whiteSpace: 'nowrap' as const,
+              }}>
+                {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+              </span>
+              <div style={{ flex: 1, height: 1, background: M.borderSubtle }} />
+            </div>
+
+            {/* Briefing body */}
+            {briefingPending || !briefingContent ? (
+              /* Pending skeleton */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <p style={{
+                  fontSize: 12,
+                  color: M.textMuted,
+                  margin: '0 0 6px',
+                  fontFamily: FONT_BODY,
+                  fontStyle: 'italic',
+                }}>
+                  Your briefing is being prepared…
+                </p>
+                {[1, 0.9, 0.72].map((w, i) => (
+                  <div key={i} style={{
+                    height: 12,
+                    borderRadius: 6,
+                    width: `${w * 100}%`,
+                    background: M.borderSubtle,
+                    opacity: 0.5,
+                  }} />
+                ))}
+              </div>
+            ) : (() => {
+              const { headline, preview, bullets } = parseBriefing(briefingContent)
+              return (
+                <>
+                  {/* Headline — clickable to toggle */}
+                  <div
+                    onClick={() => setBriefExpanded(e => !e)}
+                    style={{ cursor: 'pointer', marginBottom: 10 }}
+                  >
+                    <p style={{
+                      fontFamily: FONT_DISPLAY,
+                      fontSize: 19,
+                      fontWeight: 500,
+                      color: M.text,
+                      lineHeight: 1.35,
+                      margin: 0,
+                      letterSpacing: '-0.01em',
+                    }}>
+                      {headline}
+                    </p>
+                  </div>
+
+                  {/* Collapsed: italic preview + Read more */}
+                  {!briefExpanded && (
+                    <div>
+                      {preview && (
+                        <p style={{
+                          fontFamily: FONT_BODY,
+                          fontSize: 14,
+                          fontStyle: 'italic',
+                          color: M.textSecondary,
+                          lineHeight: 1.6,
+                          margin: '0 0 8px',
+                        }}>
+                          {preview}
+                        </p>
+                      )}
+                      <span
+                        onClick={() => setBriefExpanded(true)}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: M.accent,
+                          cursor: 'pointer',
+                          fontFamily: FONT_BODY,
+                        }}
+                      >
+                        Read more →
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Expanded: full body + bullets + Collapse */}
+                  {briefExpanded && (
+                    <div>
+                      {preview && (
+                        <p style={{
+                          fontFamily: FONT_BODY,
+                          fontSize: 14,
+                          color: M.textSecondary,
+                          lineHeight: 1.65,
+                          margin: '0 0 12px',
+                        }}>
+                          {preview}
+                        </p>
+                      )}
+                      {bullets.length > 0 && (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {bullets.map((b, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                              <span style={{
+                                width: 5,
+                                height: 5,
+                                borderRadius: '50%',
+                                background: M.accent,
+                                opacity: 0.4,
+                                flexShrink: 0,
+                                marginTop: 7,
+                              }} />
+                              <span style={{
+                                fontFamily: FONT_BODY,
+                                fontSize: 14,
+                                color: M.textSecondary,
+                                lineHeight: 1.6,
+                              }}>
+                                {b}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <span
+                        onClick={() => setBriefExpanded(false)}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: M.accent,
+                          cursor: 'pointer',
+                          fontFamily: FONT_BODY,
+                          opacity: 0.7,
+                        }}
+                      >
+                        Collapse ↑
+                      </span>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            POSTURE ROW — shown for authenticated users with posture data
+            POSTURE ROW — S212 upgraded pill colours
         ════════════════════════════════════════════════════════════════ */}
         {!isAnon && postureLabel && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '0 20px 16px',
+            padding: '0 20px 20px',
             ...anim(mounted, 4),
           }}>
             <Shield size={16} color={M.textMuted} />
-            <span style={{ fontSize: 13, color: M.textSecondary }}>
+            <span style={{ fontSize: 13, color: M.textSecondary, fontFamily: FONT_BODY }}>
               Positions aligned with regime
             </span>
             <div style={{
@@ -519,19 +737,11 @@ export default function DashboardPage() {
               borderRadius: 20,
               fontSize: 11,
               fontWeight: 600,
-              background: postureLabel === 'Aligned' || postureLabel === 'On track'
-                ? 'rgba(42,157,143,.12)'
-                : M.volatilityDim,
-              color: postureLabel === 'Aligned' || postureLabel === 'On track'
-                ? M.positive
-                : M.volatility,
-              border: `1px solid ${
-                postureLabel === 'Aligned' || postureLabel === 'On track'
-                  ? 'rgba(42,157,143,.25)'
-                  : 'rgba(212,160,23,.25)'
-              }`,
               whiteSpace: 'nowrap' as const,
               fontFamily: FONT_BODY,
+              ...(postureLabel === 'Aligned'    ? { background: 'rgba(42,157,143,.12)',  color: M.positive,   border: '1px solid rgba(42,157,143,.25)' }  :
+                  postureLabel === 'On track'   ? { background: `rgba(123,111,168,.12)`, color: M.accent,     border: `1px solid rgba(123,111,168,.25)` }  :
+                  /* Off target */                { background: M.volatilityDim,         color: M.volatility, border: '1px solid rgba(212,160,23,.25)' }),
             }}>
               {postureLabel}
             </div>
@@ -565,33 +775,227 @@ export default function DashboardPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            SIGNALS — existing signal cards
+            SOURCES CAROUSEL — S213 (coming-soon gate via SOURCES_ENABLED)
         ════════════════════════════════════════════════════════════════ */}
-        {signals.length > 0 && (
-          <div style={{ padding: '0 16px 16px', ...anim(mounted, 7) }}>
+        <div style={{ padding: '0 0 20px', ...anim(mounted, 7) }}>
+          {/* Header row */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 20px 10px',
+          }}>
+            <span style={{
+              fontSize: 10,
+              fontFamily: FONT_MONO,
+              fontWeight: 500,
+              color: M.textMuted,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase' as const,
+            }}>
+              From the web
+            </span>
+            <button
+              onClick={() => SOURCES_ENABLED && setSourcesSheetOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '5px 12px',
+                borderRadius: 20,
+                border: `1.5px solid ${M.border}`,
+                background: 'rgba(255,255,255,0.6)',
+                fontSize: 12,
+                fontWeight: 700,
+                color: M.text,
+                cursor: SOURCES_ENABLED ? 'pointer' : 'default',
+                fontFamily: FONT_BODY,
+              }}
+            >
+              See all <span style={{ fontSize: 11 }}>›</span>
+            </button>
+          </div>
+
+          {/* Carousel + coming-soon overlay wrapper */}
+          <div style={{ position: 'relative' }}>
+            {/* Horizontal scroll cards */}
+            <div style={{
+              display: 'flex',
+              gap: 12,
+              overflowX: 'auto' as const,
+              scrollbarWidth: 'none' as const,
+              padding: '0 20px 4px',
+            }}>
+              {MOCK_SOURCES.map(src => (
+                <div key={src.id} style={{
+                  ...card({ padding: 16 }),
+                  flexShrink: 0,
+                  width: 220,
+                  display: 'flex',
+                  flexDirection: 'column' as const,
+                  gap: 8,
+                }}>
+                  {/* Dot + source + time */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: src.dot,
+                      flexShrink: 0,
+                    }} />
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      color: M.textMuted,
+                      fontFamily: FONT_MONO,
+                      textTransform: 'uppercase' as const,
+                      flex: 1,
+                    }}>
+                      {src.source}
+                    </span>
+                    <span style={{
+                      fontSize: 10,
+                      color: M.textMuted,
+                      fontFamily: FONT_MONO,
+                    }}>
+                      {src.time}
+                    </span>
+                  </div>
+                  {/* Headline */}
+                  <p style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: M.text,
+                    lineHeight: 1.45,
+                    margin: 0,
+                    fontFamily: FONT_BODY,
+                  }}>
+                    {src.headline}
+                  </p>
+                  {/* Tag chip */}
+                  <div style={{
+                    alignSelf: 'flex-start' as const,
+                    padding: '2px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(255,193,7,0.12)',
+                    color: '#D4A017',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    fontFamily: FONT_BODY,
+                  }}>
+                    {src.tag}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Coming-soon overlay — removed when SOURCES_ENABLED = true */}
+            {!SOURCES_ENABLED && (
+              <div style={{
+                position: 'absolute' as const,
+                inset: 0,
+                borderRadius: 16,
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                background: 'rgba(236,234,239,0.72)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'all' as const,
+              }}>
+                <span style={{
+                  fontSize: 11,
+                  fontFamily: FONT_MONO,
+                  color: M.textMuted,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase' as const,
+                }}>
+                  Coming soon
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SIGNALS — S213 live from /api/market-user with coloured badges
+        ════════════════════════════════════════════════════════════════ */}
+        {!isAnon && signals.length > 0 && (
+          <div style={{ padding: '0 20px 8px', ...anim(mounted, 8) }}>
             <div style={{
               fontSize: 10,
-              fontFamily: FONT_BODY,
+              fontFamily: FONT_MONO,
+              fontWeight: 500,
               color: M.textMuted,
               textTransform: 'uppercase' as const,
               letterSpacing: '0.1em',
-              marginBottom: 10,
-              paddingLeft: 4,
+              marginBottom: 12,
             }}>
               Signals &amp; context
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {signals.slice(0, 3).map((sig, i) => (
-                <InsightCard
-                  key={sig.id ?? i}
-                  text={sig.reason}
-                  accentColor={
-                    sig.severity >= 3 ? M.volatility
-                    : sig.severity === 2 ? M.accent
-                    : M.positive
-                  }
-                />
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {signals.slice(0, 3).map((sig, i) => {
+                const color = signalColor(sig.severity)
+                const Icon  = signalIcon(sig.action)
+                return (
+                  <div key={sig.id ?? i} style={{
+                    ...card({ padding: '14px 16px' }),
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                  }}>
+                    {/* Coloured icon badge */}
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      background: `${color}18`,
+                      border: `1px solid ${color}30`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Icon size={15} color={color} />
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: M.text,
+                        lineHeight: 1.5,
+                        margin: '0 0 5px',
+                        fontFamily: FONT_BODY,
+                      }}>
+                        {sig.reason}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.1em',
+                          color: M.textMuted,
+                          fontFamily: FONT_MONO,
+                          textTransform: 'uppercase' as const,
+                        }}>
+                          {sig.asset}
+                        </span>
+                        <span style={{ fontSize: 10, color: M.textMuted, opacity: 0.5 }}>·</span>
+                        <span style={{
+                          fontSize: 10,
+                          color: M.textMuted,
+                          fontFamily: FONT_MONO,
+                        }}>
+                          {sig.time}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -646,15 +1050,18 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════════════════════
             DISCLAIMER
         ════════════════════════════════════════════════════════════════ */}
-        <div style={{
-          textAlign: 'center' as const,
-          padding: '4px 20px 16px',
-          fontSize: 10,
-          color: M.textMuted,
-          fontFamily: FONT_MONO,
-        }}>
-          Educational only · Not financial advice
-        </div>
+        {!isAnon && (
+          <div style={{
+            textAlign: 'center' as const,
+            padding: '8px 20px 20px',
+            fontSize: 10,
+            color: M.textMuted,
+            fontFamily: FONT_MONO,
+            letterSpacing: '0.04em',
+          }}>
+            Educational only · Not financial advice
+          </div>
+        )}
 
       </div>
 
