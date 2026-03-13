@@ -1,5 +1,5 @@
 // ━━━ Today Page ━━━
-// v5.6.1 · S214-navfix · Sprint 43 — Match inline nav style to shared BottomNav
+// v5.6.2 · S215-chatfix · Sprint 43 — Fixed header/footer in chat sheet, no re-typewrite on reopen
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
@@ -1367,8 +1367,11 @@ export default function DashboardPage() {
       ═══════════════════════════════════════════════════════════════════ */}
       <BottomSheet
         isOpen={chatSheetOpen}
-        onClose={() => setChatSheetOpen(false)}
-        scrollable={true}
+        onClose={() => {
+          setChatSheetOpen(false)
+          setChatMessages(prev => prev.map(m => ({ ...m, isNew: false })))
+        }}
+        scrollable={false}
         maxHeight="76vh"
       >
         {/* Header */}
@@ -1405,6 +1408,9 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* Scrollable message area — flex:1 so it fills between fixed header + fixed footer */}
+        <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto' as const, overscrollBehavior: 'contain' }}>
+
         {/* Empty state — before first chip tapped */}
         {chatMessages.length === 0 && !chatTyping && (
           <div style={{ padding: '12px 20px 20px', textAlign: 'center' as const }}>
@@ -1416,7 +1422,7 @@ export default function DashboardPage() {
         )}
 
         {/* Message thread */}
-        <div ref={chatScrollRef}>
+        <div>
           {chatMessages.map((msg, i) => {
             if (msg.role === 'user') {
               return (
@@ -1441,7 +1447,9 @@ export default function DashboardPage() {
           {chatTyping && <TypingDots />}
         </div>
 
-        {/* Chip area */}
+        </div>{/* end scrollable message area */}
+
+        {/* Chip area — fixed footer, always visible */}
         <div style={{
           borderTop: `1px solid ${M.borderSubtle}`,
           padding: '14px 20px 20px',
