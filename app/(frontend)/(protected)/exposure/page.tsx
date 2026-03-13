@@ -309,7 +309,7 @@ export default function ExposurePage() {
         setRegimeWindow(resolvedWindow)
         fetchSnapshot(resolvedWindow)
 
-        fetch(`/api/market-context?days=90&window=${resolvedWindow}`)
+        fetch(`/api/market-context?days=${resolvedWindow}&window=${resolvedWindow}`)
           .then(r => r.ok ? r.json() : null)
           .then((data: any) => {
             const regimes = data?.regimes || []

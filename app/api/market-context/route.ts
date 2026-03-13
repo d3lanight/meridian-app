@@ -1,4 +1,5 @@
 // ━━━ Market Context API ━━━
+// v3.10.0 · Sprint 42 — days param now mirrors window (180/360 supported). VALID_DAYS expanded.
 // v3.9.0 · Sprint 42 — Redis server-side cache (TTL 60s, keyed by window param).
 //                       Supabase only hit on cache miss.
 // v3.8.0 · S207-fix · Sprint 42 — swap createClient → createAnonClient
@@ -14,13 +15,14 @@ import { cacheGet, cacheSet } from '@/lib/redis'
 
 const CACHE_TTL = 60 // seconds — keyed per window value
 
-const VALID_DAYS = [7, 30, 90] as const
+// Days must match valid windows — history depth follows the user's regime view
+const VALID_DAYS = [7, 30, 90, 180, 360] as const
 type ValidDays = (typeof VALID_DAYS)[number]
 
 function parseDays(param: string | null): ValidDays {
   const n = Number(param)
   if (VALID_DAYS.includes(n as ValidDays)) return n as ValidDays
-  return 7
+  return 30
 }
 
 const VALID_WINDOWS = [7, 30, 90, 180, 360] as const

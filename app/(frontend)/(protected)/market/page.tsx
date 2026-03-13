@@ -1,4 +1,5 @@
 // ━━━ Market Pulse Page ━━━
+// v5.6.0 · Sprint 42 — days param mirrors window for correct regime timeline depth.
 // v5.5.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 // v5.4.0 · S207 · Sprint 42
 // Changelog:
@@ -494,7 +495,7 @@ export default function PulsePage() {
 
         // S207: Parallel fetch — public routes + auth-gated market-user for logged-in users
         const fetches: Promise<Response>[] = [
-          fetch(`/api/market-context?days=90&window=${regimeWindow}`),
+          fetch(`/api/market-context?days=${regimeWindow}&window=${regimeWindow}`),
           fetch('/api/market'),
         ]
         if (!isAnon) fetches.push(fetch('/api/market-user'))
@@ -605,7 +606,7 @@ export default function PulsePage() {
                 // Re-fetch market-context with new window — update full regime state.
                 // current_prices (btcChange/ethChange) are live 24h values, window-invariant.
                 // EthConfirmationCard spread always reflects live prices regardless of window.
-                const mcRes = await fetch(`/api/market-context?days=90&window=${val}`)
+                const mcRes = await fetch(`/api/market-context?days=${val}&window=${val}`)
                 if (mcRes.ok) {
                   const mc = await mcRes.json()
                   const regimes: any[] = mc.regimes ?? []
