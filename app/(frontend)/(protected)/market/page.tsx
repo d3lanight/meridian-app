@@ -1,4 +1,5 @@
 // ━━━ Market Pulse Page ━━━
+// v5.5.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 // v5.4.0 · S207 · Sprint 42
 // Changelog:
 //   v5.4.0 — S207: /api/market split — public data from /api/market, per-user portfolio+signals
@@ -41,6 +42,7 @@ import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Lock } from 'lucide-r
 import { M } from '@/lib/meridian'
 import { anim } from '@/lib/ui-helpers'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
+import { useUser } from '@/contexts/UserContext'
 import { User } from 'lucide-react'
 
 import {
@@ -470,45 +472,32 @@ export default function PulsePage() {
   const [isVolatile, setIsVolatile]         = useState(false)
   const [btcIcon, setBtcIcon]               = useState<string | null>(null)
   const [ethIcon, setEthIcon]               = useState<string | null>(null)
-  const [isAnon, setIsAnon]                 = useState(true)
-  const [isPro, setIsPro]                   = useState(false)
-  const [regimeWindowState, setRegimeWindowState] = useState(30)   // S191: lifted from local var
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([])
   const { openAuth } = useAuthSheet()
+
+  // S209: User data from context — no Supabase calls on mount
+  const { isAnon, isPro, regimeWindow: ctxRegimeWindow, userId, loading: userLoading } = useUser()
+  const [regimeWindowState, setRegimeWindowState] = useState(30)
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
   }, [])
 
+  // S209: re-run load when userLoading resolves (context bootstrapped)
   useEffect(() => {
+    if (userLoading) return
+    setRegimeWindowState(ctxRegimeWindow)
     const load = async () => {
       try {
-        // Resolve user + regime window pref before fetching market-context
-        const { createClient: cc } = await import('@/lib/supabase/client')
-        const _supabase = cc()
-        const { data: { user: _user } } = await _supabase.auth.getUser()
-        let regimeWindow = 30
-        if (_user) {
-          const { data: winPref } = await _supabase
-            .from('user_preferences')
-            .select('value')
-            .eq('user_id', _user.id)
-            .eq('name', 'regime_display_window')
-            .maybeSingle()
-          const parsed = parseInt(winPref?.value ?? '30', 10)
-          // Downgrade guard: non-30 windows require Pro — enforce at read time
-          const isPro_ = (await _supabase.from('profiles').select('tier').eq('id', _user.id).maybeSingle()).data?.tier === 'pro'
-          regimeWindow = (!isPro_ && parsed !== 30) ? 30 : parsed
-        }
-        setRegimeWindowState(regimeWindow)   // S191: lift to state
+        const regimeWindow = ctxRegimeWindow
 
         // S207: Parallel fetch — public routes + auth-gated market-user for logged-in users
         const fetches: Promise<Response>[] = [
           fetch(`/api/market-context?days=90&window=${regimeWindow}`),
           fetch('/api/market'),
         ]
-        if (_user) fetches.push(fetch('/api/market-user'))
+        if (!isAnon) fetches.push(fetch('/api/market-user'))
 
         const [mcRes, mRes, marketUserRes] = await Promise.all(fetches)
 
@@ -563,26 +552,17 @@ export default function PulsePage() {
         }
 
         // S207: Wire per-user data from new auth-gated endpoint (portfolio/signals for future use)
-        if (marketUserRes && _user && marketUserRes.ok) {
+        if (marketUserRes && !isAnon && marketUserRes.ok) {
           // Reserved for future portfolio/signals UI on Pulse — data available, not yet rendered
           await marketUserRes.json()
         }
 
-        setIsAnon(!_user)
-        if (_user) {
-          const { data: profile } = await _supabase
-            .from('profiles')
-            .select('tier')
-            .eq('id', _user.id)
-            .maybeSingle()
-          setIsPro(profile?.tier === 'pro')
-        }
       } catch {}
 
       setLoading(false)
     }
     load()
-  }, [])
+  }, [userLoading, ctxRegimeWindow, isAnon])
 
   return (
     <div style={{ padding: '20px 20px 24px' }}>
@@ -612,15 +592,14 @@ export default function PulsePage() {
               isVolatile={isVolatile}
               regimeWindow={regimeWindowState}
               onWindowChange={async (val) => {
-                // Write to user_preferences
+                // Write to user_preferences — userId from context, no getUser() needed
+                if (!userId) return
                 const { createClient: cc } = await import('@/lib/supabase/client')
                 const _sb = cc()
-                const { data: { user: _u } } = await _sb.auth.getUser()
-                if (!_u) return
                 await _sb
                   .from('user_preferences')
                   .update({ value: val })
-                  .eq('user_id', _u.id)
+                  .eq('user_id', userId)
                   .eq('name', 'regime_display_window')
                 setRegimeWindowState(Number(val))
                 // Re-fetch market-context with new window — update full regime state.

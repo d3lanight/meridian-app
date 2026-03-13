@@ -1,4 +1,6 @@
 // app/(frontend)/(protected)/profile/page.tsx
+// Profile v4.3.0 — Sprint 42 · S209: Replace fetchProfile Supabase reads with useUser() context.
+//                    Profile writes (risk_profile, regime_display_window) still go direct to Supabase.
 // Profile v4.2.0 — S188: regime_display_window preference — selector in Portfolio section
 // Sprint: 38
 // Changelog:
@@ -42,6 +44,7 @@ import { M } from '@/lib/meridian'
 import { card } from '@/lib/ui-helpers'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/contexts/UserContext'
 import {
   IdentityHero,
   EditNameSheet,
@@ -354,15 +357,17 @@ function RegimeWindowDetail({
 export default function ProfilePage() {
   const [section, setSection] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [name, setName] = useState<string | null>(null)
-  const [email, setEmail] = useState<string>('')
-  const [tier, setTier] = useState<string | null>(null)
-  const [memberSince, setMemberSince] = useState<string>('')
-  const [userId, setUserId] = useState<string>('')
   const [riskProfile, setRiskProfile] = useState<string | null>(null)
   const [regimeWindow, setRegimeWindow] = useState<string>('30')
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+
+  // S209: identity + prefs from context — no fetchProfile needed for reads
+  const {
+    userId, email, displayName: ctxName, tier, isPro: ctxIsPro, isAdmin,
+    memberSince, riskProfile: ctxRiskProfile, regimeWindow: ctxRegimeWindow,
+    loading: userLoading, refresh: refreshUser,
+  } = useUser()
+  const name = ctxName || null
+  const loading = userLoading
 
   const { hidden, toggleHidden } = usePrivacy()
 
@@ -372,71 +377,12 @@ export default function ProfilePage() {
     return () => clearTimeout(t)
   }, [])
 
+  // S209: sync local pref state from context once loaded
   useEffect(() => {
-    const fetchProfile = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      setUserId(user.id)
-      setEmail(user.email ?? '')
-
-      // Fetch profile + preferences in parallel
-      const [profileRes, prefRes, winRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('display_name, tier, is_admin, created_at')
-          .eq('id', user.id)
-          .single(),
-        supabase
-          .from('user_preferences')
-          .select('value')
-          .eq('user_id', user.id)
-          .eq('name', 'risk_profile')
-          .maybeSingle(),
-        supabase
-          .from('user_preferences')
-          .select('value')
-          .eq('user_id', user.id)
-          .eq('name', 'regime_display_window')
-          .maybeSingle(),
-      ])
-
-      if (profileRes.data) {
-        setName(profileRes.data.display_name ?? null)
-        setTier(profileRes.data.tier ?? null)
-        setIsAdmin(profileRes.data.is_admin ?? false)
-        if (profileRes.data.created_at) {
-          const d = new Date(profileRes.data.created_at)
-          setMemberSince(
-            d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '")
-          )
-        }
-      }
-
-      if (prefRes.data) {
-        setRiskProfile(prefRes.data.value ?? null)
-      }
-
-      if (winRes.data) {
-        const parsed = winRes.data.value ?? '30'
-        // Downgrade guard: non-30 requires Pro
-        const isPro_ = profileRes.data?.tier === 'pro'
-        setRegimeWindow((!isPro_ && parsed !== '30') ? '30' : parsed)
-      } else {
-        // Seed default row for new/existing users who don't have this pref yet
-        supabase
-          .from('user_preferences')
-          .insert({ user_id: user.id, name: 'regime_display_window', value: '30' })
-          .then(() => {}) // fire-and-forget: non-critical seed, read already defaults to '30'
-        setRegimeWindow('30')
-      }
-
-      setLoading(false)
-    }
-
-    fetchProfile()
-  }, [])
+    if (userLoading) return
+    if (ctxRiskProfile !== null) setRiskProfile(ctxRiskProfile)
+    setRegimeWindow(String(ctxRegimeWindow))
+  }, [userLoading, ctxRiskProfile, ctxRegimeWindow])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -444,7 +390,7 @@ export default function ProfilePage() {
     window.location.href = '/dashboard'
   }
 
-  const isPro = tier === 'pro'
+  const isPro = ctxIsPro
 
   // Shared page wrapper style for sub-views
   const subViewWrapper = {
@@ -559,8 +505,8 @@ export default function ProfilePage() {
         <link href={FONTS_LINK} rel="stylesheet" />
         <EditNameSheet
           current={name}
-          userId={userId}
-          onSave={(v) => { setName(v); setSection(null) }}
+          userId={userId ?? ''}
+          onSave={async (_v: string) => { await refreshUser(); setSection(null) }}
           onBack={() => setSection(null)}
         />
       </div>

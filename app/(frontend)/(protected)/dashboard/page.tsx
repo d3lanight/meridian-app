@@ -1,4 +1,6 @@
 // ━━━ Today Page ━━━
+// v5.1.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
+//                            Zero Supabase calls on mount — data already loaded by ProtectedLayout.
 // v5.0.0 · S202 · S204 · Sprint 41
 // Purpose: Today intelligence hub — live briefing, AgentPrompt wired, AnswerCard, tier gate.
 // Changelog:
@@ -14,7 +16,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/contexts/UserContext'
 import { M } from '@/lib/meridian'
 import { anim } from '@/lib/ui-helpers'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
@@ -221,16 +223,12 @@ function ExploreCard() {
 
 export default function TodayPage() {
   const [mounted, setMounted] = useState(false)
-  const [isAnon, setIsAnon] = useState(true)
-  const [displayName, setDisplayName] = useState('')
-  const [isPro, setIsPro] = useState(false)
-  const [regimeWindow, setRegimeWindow] = useState(30)
   const [betaOpen, setBetaOpen] = useState(false)
   const [showProUpgrade, setShowProUpgrade] = useState(false)
 
   // Briefing state
   const [briefingContent, setBriefingContent] = useState<string | undefined>(undefined)
-  const [briefingPending, setBriefingPending] = useState(false)
+  const [briefingPending, setBriefingPending] = useState(true) // true until API responds
 
   // Answer state
   const [answer, setAnswer] = useState<{
@@ -243,60 +241,25 @@ export default function TodayPage() {
 
   const { openAuth } = useAuthSheet()
 
+  // User data from context — no Supabase calls needed
+  const { isAnon, displayName, isPro, regimeWindow, loading: userLoading } = useUser()
+
   // ── Mount ──────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
   }, [])
 
-  // ── Load user + prefs + briefing ──────────────
+  // ── Briefing fetch — only once user state is resolved ─────────────────────
   useEffect(() => {
-    const load = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const anon = !user
-      setIsAnon(anon)
-
-      if (!anon && user) {
-        try {
-          // Profile: display_name + tier
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name, tier')
-            .eq('id', user.id)
-            .maybeSingle()
-
-          if (profile?.display_name) setDisplayName(profile.display_name)
-          const pro = profile?.tier === 'pro'
-          setIsPro(pro)
-
-          // regime_display_window pref (KV) — downgrade guard for free users
-          const { data: windowPref } = await supabase
-            .from('user_preferences')
-            .select('value')
-            .eq('user_id', user.id)
-            .eq('name', 'regime_display_window')
-            .maybeSingle()
-
-          const parsed = parseInt(windowPref?.value ?? '30', 10)
-          const validWindows = [7, 30, 90, 180, 360]
-          const resolvedWindow = (!validWindows.includes(parsed) || (!pro && parsed !== 30)) ? 30 : parsed
-          setRegimeWindow(resolvedWindow)
-
-          // Briefing fetch (parallel — don't block above)
-          fetchBriefing()
-        } catch {}
-      }
-    }
-    load()
-  }, [])
+    if (userLoading) return
+    if (isAnon) { setBriefingPending(false); return }
+    fetchBriefing()
+  }, [userLoading, isAnon])
 
   // ── Briefing fetch ─────────────────────────────
   const fetchBriefing = async () => {
     try {
-      setBriefingPending(false)
-      setBriefingContent(undefined)
-
       const res = await fetch('/api/briefing')
       if (!res.ok) return
 
@@ -439,7 +402,7 @@ export default function TodayPage() {
         Educational purposes only · Not financial advice
       </div>
 
-      {/* ProUpgradeCard overlay — tap on pro-locked chip */}
+      {/* ProUpgradeCard overlay */}
       {showProUpgrade && (
         <div
           onClick={() => setShowProUpgrade(false)}

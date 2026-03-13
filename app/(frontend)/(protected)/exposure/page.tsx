@@ -1,6 +1,8 @@
 // ━━━ Exposure Page ━━━
+// v4.2.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 //   v4.1.0 — S195
 // Changelog:
+// v4.2.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 //   v4.1.0 — S195-fix: initPage extracted + visibilitychange listener added.
 //             Exposure now re-reads regime_display_window when user returns from Profile.
 //   v4.0.0 — S194: Resolve regimeWindow before fetching snapshot.
@@ -41,6 +43,7 @@ import PostureHero from '@/components/exposure/PostureHero'
 import AllocationCard, { buildAllocations } from '@/components/exposure/AllocationCard'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
+import { useUser } from '@/contexts/UserContext'
 import { usePortfolio } from '@/hooks/usePortfolio'
 import InsightCard from '@/components/exposure/InsightCard'
 import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
@@ -233,8 +236,10 @@ export default function ExposurePage() {
   const [regimeConfidence, setRegimeConfidence] = useState<number>(0)
   const [regimePersistence, setRegimePersistence] = useState(1)
   const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
-  const [isPro, setIsPro]       = useState(false)
   const [regimeWindow, setRegimeWindow] = useState<number>(30)
+
+  // S209: user data from context
+  const { isPro, regimeWindow: ctxRegimeWindow, loading: userLoading } = useUser()
   const [sheet, setSheet]       = useState<{ type: 'add' } | { type: 'edit'; holdingId: string } | null>(null)
   const [currentPrices, setCurrentPrices] = useState<Record<string, { price: number; change_24h: number }>>({})
   const [coinContext, setCoinContext]      = useState<Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>>({})
@@ -297,23 +302,10 @@ export default function ExposurePage() {
     // S195-fix: extracted into named fn so visibilitychange can re-run it
     // when user returns from Profile after changing regime_display_window.
     const initPage = async () => {
+      if (userLoading) return
       try {
-        const { createClient } = await import('@/lib/supabase/client')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-
-        let resolvedWindow = 30
-        if (user) {
-          const [profileRes, winRes] = await Promise.all([
-            supabase.from('profiles').select('tier').eq('id', user.id).maybeSingle(),
-            supabase.from('user_preferences').select('value').eq('user_id', user.id).eq('name', 'regime_display_window').maybeSingle(),
-          ])
-          const isPro = profileRes.data?.tier === 'pro'
-          setIsPro(isPro)
-          const parsed = parseInt(winRes.data?.value ?? '30', 10)
-          resolvedWindow = (!isPro && parsed !== 30) ? 30 : parsed
-        }
-
+        // S209: user data already loaded by context — no getUser() or pref fetch needed
+        const resolvedWindow = ctxRegimeWindow
         setRegimeWindow(resolvedWindow)
         fetchSnapshot(resolvedWindow)
 
@@ -351,7 +343,7 @@ export default function ExposurePage() {
       clearTimeout(t)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [])
+  }, [userLoading, ctxRegimeWindow])
 
   const holdingCount  = snapshot?.enriched_holdings?.length ?? snapshot?.holdings_count ?? 0
 
