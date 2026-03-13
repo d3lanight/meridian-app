@@ -1,467 +1,743 @@
 // ━━━ Today Page ━━━
-// v5.1.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
-//                            Zero Supabase calls on mount — data already loaded by ProtectedLayout.
-// v5.0.0 · S202 · S204 · Sprint 41
-// Purpose: Today intelligence hub — live briefing, AgentPrompt wired, AnswerCard, tier gate.
+// v5.1.0 · S211 · Sprint 43
+// Purpose: Today dashboard — personalised header, regime block, prices trio.
 // Changelog:
-//   v5.0.0 — S202/S204: Full wiring.
-//             Fetches: /api/briefing + user_preferences (regime_display_window) + profiles (display_name, tier).
-//             Briefing: live content from /api/briefing, pending → skeleton.
-//             AgentPrompt: live question registry, isPro from profiles.tier.
-//             AnswerCard: inline answer display, dismiss, loading skeleton.
-//             Free gate: portfolio chips → ProBadge + ProUpgradeCard overlay.
-//             ExternalCard and "From the network" divider removed (usage only — files kept).
-//   v4.1.0 — S177: Beta state. WelcomeCard + AnonCTA + ExploreCard.
+//   v5.1.0 — S211: Personalised greeting header (display_name, first-token split).
+//             Date line (DM Mono). ActivityBadge with notification dot.
+//             Regime row: label + day count + gain % + window badge.
+//             Prices trio: BTC / ETH / BTC.D with dividers.
+//             Replaced old anonymous header block with auth-aware greeting.
+//   v5.0.0 — S202+S204: Live briefing, AgentPrompt wired, AnswerCard, /api/ask.
+//   v4.x   — See codebase skill.
+// Affected files: app/(frontend)/dashboard/page.tsx
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useUser } from '@/contexts/UserContext'
+import { useState, useEffect, useCallback } from 'react'
+import { Home, Activity, Shield, User } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
-import { anim } from '@/lib/ui-helpers'
+import { card, anim } from '@/lib/ui-helpers'
+import { getRegimeConfig } from '@/lib/regime-utils'
+import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/contexts/UserContext'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
 import {
-  Bell, Lock, ArrowUpRight, ChevronRight,
-  Activity, Shield,
-} from 'lucide-react'
-import BetaSheet from '@/components/today/BetaSheet'
-import Briefing from '@/components/today/Briefing'
-import AgentPrompt from '@/components/today/AgentPrompt'
+  Briefing,
+  AgentPrompt,
+  ActivityBadge,
+  InsightCard,
+  LearnCard,
+} from '@/components/today'
 import { AnswerCard } from '@/components/agent'
-import { ProUpgradeCard } from '@/components/profile'
+import type { RegimeData, Signal, MarketMetrics } from '@/types'
 
-// ── Fonts ──────────────────────────────────────
+// ── Font constants ─────────────────────────────────────────────────────────
+
 const FONT_DISPLAY = "'Outfit', sans-serif"
 const FONT_BODY    = "'DM Sans', sans-serif"
+const FONT_MONO    = "'DM Mono', monospace"
 
-// ── Helpers ────────────────────────────────────
+// ── Regime gradient wash (top of page background) ─────────────────────────
 
-function getGreeting(): string {
+function regimeGradientWash(regimeCurrent: string): string {
+  const r = regimeCurrent.toLowerCase()
+  if (r.includes('bull'))  return 'linear-gradient(180deg,rgba(42,157,143,.15) 0%,transparent 100%)'  // teal
+  if (r.includes('bear'))  return 'linear-gradient(180deg,rgba(231,111,81,.13) 0%,transparent 100%)'   // coral
+  if (r.includes('volat')) return 'linear-gradient(180deg,rgba(212,160,23,.13) 0%,transparent 100%)'   // amber
+  return 'linear-gradient(180deg,rgba(91,127,166,.13) 0%,transparent 100%)'                            // steel blue (range)
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Returns first word of a free-text display name, or full string if no space. */
+function firstName(name: string | null | undefined): string {
+  if (!name) return ''
+  return name.trim().split(/\s+/)[0]
+}
+
+/** Returns "Good morning / afternoon / evening" based on local hour. */
+function greeting(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Good morning'
   if (h < 18) return 'Good afternoon'
   return 'Good evening'
 }
 
-function getDateString(): string {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  })
+/** Formats today as "Friday · March 13" */
+function todayLabel(): string {
+  const now = new Date()
+  const day  = now.toLocaleDateString('en-US', { weekday: 'long' })
+  const date = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  return `${day} · ${date}`
 }
 
-// ── Beta Chip ──────────────────────────────────
-
-function BetaChip({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        background: `linear-gradient(135deg, ${M.accentMuted}, rgba(90,77,138,0.05))`,
-        border: `1px solid ${M.borderAccent}`,
-        borderRadius: 100, padding: '5px 11px 5px 8px',
-        cursor: 'pointer', fontFamily: FONT_BODY,
-      }}
-    >
-      <style>{`
-        @keyframes betapulse {
-          0%, 100% { opacity: 1; box-shadow: 0 0 0 2px rgba(123,111,168,0.18); }
-          50% { opacity: 0.45; box-shadow: 0 0 0 4px rgba(123,111,168,0.07); }
-        }
-      `}</style>
-      <div style={{
-        width: 5, height: 5, borderRadius: '50%',
-        background: M.accent,
-        boxShadow: `0 0 0 2px ${M.accentDim}`,
-        animation: 'betapulse 2.4s ease-in-out infinite',
-      }} />
-      <span style={{
-        fontSize: 10, fontWeight: 700, color: M.accent,
-        letterSpacing: '0.07em', textTransform: 'uppercase',
-      }}>
-        Beta
-      </span>
-    </button>
-  )
+/** Format USD price compactly. */
+function formatPrice(n: number): string {
+  if (n >= 1000) return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+  if (n >= 1)    return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  return '$' + n.toPrecision(3)
 }
 
-// ── Anon CTA ───────────────────────────────────
+/** Uppercase regime label from raw DB key — not needed, mapRegime already returns the full label. */
 
-function AnonCTA({ onAuth }: { onAuth: (trigger: string, mode?: 'login' | 'signup') => void }) {
-  return (
-    <div style={{
-      background: `linear-gradient(135deg, ${M.accentMuted}, rgba(123,111,168,0.03))`,
-      border: `1px solid ${M.borderAccent}`,
-      borderRadius: 24, padding: 18,
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Lock size={14} color={M.accent} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_DISPLAY }}>
-          Track your portfolio
-        </span>
-      </div>
-      <p style={{
-        fontSize: 13, color: M.textSecondary,
-        lineHeight: 1.65, margin: '0 0 14px', fontFamily: FONT_BODY,
-      }}>
-        Sign in to see your posture score, allocation targets, and how your portfolio aligns with the current market regime.
-      </p>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={() => onAuth('Today', 'login')}
-          style={{
-            flex: 1,
-            background: `linear-gradient(90deg, ${M.accent}, ${M.accentDeep})`,
-            color: 'white', padding: '11px 16px',
-            borderRadius: 16, border: 'none',
-            fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT_BODY,
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 6,
-            boxShadow: '0 4px 14px rgba(90,77,138,0.22)',
-          }}
-        >
-          Sign in <ArrowUpRight size={13} />
-        </button>
-        <button
-          onClick={() => onAuth('Today', 'signup')}
-          style={{
-            flex: 1,
-            background: 'rgba(255,255,255,0.5)',
-            color: M.accentDeep, padding: '11px 16px',
-            borderRadius: 16,
-            border: `1px solid ${M.borderAccent}`,
-            fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT_BODY,
-          }}
-        >
-          Create account
-        </button>
-      </div>
-    </div>
-  )
+/** Colour for the regime label text — matches against full label string from mapRegime. */
+function regimeLabelColor(regimeCurrent: string): string {
+  const r = regimeCurrent.toLowerCase()
+  if (r.includes('bull'))  return M.positive
+  if (r.includes('bear'))  return M.negative
+  if (r.includes('volat')) return M.volatility
+  return '#5B7FA6'
 }
 
-// ── Explore Card ───────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
-function ExploreCard() {
-  const items = [
-    {
-      icon: Activity,
-      label: 'Pulse',
-      desc: 'Live market regime & signals',
-      color: M.accent,
-      bg: M.accentDim,
-      href: '/market',
-    },
-    {
-      icon: Shield,
-      label: 'Exposure',
-      desc: 'Your portfolio posture & holdings',
-      color: M.positive,
-      bg: M.positiveDim,
-      href: '/exposure',
-    },
-  ]
-
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.6)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      borderRadius: 24, padding: '16px 18px',
-      border: '1px solid rgba(255,255,255,0.8)',
-      boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 600, color: M.textMuted,
-        textTransform: 'uppercase', letterSpacing: '0.09em',
-        fontFamily: FONT_BODY, marginBottom: 12,
-      }}>
-        Explore Meridian
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map(({ icon: Icon, label, desc, color, bg, href }) => (
-          <a
-            key={label}
-            href={href}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              background: 'rgba(255,255,255,0.45)',
-              border: '1px solid rgba(255,255,255,0.7)',
-              borderRadius: 16, padding: '12px 14px',
-              textDecoration: 'none',
-            }}
-          >
-            <div style={{
-              width: 36, height: 36, borderRadius: 11,
-              background: bg,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <Icon size={16} color={color} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: M.text, fontFamily: FONT_BODY }}>
-                {label}
-              </div>
-              <div style={{ fontSize: 12, color: M.textMuted, fontFamily: FONT_BODY, marginTop: 1 }}>
-                {desc}
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
-  )
+interface BriefingApiResponse {
+  status: 'pending' | 'ready'
+  content?: string
 }
 
-// ── Page ────────────────────────────────────────
+interface AskApiResponse {
+  answer: string
+  question_id: string
+  generated_at: string
+  regime_window: number
+}
 
-export default function TodayPage() {
-  const [mounted, setMounted] = useState(false)
-  const [betaOpen, setBetaOpen] = useState(false)
-  const [showProUpgrade, setShowProUpgrade] = useState(false)
+// ── Nav config ─────────────────────────────────────────────────────────────
 
-  // Briefing state
-  const [briefingContent, setBriefingContent] = useState<string | undefined>(undefined)
-  const [briefingPending, setBriefingPending] = useState(true) // true until API responds
+const NAV_TABS = [
+  { id: 'home',     label: 'Today',    icon: Home,     href: '/dashboard' },
+  { id: 'market',   label: 'Pulse',    icon: Activity, href: '/market'    },
+  { id: 'exposure', label: 'Exposure', icon: Shield,   href: '/exposure'  },
+  { id: 'profile',  label: 'Profile',  icon: User,     href: '/profile'   },
+]
 
-  // Answer state
-  const [answer, setAnswer] = useState<{
-    text: string
-    question: string
-    generated_at: string
-  } | null>(null)
-  const [answerLoading, setAnswerLoading] = useState(false)
+// ── Page ───────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const router        = useRouter()
+  const { userId, displayName, tier, isAnon, loading: userLoading, regimeWindow } = useUser()
+  const { openAuth }  = useAuthSheet()
+  const isPro         = tier === 'pro'
+  const handleOpenAuth = () => openAuth('dashboard-cta')
+
+  // ── Market data ────────────────────────────────────────────────────────
+  const [regime,  setRegime]  = useState<RegimeData | null>(null)
+  const [metrics, setMetrics] = useState<MarketMetrics | null>(null)
+  const [signals, setSignals] = useState<Signal[]>([])
+  const [regimeDay, setRegimeDay] = useState<number | null>(null)
+
+  // ── Briefing ───────────────────────────────────────────────────────────
+  const [briefingContent,  setBriefingContent]  = useState<string | undefined>(undefined)
+  const [briefingPending,  setBriefingPending]  = useState(true)
+
+  // ── Ask / AgentPrompt ──────────────────────────────────────────────────
   const [activeQuestion, setActiveQuestion] = useState<string | null>(null)
+  const [answer,         setAnswer]         = useState<AskApiResponse | null>(null)
+  const [answerQuestion, setAnswerQuestion] = useState<string>('')
 
-  const { openAuth } = useAuthSheet()
+  // ── Posture ────────────────────────────────────────────────────────────
+  const [postureLabel, setPostureLabel] = useState<string | null>(null)
 
-  // User data from context — no Supabase calls needed
-  const { isAnon, displayName, isPro, regimeWindow, loading: userLoading } = useUser()
-
-  // ── Mount ──────────────────────────────────────
+  // ── Mount animation ────────────────────────────────────────────────────
+  const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
   }, [])
 
-  // ── Briefing fetch — only once user state is resolved ─────────────────────
+  // ── Fetch: regime — same source + window as Pulse page ────────────────
   useEffect(() => {
     if (userLoading) return
+    fetch(`/api/market-context?window=${regimeWindow}&days=${regimeWindow}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data?.regimes?.length) return
+        const latest = data.regimes[0]
+        if (!latest) return
+        const REGIME_LABELS: Record<string, string> = {
+          bull: 'Bull Market', bear: 'Bear Market',
+          range: 'Range', volatility: 'High Volatility',
+          insufficient_data: 'Insufficient Data',
+        }
+        const r1d  = (latest.r_1d  ?? 0) * 100
+        const r7d  = (latest.r_7d  ?? 0) * 100
+        const vol  = (latest.vol_7d ?? 0) * 100
+        const regimeData: RegimeData = {
+          current:     REGIME_LABELS[latest.regime] ?? latest.regime ?? 'Unknown',
+          confidence:  Math.round((latest.confidence ?? 0) * 100),
+          persistence: 0,
+          trend:       `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
+          dailyShift:  r1d > 3 ? 'High' : r1d > -3 ? 'Moderate' : 'Low',
+          volatility:  `${vol.toFixed(0)}%`,
+        }
+        setRegime(regimeData)
+        const rows  = data.regimes as { regime: string }[]
+        const first = rows[0]?.regime
+        let count = 0
+        for (const row of rows) {
+          if (row.regime !== first) break
+          count++
+        }
+        setRegimeDay(count)
+      })
+      .catch(() => {})
+  }, [userLoading, regimeWindow])
+
+  // ── Fetch: metrics from /api/market (window-invariant) ────────────────
+  useEffect(() => {
+    fetch('/api/market')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data) return
+        setMetrics(data.metrics ?? null)
+      })
+      .catch(() => {})
+  }, [])
+
+  // ── Fetch: briefing (auth only) ────────────────────────────────────────
+  useEffect(() => {
     if (isAnon) { setBriefingPending(false); return }
-    fetchBriefing()
-  }, [userLoading, isAnon])
+    fetch('/api/briefing')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: BriefingApiResponse | null) => {
+        if (!data) { setBriefingPending(false); return }
+        if (data.status === 'ready') {
+          setBriefingContent(data.content)
+          setBriefingPending(false)
+        } else {
+          setBriefingPending(true)
+        }
+      })
+      .catch(() => setBriefingPending(false))
+  }, [isAnon])
 
-  // ── Briefing fetch ─────────────────────────────
-  const fetchBriefing = async () => {
-    try {
-      const res = await fetch('/api/briefing')
-      if (!res.ok) return
+  // ── Fetch: portfolio snapshot for posture label ────────────────────────
+  useEffect(() => {
+    if (isAnon) return
+    fetch('/api/portfolio-snapshot')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data) return
+        const score = data.posture_score ?? null
+        if (score === null) return
+        if      (score >= 80) setPostureLabel('Aligned')
+        else if (score >= 50) setPostureLabel('On track')
+        else                  setPostureLabel('Off target')
+      })
+      .catch(() => {})
+  }, [isAnon])
 
-      const data = await res.json()
-      if (data.status === 'pending') {
-        setBriefingPending(true)
-      } else if (data.status === 'ready' && data.content) {
-        setBriefingContent(data.content)
-        setBriefingPending(false)
-      }
-    } catch {}
-  }
-
-  // ── Ask handler ────────────────────────────────
-  async function handleQuestion(questionId: string) {
+  // ── Handle question chip tap ───────────────────────────────────────────
+  const handleQuestion = useCallback(async (questionId: string) => {
+    if (isAnon) { openAuth('agent-prompt-question'); return }
     setActiveQuestion(questionId)
-    setAnswerLoading(true)
     setAnswer(null)
+
+    // Find the question label from AgentPrompt QUESTIONS (sourced from component)
+    const labelMap: Record<string, string> = {
+      'market.regime_today':       'What regime are we in?',
+      'market.regime_duration':    'How long has this regime lasted?',
+      'market.signals_now':        'Key signals right now',
+      'market.volatility_context': 'Is volatility normal?',
+      'market.sentiment_meaning':  'What does sentiment mean?',
+      'portfolio.my_posture':      'How is my portfolio positioned?',
+      'portfolio.biggest_risk':    'My biggest risk right now',
+      'portfolio.posture_score':   'Why is my posture score this?',
+      'portfolio.alt_exposure':    'What does my ALT allocation mean?',
+      'portfolio.watch_today':     'What to watch in my portfolio',
+    }
+    setAnswerQuestion(labelMap[questionId] ?? questionId)
+
     try {
-      const res = await fetch('/api/ask', {
+      const res  = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question_id: questionId, regime_window: regimeWindow }),
       })
-      if (!res.ok) throw new Error('Failed')
-      const data = await res.json()
-      setAnswer({
-        text: data.answer,
-        question: questionId,
-        generated_at: data.generated_at,
-      })
+      if (!res.ok) throw new Error(`ask ${res.status}`)
+      const data: AskApiResponse = await res.json()
+      setAnswer(data)
     } catch {
-      // silently clear — no error state for v1
+      // silently fail — AnswerCard won't appear
     } finally {
-      setAnswerLoading(false)
       setActiveQuestion(null)
     }
-  }
+  }, [isAnon, openAuth, regimeWindow])
 
-  const greeting = getGreeting()
-  const title = (!isAnon && displayName) ? `${greeting}, ${displayName}` : greeting
-  const hasBriefing = briefingPending || !!briefingContent
+  const handleProTap = useCallback(() => {
+    // Navigate to Profile where ProUpgradeCard is surfaced
+    router.push('/profile')
+  }, [router])
+
+  // ── Derived display values ─────────────────────────────────────────────
+  const name        = firstName(displayName)
+  const greetText   = greeting()
+  const dateText    = todayLabel()
+  const regimeType  = regime?.current ?? ''           // already full label from mapRegime
+  const labelText   = regimeType
+  const labelColor  = regimeLabelColor(regimeType)
+
+  // Gain % — regime.trend is already formatted like "+4.1%" from mapRegime
+  const gainLabel   = regime?.trend ?? null
+
+  const btcDom      = metrics?.btcDominance ?? null   // camelCase per MarketMetrics type
+
+  // BTC + ETH prices from /api/market-context current_prices record
+  const [btcPrice, setBtcPrice] = useState<number | null>(null)
+  const [ethPrice,  setEthPrice] = useState<number | null>(null)
+  useEffect(() => {
+    fetch('/api/market-context?window=30&days=7')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        const prices = data?.current_prices ?? {}   // snake_case per route.ts payload
+        if (prices['BTC']?.price) setBtcPrice(prices['BTC'].price)
+        if (prices['ETH']?.price) setEthPrice(prices['ETH'].price)
+      })
+      .catch(() => {})
+  }, [])
+
+  // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '20px 20px 24px' }}>
-      {/* Header */}
-      <div style={{
-        ...anim(mounted, 0),
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        marginBottom: 24,
-      }}>
-        <div>
-          <h1 style={{
-            fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 400,
-            color: M.text, lineHeight: 1.3, marginBottom: 6,
-          }}>
-            {title}
-          </h1>
-          <p style={{ fontSize: 12, color: M.textMuted, margin: 0, fontFamily: FONT_BODY }}>
-            {getDateString()}
-          </p>
-        </div>
+    <div style={{
+      minHeight: '100dvh',
+      background: M.bg,
+      fontFamily: FONT_BODY,
+      position: 'relative',
+    }}>
 
-        {/* Beta chip + bell */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BetaChip onClick={() => setBetaOpen(true)} />
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.5)',
-            border: '1px solid rgba(255,255,255,0.8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Bell size={15} color={M.textSecondary} />
+      {/* ── Regime wash — colour reacts to current regime ── */}
+      <div style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0,
+        height: 320,
+        background: regimeGradientWash(regimeType),
+        pointerEvents: 'none',
+        zIndex: 0,
+        transition: 'background 0.6s ease',
+      }} />
+
+      {/* ── Scrollable content ── */}
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        maxWidth: 430,
+        margin: '0 auto',
+        paddingBottom: 96,
+        overflowX: 'hidden',
+      }}>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            HEADER — S211
+        ════════════════════════════════════════════════════════════════ */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          padding: '14px 20px 8px',
+          ...anim(mounted, 0),
+        }}>
+          <div>
+            <div style={{
+              fontSize: 11,
+              color: M.textMuted,
+              fontWeight: 500,
+              fontFamily: FONT_BODY,
+              marginBottom: 4,
+            }}>
+              {dateText}
+            </div>
+            <div style={{
+              fontFamily: FONT_DISPLAY,
+              fontSize: 26,
+              fontWeight: 600,
+              color: M.text,
+              lineHeight: 1.2,
+              letterSpacing: '-0.02em',
+            }}>
+              {greetText}{name ? `,\n${name}.` : '.'}
+            </div>
+          </div>
+
+          {/* Bell — uses existing ActivityBadge */}
+          <div style={{ marginTop: 4, flexShrink: 0 }}>
+            <ActivityBadge count={1} />
           </div>
         </div>
-      </div>
 
-      {/* Briefing — authenticated only, when briefing data available */}
-      {!isAnon && hasBriefing && (
-        <div style={{ ...anim(mounted, 1), marginBottom: 12 }}>
-          <Briefing
-            content={briefingContent}
-            isPending={briefingPending}
-          />
-        </div>
-      )}
+        {/* ═══════════════════════════════════════════════════════════════
+            REGIME ROW — S211
+        ════════════════════════════════════════════════════════════════ */}
+        {regime && (
+          <div style={{
+            padding: '2px 20px 4px',
+            ...anim(mounted, 1),
+          }}>
+            {/* Regime label */}
+            <div style={{
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase' as const,
+              color: labelColor,
+              marginBottom: 4,
+            }}>
+              {labelText}
+            </div>
 
-      {/* AgentPrompt — authenticated only */}
-      {!isAnon && (
-        <div style={{ ...anim(mounted, 2), marginBottom: 12 }}>
+            {/* Stats row */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap' as const,
+            }}>
+              {regimeDay !== null && (
+                <span style={{
+                  fontSize: 12,
+                  color: M.textMuted,
+                }}>
+                  {regimeDay}th day
+                </span>
+              )}
+              {gainLabel && (
+                <>
+                  <span style={{ fontSize: 12, color: M.textMuted, opacity: 0.4 }}>·</span>
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: M.positive,
+                    fontFamily: FONT_BODY,
+                  }}>
+                    {gainLabel}
+                  </span>
+                </>
+              )}
+              {/* Window badge */}
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '1px 7px',
+                borderRadius: 9,
+                background: 'rgba(255,255,255,0.52)',
+                color: M.textSecondary,
+                fontSize: 10,
+                fontWeight: 600,
+                fontFamily: FONT_BODY,
+                border: `1px solid rgba(255,255,255,0.7)`,
+              }}>
+                {regimeWindow}d
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            PRICES TRIO — S211
+        ════════════════════════════════════════════════════════════════ */}
+        {(btcPrice || ethPrice || btcDom) && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '8px 20px 14px',
+            ...anim(mounted, 2),
+          }}>
+            {[
+              { sym: 'BTC',   val: btcPrice  !== null ? formatPrice(btcPrice)               : null },
+              { sym: 'ETH',   val: ethPrice  !== null ? formatPrice(ethPrice)               : null },
+              { sym: 'BTC.D', val: btcDom    !== null ? `${btcDom.toFixed(1)}%`             : null },
+            ]
+              .filter(item => item.val !== null)
+              .map((item, i) => (
+                <div key={item.sym} style={{ display: 'flex', alignItems: 'center' }}>
+                  {i > 0 && (
+                    <div style={{
+                      width: 1,
+                      height: 24,
+                      background: `rgba(45,36,22,.1)`,
+                      margin: '0 18px',
+                    }} />
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{
+                      fontSize: 10,
+                      textTransform: 'uppercase' as const,
+                      letterSpacing: '0.1em',
+                      color: M.textMuted,
+                      fontWeight: 600,
+                      fontFamily: FONT_BODY,
+                    }}>
+                      {item.sym}
+                    </div>
+                    <div style={{
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: M.text,
+                      letterSpacing: '-0.01em',
+                      fontFamily: FONT_BODY,
+                    }}>
+                      {item.val}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            BRIEFING — existing Briefing component (unchanged)
+        ════════════════════════════════════════════════════════════════ */}
+        {!isAnon && (
+          <div style={{ padding: '0 16px 16px', ...anim(mounted, 3) }}>
+            <Briefing
+              content={briefingContent}
+              isPending={briefingPending}
+            />
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            POSTURE ROW — shown for authenticated users with posture data
+        ════════════════════════════════════════════════════════════════ */}
+        {!isAnon && postureLabel && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '0 20px 16px',
+            ...anim(mounted, 4),
+          }}>
+            <Shield size={16} color={M.textMuted} />
+            <span style={{ fontSize: 13, color: M.textSecondary }}>
+              Positions aligned with regime
+            </span>
+            <div style={{
+              marginLeft: 'auto',
+              padding: '3px 10px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 600,
+              background: postureLabel === 'Aligned' || postureLabel === 'On track'
+                ? 'rgba(42,157,143,.12)'
+                : M.volatilityDim,
+              color: postureLabel === 'Aligned' || postureLabel === 'On track'
+                ? M.positive
+                : M.volatility,
+              border: `1px solid ${
+                postureLabel === 'Aligned' || postureLabel === 'On track'
+                  ? 'rgba(42,157,143,.25)'
+                  : 'rgba(212,160,23,.25)'
+              }`,
+              whiteSpace: 'nowrap' as const,
+              fontFamily: FONT_BODY,
+            }}>
+              {postureLabel}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            AGENT PROMPT — existing component (unchanged)
+        ════════════════════════════════════════════════════════════════ */}
+        <div style={{ padding: '0 16px 16px', ...anim(mounted, 5) }}>
           <AgentPrompt
             isPro={isPro}
             activeQuestion={activeQuestion}
             onQuestion={handleQuestion}
-            onProTap={() => setShowProUpgrade(true)}
+            onProTap={handleProTap}
           />
         </div>
-      )}
 
-      {/* AnswerCard — shown when loading or answer ready */}
-      {!isAnon && (answerLoading || answer) && (
-        <div style={{ ...anim(mounted, 3), marginBottom: 12 }}>
-          {answerLoading ? (
+        {/* ═══════════════════════════════════════════════════════════════
+            ANSWER CARD — shown after chip tap (existing component)
+        ════════════════════════════════════════════════════════════════ */}
+        {answer && (
+          <div style={{ padding: '0 16px 16px', ...anim(mounted, 6) }}>
             <AnswerCard
-              answer=""
-              question={activeQuestion ?? ''}
-              generated_at={new Date().toISOString()}
-              onDismiss={() => setAnswer(null)}
-              loading
-            />
-          ) : answer ? (
-            <AnswerCard
-              answer={answer.text}
-              question={answer.question}
+              answer={answer.answer}
+              question={answerQuestion}
               generated_at={answer.generated_at}
               onDismiss={() => setAnswer(null)}
             />
-          ) : null}
-        </div>
-      )}
-
-      {/* AnonCTA — anonymous only */}
-      {isAnon && (
-        <div style={{ ...anim(mounted, 1), marginBottom: 12 }}>
-          <AnonCTA onAuth={openAuth} />
-        </div>
-      )}
-
-      {/* ExploreCard */}
-      <div style={{ ...anim(mounted, isAnon ? 2 : 4), marginBottom: 12 }}>
-        <ExploreCard />
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        ...anim(mounted, isAnon ? 3 : 5),
-        textAlign: 'center', padding: '12px 0', fontSize: 10, color: M.textMuted,
-        fontFamily: FONT_BODY,
-      }}>
-        Educational purposes only · Not financial advice
-      </div>
-
-      {/* ProUpgradeCard overlay */}
-      {showProUpgrade && (
-        <div
-          onClick={() => setShowProUpgrade(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 40,
-            background: 'rgba(45,36,22,0.22)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
-            display: 'flex', alignItems: 'flex-end',
-            padding: '0 20px 96px',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 428, margin: '0 auto' }}
-          >
-            <ProUpgradeCard />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* BetaSheet */}
-      {betaOpen && (
+        {/* ═══════════════════════════════════════════════════════════════
+            SIGNALS — existing signal cards
+        ════════════════════════════════════════════════════════════════ */}
+        {signals.length > 0 && (
+          <div style={{ padding: '0 16px 16px', ...anim(mounted, 7) }}>
+            <div style={{
+              fontSize: 10,
+              fontFamily: FONT_BODY,
+              color: M.textMuted,
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.1em',
+              marginBottom: 10,
+              paddingLeft: 4,
+            }}>
+              Signals &amp; context
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {signals.slice(0, 3).map((sig, i) => (
+                <InsightCard
+                  key={sig.id ?? i}
+                  text={sig.reason}
+                  accentColor={
+                    sig.severity >= 3 ? M.volatility
+                    : sig.severity === 2 ? M.accent
+                    : M.positive
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ANONYMOUS CTA — shown only for anon users
+        ════════════════════════════════════════════════════════════════ */}
+        {isAnon && (
+          <div style={{ padding: '0 16px 16px', ...anim(mounted, 5) }}>
+            <div style={{
+              ...card({ padding: 20 }),
+              textAlign: 'center' as const,
+            }}>
+              <div style={{
+                fontFamily: FONT_DISPLAY,
+                fontSize: 16,
+                fontWeight: 600,
+                color: M.text,
+                marginBottom: 6,
+              }}>
+                Sign in for your full briefing
+              </div>
+              <p style={{
+                fontSize: 13,
+                color: M.textSecondary,
+                lineHeight: 1.6,
+                marginBottom: 16,
+              }}>
+                Personalised regime analysis, portfolio posture, and AI-powered answers.
+              </p>
+              <button
+                onClick={handleOpenAuth}
+                style={{
+                  background: M.accentGradient,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 16,
+                  padding: '11px 24px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: FONT_BODY,
+                  boxShadow: `0 4px 14px ${M.accentGlow}`,
+                }}
+              >
+                Sign in
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            DISCLAIMER
+        ════════════════════════════════════════════════════════════════ */}
         <div style={{
-          position: 'fixed', inset: 0,
-          maxWidth: 428, margin: '0 auto',
-          zIndex: 50,
-          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          pointerEvents: 'auto',
+          textAlign: 'center' as const,
+          padding: '4px 20px 16px',
+          fontSize: 10,
+          color: M.textMuted,
+          fontFamily: FONT_MONO,
         }}>
-          {/* Backdrop */}
-          <div
-            onClick={() => setBetaOpen(false)}
-            onWheel={e => e.preventDefault()}
-            style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(45,36,22,0.22)',
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
-            }}
-          />
-          {/* Sheet */}
-          <div style={{
-            position: 'relative',
-            background: 'rgba(255,255,255,0.96)',
-            borderRadius: '24px 24px 0 0',
-            margin: '0 12px',
-            boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            maxHeight: '78vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            <BetaSheet onClose={() => setBetaOpen(false)} />
-          </div>
+          Educational only · Not financial advice
         </div>
-      )}
+
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          BOTTOM NAV
+      ═══════════════════════════════════════════════════════════════════ */}
+      <nav style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        maxWidth: 430,
+        margin: '0 auto',
+        height: 82,
+        background: 'rgba(236,234,239,.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: '1px solid rgba(255,255,255,.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        padding: '0 8px 10px',
+        zIndex: 30,
+      }}>
+        {NAV_TABS.map(tab => {
+          const isActive = tab.id === 'home'
+          const Icon     = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => router.push(tab.href)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column' as const,
+                alignItems: 'center',
+                gap: 3,
+                opacity: isActive ? 1 : 0.32,
+                flex: 1,
+                padding: '4px 0',
+                position: 'relative',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+              }}
+            >
+              {/* Active indicator line */}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  top: -10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 28,
+                  height: 2,
+                  borderRadius: 2,
+                  background: `linear-gradient(90deg,${M.accent},${M.accentDeep})`,
+                }} />
+              )}
+              <div style={{
+                width: 36,
+                height: 30,
+                borderRadius: 10,
+                background: isActive ? M.accentDim : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isActive ? M.accentDeep : M.textMuted,
+              }}>
+                <Icon size={18} />
+              </div>
+              <span style={{
+                fontSize: 9,
+                fontWeight: isActive ? 700 : 600,
+                color: isActive ? M.accentDeep : M.text,
+                fontFamily: FONT_BODY,
+              }}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
+
     </div>
   )
 }
