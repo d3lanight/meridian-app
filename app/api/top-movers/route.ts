@@ -1,4 +1,5 @@
 // ━━━ Top Movers API ━━━
+// v1.3.0 · S205 · Sprint 42 — Cache-Control header added (s-maxage=120, stale-while-revalidate=600)
 // v1.2.0 · S162 · Sprint 34
 // Returns top 5 gainers and 5 losers from asset_prices
 // icon_url from asset_mapping. Excludes stablecoins. No auth required.
@@ -34,7 +35,9 @@ export async function GET() {
     const gainers = rows.filter((r: any) => r.change_24h > 0).slice(0, 5)
     const losers = rows.filter((r: any) => r.change_24h < 0).sort((a: any, b: any) => a.change_24h - b.change_24h).slice(0, 5)
 
-    return NextResponse.json({ gainers, losers, total: rows.length })
+    return NextResponse.json({ gainers, losers, total: rows.length }, {
+      headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
+    })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

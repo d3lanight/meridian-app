@@ -1,4 +1,5 @@
 // ━━━ Market Context API ━━━
+// v3.7.0 · S205 · Sprint 42 — Cache-Control header added (s-maxage=60, stale-while-revalidate=300)
 // v3.6.0 · S187 · Sprint 38 — window param added; market_regimes filtered by ?window= (default 30)
 // v3.5.0 · S176 · Sprint 36 — is_volatile added to market_regimes select and regimes map
 // v3.4.0 · S173 · Sprint 35 — current_prices for ALL symbols (not just BTC/ETH); change_24h rounded to 2dp
@@ -181,6 +182,8 @@ export async function GET(request: NextRequest) {
       generated_at: new Date().toISOString(),
       current_prices: currentPrices,
       intraday_signals: intradaySignals,
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' },
     });
   } catch (err) {
     console.error('Market context API error:', err);
