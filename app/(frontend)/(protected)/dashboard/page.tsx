@@ -1,7 +1,13 @@
 // ━━━ Today Page ━━━
-// v5.3.0 · S213 · Sprint 43
-// Purpose: Today dashboard — Sources carousel (coming-soon gate) + Signals section.
+// v5.6.0 · S214+S215+S216 · Sprint 43
+// Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
+//   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
+//             Orb opens Chat sheet. Gradient shifts when chat open.
+//             S215: Chat sheet — BottomSheet shell, ChipStack (pre-message) / ChipStrip
+//             (post-message), typewriter AiMessage, /api/ask wired, used-chip states.
+//             PRO chips locked. Auto-scroll to latest. Empty state before first message.
+//             S216: Sources sheet — BottomSheet, SOURCES_ENABLED gate, placeholder cards.
 //   v5.3.0 — S213: SOURCES_ENABLED flag. Sources carousel with frosted overlay gate.
 //             Signals wired to /api/market-user (auth-gated). Signal cards with coloured
 //             icon badge, label (asset), timestamp. Severity 0-100 thresholds corrected.
@@ -22,8 +28,8 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Home, Activity, Shield, User, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Home, Activity, Shield, User, TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
@@ -31,6 +37,7 @@ import { getRegimeConfig } from '@/lib/regime-utils'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
+import BottomSheet from '@/components/shared/BottomSheet'
 import {
   AgentPrompt,
   ActivityBadge,
@@ -102,6 +109,92 @@ const MOCK_SOURCES = [
   { id: 1, dot: '#F4A261', source: 'COINDESK',   time: '14m ago', headline: 'Bitcoin ETF inflows hit $380M in a single session', tag: 'Market' },
   { id: 2, dot: '#7B6FA8', source: 'THE BLOCK',  time: '1h ago',  headline: 'SEC signals softer stance on crypto ETF approvals for altcoins', tag: 'Regulation' },
   { id: 3, dot: '#2A9D8F', source: 'DECRYPT',    time: '2h ago',  headline: 'Ethereum staking rate climbs to 28% ahead of next upgrade', tag: 'ETH' },
+]
+
+// ── Question registry (mirrors AgentPrompt + /api/ask) ────────────────────
+
+interface Question { id: string; label: string; sub: string; proOnly: boolean }
+
+const QUESTIONS: Question[] = [
+  { id: 'market.regime_today',       label: 'What regime are we in?',           sub: 'Market overview',         proOnly: false },
+  { id: 'market.regime_duration',    label: 'How long has this regime lasted?',  sub: 'Historical context',      proOnly: false },
+  { id: 'market.signals_now',        label: 'Key signals right now',             sub: 'Signal digest',           proOnly: false },
+  { id: 'market.volatility_context', label: 'Is volatility normal?',             sub: 'Vol analysis',            proOnly: false },
+  { id: 'market.sentiment_meaning',  label: 'What does sentiment mean?',         sub: 'Fear & Greed context',    proOnly: false },
+  { id: 'portfolio.my_posture',      label: 'How is my portfolio positioned?',   sub: 'Posture analysis',        proOnly: true  },
+  { id: 'portfolio.biggest_risk',    label: 'My biggest risk right now',         sub: 'Risk breakdown',          proOnly: true  },
+  { id: 'portfolio.posture_score',   label: 'Why is my posture score this?',     sub: 'Score explanation',       proOnly: true  },
+  { id: 'portfolio.alt_exposure',    label: 'What does my ALT allocation mean?', sub: 'ALT context',             proOnly: true  },
+  { id: 'portfolio.watch_today',     label: 'What to watch in my portfolio',     sub: 'Daily watchlist',         proOnly: true  },
+]
+
+// ── useTypewriter — character-by-character reveal ─────────────────────────
+
+function useTypewriter(text: string, active: boolean, speed = 18): string {
+  const [displayed, setDisplayed] = useState('')
+  useEffect(() => {
+    if (!active || !text) { setDisplayed(''); return }
+    setDisplayed('')
+    let i = 0
+    const tick = setInterval(() => {
+      i++
+      setDisplayed(text.slice(0, i))
+      if (i >= text.length) clearInterval(tick)
+    }, speed)
+    return () => clearInterval(tick)
+  }, [text, active, speed])
+  return displayed
+}
+
+// ── Typing dots component (inline) ────────────────────────────────────────
+
+function TypingDots() {
+  return (
+    <div style={{ display: 'flex', gap: 5, padding: '14px 16px', alignItems: 'center' }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{
+          width: 7, height: 7, borderRadius: '50%',
+          background: M.accent,
+          opacity: 0.4,
+          animation: `dotBounce 1.2s ${i * 0.2}s ease-in-out infinite`,
+        }} />
+      ))}
+    </div>
+  )
+}
+
+// ── AiMessage component (inline) ──────────────────────────────────────────
+
+function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: string; isNew: boolean }) {
+  const displayed = useTypewriter(text, isNew)
+  const content   = isNew ? displayed : text
+  const ts = new Date(generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return (
+    <div style={{ padding: '0 20px 16px' }}>
+      <div style={{
+        background: 'rgba(123,111,168,0.06)',
+        border: `1px solid ${M.borderAccent}`,
+        borderRadius: 16,
+        padding: '14px 16px',
+      }}>
+        <p style={{ margin: '0 0 8px', fontSize: 14, lineHeight: 1.6, color: M.text, fontFamily: FONT_BODY }}>
+          {content}
+          {isNew && content.length < text.length && (
+            <span style={{ opacity: 0.5, animation: 'cursorBlink 0.8s step-end infinite', marginLeft: 1 }}>|</span>
+          )}
+        </p>
+        <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{ts}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Placeholder source cards (SOURCES_ENABLED = false) ────────────────────
+
+const PLACEHOLDER_SOURCES = [
+  { id: 1, dot: '#F4A261', source: 'COINDESK',  time: '—', headline: 'Market analysis and crypto news will appear here', tag: 'Market' },
+  { id: 2, dot: '#7B6FA8', source: 'THE BLOCK', time: '—', headline: 'Regulatory updates and industry coverage coming soon', tag: 'Regulation' },
+  { id: 3, dot: '#2A9D8F', source: 'DECRYPT',   time: '—', headline: 'On-chain insights and protocol news on the way', tag: 'On-chain' },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -199,6 +292,16 @@ export default function DashboardPage() {
 
   // ── Sources sheet ──────────────────────────────────────────────────────
   const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
+
+  // ── Chat sheet ─────────────────────────────────────────────────────────
+  const [chatSheetOpen,    setChatSheetOpen]    = useState(false)
+  const [chatTyping,       setChatTyping]       = useState(false)
+  const [chatMessages,     setChatMessages]     = useState<Array<{
+    role: 'user' | 'ai'; text: string; generated_at: string; questionId?: string; isNew?: boolean
+  }>>([])
+  const [usedChips,        setUsedChips]        = useState<Set<string>>(new Set())
+  const [readingMode,      setReadingMode]      = useState(false)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
 
   // ── Mount animation ────────────────────────────────────────────────────
   const [mounted, setMounted] = useState(false)
@@ -335,9 +438,53 @@ export default function DashboardPage() {
   }, [isAnon, openAuth, regimeWindow])
 
   const handleProTap = useCallback(() => {
-    // Navigate to Profile where ProUpgradeCard is surfaced
     router.push('/profile')
   }, [router])
+
+  // ── Chat sheet: chip tap → POST /api/ask ──────────────────────────────
+  const handleChipTap = useCallback(async (q: Question) => {
+    if (isAnon) { openAuth('chat-chip'); return }
+    if (q.proOnly && !isPro) { router.push('/profile'); return }
+    if (usedChips.has(q.id)) return
+
+    const userMsg = { role: 'user' as const, text: q.label, generated_at: new Date().toISOString(), questionId: q.id }
+    setChatMessages(prev => [...prev, userMsg])
+    setUsedChips(prev => new Set([...prev, q.id]))
+    setReadingMode(true)
+    setChatTyping(true)
+
+    setTimeout(() => {
+      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' })
+    }, 50)
+
+    try {
+      const res  = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question_id: q.id, regime_window: regimeWindow }),
+      })
+      if (!res.ok) throw new Error(`ask ${res.status}`)
+      const data = await res.json()
+      setChatTyping(false)
+      setChatMessages(prev => [...prev, {
+        role: 'ai', text: data.answer, generated_at: data.generated_at, isNew: true,
+      }])
+    } catch {
+      setChatTyping(false)
+      setChatMessages(prev => [...prev, {
+        role: 'ai', text: 'Sorry, something went wrong. Please try again.', generated_at: new Date().toISOString(), isNew: false,
+      }])
+    }
+  }, [isAnon, isPro, openAuth, regimeWindow, router, usedChips])
+
+  // Auto-scroll when new message added
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      setTimeout(() => {
+        chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' })
+      }, 100)
+    }
+  }, [chatMessages, chatTyping])
 
   // ── Derived display values ─────────────────────────────────────────────
   const name        = firstName(displayName)
@@ -1066,7 +1213,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          BOTTOM NAV
+          BOTTOM NAV — S214: Ask orb centred, elevated
       ═══════════════════════════════════════════════════════════════════ */}
       <nav style={{
         position: 'fixed',
@@ -1086,7 +1233,8 @@ export default function DashboardPage() {
         padding: '0 8px 10px',
         zIndex: 30,
       }}>
-        {NAV_TABS.map(tab => {
+        {/* Left 2 tabs */}
+        {NAV_TABS.slice(0, 2).map(tab => {
           const isActive = tab.id === 'home'
           const Icon     = tab.icon
           return (
@@ -1107,7 +1255,6 @@ export default function DashboardPage() {
                 border: 'none',
               }}
             >
-              {/* Active indicator line */}
               {isActive && (
                 <div style={{
                   position: 'absolute',
@@ -1143,7 +1290,346 @@ export default function DashboardPage() {
             </button>
           )
         })}
+
+        {/* ── Ask Orb (centred, elevated) ── */}
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
+          <button
+            onClick={() => setChatSheetOpen(true)}
+            style={{
+              position: 'absolute',
+              top: -36,
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: chatSheetOpen
+                ? `linear-gradient(135deg, ${M.accentDeep}, #3D3366)`
+                : M.accentGradient,
+              border: '3px solid rgba(236,234,239,0.92)',
+              boxShadow: `0 4px 18px ${M.accentGlow}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background 0.3s ease, box-shadow 0.3s ease',
+            }}
+          >
+            <Sparkles size={20} color="white" />
+          </button>
+        </div>
+
+        {/* Right 2 tabs */}
+        {NAV_TABS.slice(2).map(tab => {
+          const isActive = false
+          const Icon     = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => router.push(tab.href)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column' as const,
+                alignItems: 'center',
+                gap: 3,
+                opacity: 0.32,
+                flex: 1,
+                padding: '4px 0',
+                position: 'relative',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+              }}
+            >
+              <div style={{
+                width: 36,
+                height: 30,
+                borderRadius: 10,
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: M.textMuted,
+              }}>
+                <Icon size={18} />
+              </div>
+              <span style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: M.text,
+                fontFamily: FONT_BODY,
+              }}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
       </nav>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          CHAT SHEET — S215: Ask Meridian (76% height)
+      ═══════════════════════════════════════════════════════════════════ */}
+      <BottomSheet
+        isOpen={chatSheetOpen}
+        onClose={() => setChatSheetOpen(false)}
+        scrollable={true}
+        maxHeight="76vh"
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 20px 16px',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 10,
+              background: M.accentGradient,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 2px 8px ${M.accentGlow}`,
+            }}>
+              <Sparkles size={13} color="white" />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: M.text, fontFamily: FONT_DISPLAY }}>
+                Ask Meridian
+              </div>
+              <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>
+                Educational · Not financial advice
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setChatSheetOpen(false)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: M.textMuted }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Empty state — before first chip tapped */}
+        {chatMessages.length === 0 && !chatTyping && (
+          <div style={{ padding: '12px 20px 20px', textAlign: 'center' as const }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>✦</div>
+            <p style={{ fontSize: 13, color: M.textSecondary, fontFamily: FONT_BODY, lineHeight: 1.5, margin: 0 }}>
+              Tap a question below to get an educational read on your market context.
+            </p>
+          </div>
+        )}
+
+        {/* Message thread */}
+        <div ref={chatScrollRef}>
+          {chatMessages.map((msg, i) => {
+            if (msg.role === 'user') {
+              return (
+                <div key={i} style={{ padding: '0 20px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{
+                    maxWidth: '80%',
+                    background: M.accentGradient,
+                    borderRadius: '16px 16px 4px 16px',
+                    padding: '10px 14px',
+                  }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'white', fontFamily: FONT_BODY }}>
+                      {msg.text}
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <AiMessage key={i} text={msg.text} generated_at={msg.generated_at} isNew={!!msg.isNew} />
+            )
+          })}
+          {chatTyping && <TypingDots />}
+        </div>
+
+        {/* Chip area */}
+        <div style={{
+          borderTop: `1px solid ${M.borderSubtle}`,
+          padding: '14px 20px 20px',
+          flexShrink: 0,
+        }}>
+          {readingMode && (
+            <button
+              onClick={() => setReadingMode(false)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: M.accent, fontFamily: FONT_BODY, fontSize: 12, fontWeight: 600,
+                marginBottom: 10, padding: 0,
+              }}
+            >
+              <ChevronLeft size={14} /> Ask another
+            </button>
+          )}
+
+          {/* ChipStack (pre-message / back pressed) */}
+          {!readingMode && (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+              {QUESTIONS.map(q => {
+                const isLocked  = q.proOnly && !isPro
+                const isUsed    = usedChips.has(q.id)
+                const isLoading = chatTyping
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => !isUsed && !isLoading && handleChipTap(q)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      border: `1px solid ${isUsed ? M.borderSubtle : M.border}`,
+                      background: isUsed ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
+                      cursor: isUsed || isLoading ? 'default' : 'pointer',
+                      opacity: isUsed ? 0.38 : 1,
+                      textAlign: 'left' as const,
+                      pointerEvents: isUsed || isLoading ? 'none' as const : 'auto' as const,
+                    }}
+                  >
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                      background: isLocked ? M.accentDim : 'rgba(123,111,168,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Sparkles size={13} color={isLocked ? M.accentDeep : M.accent} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: isUsed ? M.textMuted : M.text, fontFamily: FONT_BODY }}>
+                        {q.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>{q.sub}</div>
+                    </div>
+                    {isLocked && (
+                      <span style={{
+                        padding: '2px 7px', borderRadius: 8,
+                        background: M.accentDim, border: `1px solid ${M.borderAccent}`,
+                        fontSize: 9, fontWeight: 700, color: M.accentDeep, fontFamily: FONT_BODY,
+                        letterSpacing: '0.06em', textTransform: 'uppercase' as const, flexShrink: 0,
+                      }}>PRO</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* ChipStrip (reading mode) */}
+          {readingMode && (
+            <div style={{
+              display: 'flex', gap: 8,
+              overflowX: 'auto' as const, scrollbarWidth: 'none' as const,
+              paddingBottom: 2,
+            }}>
+              {QUESTIONS.filter(q => !usedChips.has(q.id)).map(q => {
+                const isLocked = q.proOnly && !isPro
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => !chatTyping && handleChipTap(q)}
+                    style={{
+                      padding: '6px 14px', borderRadius: 20,
+                      border: `1px solid ${M.border}`,
+                      background: 'rgba(255,255,255,0.65)',
+                      fontSize: 12, fontWeight: 500, color: M.textSecondary,
+                      fontFamily: FONT_BODY, whiteSpace: 'nowrap' as const,
+                      cursor: chatTyping ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      flexShrink: 0, opacity: chatTyping ? 0.5 : 1,
+                    }}
+                  >
+                    {q.label}
+                    {isLocked && (
+                      <span style={{
+                        padding: '1px 5px', borderRadius: 6, background: M.accentDim,
+                        fontSize: 8, fontWeight: 700, color: M.accentDeep, fontFamily: FONT_BODY,
+                        letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+                      }}>PRO</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </BottomSheet>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SOURCES SHEET — S216: (coming-soon gate via SOURCES_ENABLED)
+      ═══════════════════════════════════════════════════════════════════ */}
+      <BottomSheet
+        isOpen={sourcesSheetOpen}
+        onClose={() => setSourcesSheetOpen(false)}
+        scrollable={true}
+        maxHeight="82vh"
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 20px 16px',
+        }}>
+          <span style={{
+            fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500,
+            color: M.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+          }}>From the web</span>
+          <button
+            onClick={() => setSourcesSheetOpen(false)}
+            style={{
+              padding: '5px 14px', borderRadius: 20,
+              border: `1px solid ${M.border}`, background: 'rgba(255,255,255,0.6)',
+              fontSize: 12, fontWeight: 700, color: M.text, cursor: 'pointer', fontFamily: FONT_BODY,
+            }}
+          >Done</button>
+        </div>
+
+        {!SOURCES_ENABLED && (
+          <div style={{
+            margin: '0 20px 16px', padding: '12px 16px', borderRadius: 12,
+            background: 'rgba(123,111,168,0.06)', border: `1px solid ${M.borderAccent}`,
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: M.textMuted, fontFamily: FONT_BODY, lineHeight: 1.5 }}>
+              Web sources are on the way. These cards show you what's coming.
+            </p>
+          </div>
+        )}
+
+        <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+          {PLACEHOLDER_SOURCES.map(src => (
+            <div key={src.id} style={{ ...card({ padding: '16px' }), opacity: SOURCES_ENABLED ? 1 : 0.65 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: src.dot, flexShrink: 0 }} />
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: M.textMuted,
+                  fontFamily: FONT_MONO, textTransform: 'uppercase' as const, flex: 1,
+                }}>{src.source}</span>
+                <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{src.time}</span>
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 500, color: M.text, lineHeight: 1.45, margin: '0 0 6px', fontFamily: FONT_BODY }}>
+                {src.headline}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{
+                  padding: '2px 8px', borderRadius: 8,
+                  background: 'rgba(255,193,7,0.12)', color: '#D4A017',
+                  fontSize: 10, fontWeight: 600, fontFamily: FONT_BODY,
+                }}>{src.tag}</div>
+                <span style={{
+                  fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY, fontWeight: 600, opacity: 0.4,
+                }}>Coming soon</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </BottomSheet>
+
+      {/* Keyframes */}
+      <style>{`
+        @keyframes dotBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; } 50% { opacity: 0; }
+        }
+      `}</style>
 
     </div>
   )
