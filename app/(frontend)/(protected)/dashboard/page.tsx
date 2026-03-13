@@ -1,5 +1,5 @@
 // ━━━ Today Page ━━━
-// v5.6.6 · Sprint 43 — Remove zIndex:1 from scroll container (was painting over layout BottomNav)
+// v5.6.7 · Sprint 43 — Remove AgentPrompt + AnswerCard (superseded by global AskSheet)
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
@@ -29,7 +29,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft, Shield } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
@@ -39,12 +39,10 @@ import { useUser } from '@/contexts/UserContext'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
 import BottomSheet from '@/components/shared/BottomSheet'
 import {
-  AgentPrompt,
   ActivityBadge,
   InsightCard,
   LearnCard,
 } from '@/components/today'
-import { AnswerCard } from '@/components/agent'
 import type { RegimeData, Signal, MarketMetrics } from '@/types'
 
 // ── Font constants ─────────────────────────────────────────────────────────
@@ -311,13 +309,6 @@ interface BriefingApiResponse {
   content?: string
 }
 
-interface AskApiResponse {
-  answer: string
-  question_id: string
-  generated_at: string
-  regime_window: number
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -338,16 +329,107 @@ export default function DashboardPage() {
   const [briefingPending,  setBriefingPending]  = useState(true)
   const [briefExpanded,    setBriefExpanded]    = useState(false)
 
-  // ── Ask / AgentPrompt ──────────────────────────────────────────────────
-  const [activeQuestion, setActiveQuestion] = useState<string | null>(null)
-  const [answer,         setAnswer]         = useState<AskApiResponse | null>(null)
-  const [answerQuestion, setAnswerQuestion] = useState<string>('')
 
   // ── Posture ────────────────────────────────────────────────────────────
   const [postureLabel, setPostureLabel] = useState<string | null>(null)
 
   // ── Sources sheet ──────────────────────────────────────────────────────
   const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
+
+  // ── Chat sheet — global in layout via AskSheet ────────────────────────────
+
+
+  // ── Fetch: regime — same source + window as Pulse page ────────────────
+  useEffect(() => {
+    if (userLoading) return
+    fetch(`/api/market-context?window=${regimeWindow}&days=${regimeWindow}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data?.regimes?.length) return
+        const latest = data.regimes[0]
+        if (!latest) return
+        const REGIME_LABELS: Record<string, string> = {
+          bull: 'Bull Market', bear: 'Bear Market',
+          range: 'Range', volatility: 'High Volatility',
+          insufficient_data: 'Insufficient Data',
+        }
+        const r1d  = (latest.r_1d  ?? 0) * 100
+        const r7d  = (latest.r_7d  ?? 0) * 100
+        const vol  = (latest.vol_7d ?? 0) * 100
+        const regimeData: RegimeData = {
+          current:     REGIME_LABELS[latest.regime] ?? latest.regime ?? 'Unknown',
+          confidence:  Math.round((latest.confidence ?? 0) * 100),
+          persistence: 0,
+          trend:       `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
+          dailyShift:  r1d > 3 ? 'High' : r1d > -3 ? 'Moderate' : 'Low',
+          volatility:  `${vol.toFixed(0)}%`,
+        }
+        setRegime(regimeData)
+        const rows  = data.regimes as { regime: string }[]
+        const first = rows[0]?.regime
+        let count = 0
+        for (const row of rows) {
+          if (row.regime !== first) break
+          count++
+        }
+        setRegimeDay(count)
+      })
+      .catch(() => {})
+  }, [userLoading, regimeWindow])
+
+  // ── Fetch: metrics from /api/market (window-invariant) ────────────────
+  useEffect(() => {
+    const fetches: Promise<Response>[] = [fetch('/api/market')]
+    if (!isAnon) fetches.push(fetch('/api/market-user'))
+
+    Promise.all(fetches)
+      .then(async ([mRes, muRes]) => {
+        if (mRes?.ok) {
+          const data = await mRes.json()
+          setMetrics(data.metrics ?? null)
+        }
+        if (muRes?.ok) {
+          const data = await muRes.json()
+          setSignals(data.signals ?? [])
+        }
+      })
+      .catch(() => {})
+  }, [isAnon])
+
+  // ── Fetch: briefing (auth only) ────────────────────────────────────────
+  useEffect(() => {
+    if (isAnon) { setBriefingPending(false); return }
+    fetch('/api/briefing')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: BriefingApiResponse | null) => {
+        if (!data) { setBriefingPending(false); return }
+        if (data.status === 'ready') {
+          setBriefingContent(data.content)
+          setBriefingPending(false)
+        } else {
+          setBriefingPending(true)
+        }
+      })
+      .catch(() => setBriefingPending(false))
+  }, [isAnon])
+
+  // ── Fetch: portfolio snapshot for posture label ────────────────────────
+  useEffect(() => {
+    if (isAnon) return
+    fetch('/api/portfolio-snapshot')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data) return
+        const score = data.posture_score ?? null
+        if (score === null) return
+        if      (score >= 80) setPostureLabel('Aligned')
+        else if (score >= 50) setPostureLabel('On track')
+        else                  setPostureLabel('Off target')
+      })
+      .catch(() => {})
+  }, [isAnon])
+
+  // ── Handle question chip tap ───────────────────────────────────────────
 
   // ── Chat sheet — global in layout via AskSheet ────────────────────────────
 
@@ -447,48 +529,6 @@ export default function DashboardPage() {
       })
       .catch(() => {})
   }, [isAnon])
-
-  // ── Handle question chip tap ───────────────────────────────────────────
-  const handleQuestion = useCallback(async (questionId: string) => {
-    if (isAnon) { openAuth('agent-prompt-question'); return }
-    setActiveQuestion(questionId)
-    setAnswer(null)
-
-    // Find the question label from AgentPrompt QUESTIONS (sourced from component)
-    const labelMap: Record<string, string> = {
-      'market.regime_today':       'What regime are we in?',
-      'market.regime_duration':    'How long has this regime lasted?',
-      'market.signals_now':        'Key signals right now',
-      'market.volatility_context': 'Is volatility normal?',
-      'market.sentiment_meaning':  'What does sentiment mean?',
-      'portfolio.my_posture':      'How is my portfolio positioned?',
-      'portfolio.biggest_risk':    'My biggest risk right now',
-      'portfolio.posture_score':   'Why is my posture score this?',
-      'portfolio.alt_exposure':    'What does my ALT allocation mean?',
-      'portfolio.watch_today':     'What to watch in my portfolio',
-    }
-    setAnswerQuestion(labelMap[questionId] ?? questionId)
-
-    try {
-      const res  = await fetch('/api/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: questionId, regime_window: regimeWindow }),
-      })
-      if (!res.ok) throw new Error(`ask ${res.status}`)
-      const data: AskApiResponse = await res.json()
-      setAnswer(data)
-    } catch {
-      // silently fail — AnswerCard won't appear
-    } finally {
-      setActiveQuestion(null)
-    }
-  }, [isAnon, openAuth, regimeWindow])
-
-  const handleProTap = useCallback(() => {
-    router.push('/profile')
-  }, [router])
-
 
   // ── Derived display values ─────────────────────────────────────────────
   const name        = firstName(displayName)
@@ -898,31 +938,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════
-            AGENT PROMPT — existing component (unchanged)
-        ════════════════════════════════════════════════════════════════ */}
-        <div style={{ padding: '0 16px 16px', ...anim(mounted, 5) }}>
-          <AgentPrompt
-            isPro={isPro}
-            activeQuestion={activeQuestion}
-            onQuestion={handleQuestion}
-            onProTap={handleProTap}
-          />
-        </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            ANSWER CARD — shown after chip tap (existing component)
-        ════════════════════════════════════════════════════════════════ */}
-        {answer && (
-          <div style={{ padding: '0 16px 16px', ...anim(mounted, 6) }}>
-            <AnswerCard
-              answer={answer.answer}
-              question={answerQuestion}
-              generated_at={answer.generated_at}
-              onDismiss={() => setAnswer(null)}
-            />
-          </div>
-        )}
 
         {/* ═══════════════════════════════════════════════════════════════
             SOURCES CAROUSEL — S213 (coming-soon gate via SOURCES_ENABLED)
