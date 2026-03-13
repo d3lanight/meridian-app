@@ -1,5 +1,5 @@
 // ━━━ Today Page ━━━
-// v5.6.2 · S215-chatfix · Sprint 43 — Fixed header/footer in chat sheet, no re-typewrite on reopen
+// v5.6.3 · S215-chatfix2 · Sprint 43 — Markdown in AI replies, ChipStrip shows all with accent/muted state + icons
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
@@ -163,6 +163,71 @@ function TypingDots() {
   )
 }
 
+// ── Markdown renderer ─────────────────────────────────────────────────────
+// Converts plain markdown to React nodes. Handles: **bold**, *italic*, `code`,
+// # headers, - bullets, 1. numbered lists, paragraphs.
+
+function renderMarkdown(text: string, fontBody: string, fontMono: string, textColor: string, mutedColor: string): React.ReactNode[] {
+  const lines = text.split('\n')
+  const nodes: React.ReactNode[] = []
+  let listItems: React.ReactNode[] = []
+  let listType: 'ul' | 'ol' | null = null
+  let key = 0
+
+  function flushList() {
+    if (!listItems.length) return
+    if (listType === 'ul') {
+      nodes.push(<ul key={key++} style={{ margin: '4px 0 8px', paddingLeft: 18 }}>{listItems}</ul>)
+    } else {
+      nodes.push(<ol key={key++} style={{ margin: '4px 0 8px', paddingLeft: 18 }}>{listItems}</ol>)
+    }
+    listItems = []
+    listType = null
+  }
+
+  function inlineFormat(str: string): React.ReactNode[] {
+    const parts: React.ReactNode[] = []
+    const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g
+    let last = 0, m: RegExpExecArray | null
+    let ki = 0
+    while ((m = re.exec(str)) !== null) {
+      if (m.index > last) parts.push(<span key={ki++}>{str.slice(last, m.index)}</span>)
+      if (m[2]) parts.push(<strong key={ki++} style={{ fontWeight: 700 }}>{m[2]}</strong>)
+      else if (m[3]) parts.push(<em key={ki++} style={{ fontStyle: 'italic' }}>{m[3]}</em>)
+      else if (m[4]) parts.push(<code key={ki++} style={{ fontFamily: fontMono, fontSize: 12, background: 'rgba(123,111,168,0.1)', padding: '1px 5px', borderRadius: 4 }}>{m[4]}</code>)
+      last = m.index + m[0].length
+    }
+    if (last < str.length) parts.push(<span key={ki++}>{str.slice(last)}</span>)
+    return parts
+  }
+
+  for (const line of lines) {
+    const hMatch = line.match(/^(#{1,3})\s+(.+)/)
+    const ulMatch = line.match(/^[-*]\s+(.+)/)
+    const olMatch = line.match(/^\d+\.\s+(.+)/)
+
+    if (hMatch) {
+      flushList()
+      const level = hMatch[1].length
+      const size = level === 1 ? 16 : level === 2 ? 14 : 13
+      nodes.push(<div key={key++} style={{ fontSize: size, fontWeight: 700, color: textColor, fontFamily: fontBody, margin: '10px 0 4px', lineHeight: 1.3 }}>{inlineFormat(hMatch[2])}</div>)
+    } else if (ulMatch) {
+      if (listType !== 'ul') { flushList(); listType = 'ul' }
+      listItems.push(<li key={listItems.length} style={{ fontSize: 14, lineHeight: 1.6, color: textColor, fontFamily: fontBody, marginBottom: 2 }}>{inlineFormat(ulMatch[1])}</li>)
+    } else if (olMatch) {
+      if (listType !== 'ol') { flushList(); listType = 'ol' }
+      listItems.push(<li key={listItems.length} style={{ fontSize: 14, lineHeight: 1.6, color: textColor, fontFamily: fontBody, marginBottom: 2 }}>{inlineFormat(olMatch[1])}</li>)
+    } else if (line.trim() === '') {
+      flushList()
+    } else {
+      flushList()
+      nodes.push(<p key={key++} style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.6, color: textColor, fontFamily: fontBody }}>{inlineFormat(line)}</p>)
+    }
+  }
+  flushList()
+  return nodes
+}
+
 // ── AiMessage component (inline) ──────────────────────────────────────────
 
 function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: string; isNew: boolean }) {
@@ -177,12 +242,12 @@ function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: 
         borderRadius: 16,
         padding: '14px 16px',
       }}>
-        <p style={{ margin: '0 0 8px', fontSize: 14, lineHeight: 1.6, color: M.text, fontFamily: FONT_BODY }}>
-          {content}
+        <div style={{ marginBottom: 8 }}>
+          {renderMarkdown(content, FONT_BODY, FONT_MONO, M.text, M.textMuted)}
           {isNew && content.length < text.length && (
             <span style={{ opacity: 0.5, animation: 'cursorBlink 0.8s step-end infinite', marginLeft: 1 }}>|</span>
           )}
-        </p>
+        </div>
         <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{ts}</span>
       </div>
     </div>
@@ -1519,32 +1584,45 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ChipStrip (reading mode) */}
+          {/* ChipStrip (reading mode) — all questions visible, used = muted, available = accent */}
           {readingMode && (
             <div style={{
               display: 'flex', gap: 8,
               overflowX: 'auto' as const, scrollbarWidth: 'none' as const,
               paddingBottom: 2,
             }}>
-              {QUESTIONS.filter(q => !usedChips.has(q.id)).map(q => {
+              {QUESTIONS.map(q => {
+                const isUsed   = usedChips.has(q.id)
                 const isLocked = q.proOnly && !isPro
+                const canTap   = !isUsed && !chatTyping
                 return (
                   <button
                     key={q.id}
-                    onClick={() => !chatTyping && handleChipTap(q)}
+                    onClick={() => canTap && handleChipTap(q)}
                     style={{
-                      padding: '6px 14px', borderRadius: 20,
-                      border: `1px solid ${M.border}`,
-                      background: 'rgba(255,255,255,0.65)',
-                      fontSize: 12, fontWeight: 500, color: M.textSecondary,
+                      padding: '6px 10px 6px 8px', borderRadius: 20,
+                      border: `1px solid ${isUsed ? M.borderSubtle : M.borderAccent}`,
+                      background: isUsed ? 'rgba(0,0,0,0.03)' : M.accentDim,
+                      fontSize: 12, fontWeight: 500,
+                      color: isUsed ? M.textMuted : M.accentDeep,
                       fontFamily: FONT_BODY, whiteSpace: 'nowrap' as const,
-                      cursor: chatTyping ? 'default' : 'pointer',
+                      cursor: canTap ? 'pointer' : 'default',
                       display: 'flex', alignItems: 'center', gap: 5,
-                      flexShrink: 0, opacity: chatTyping ? 0.5 : 1,
+                      flexShrink: 0,
+                      opacity: isUsed ? 0.45 : chatTyping ? 0.6 : 1,
+                      transition: 'opacity 0.2s ease',
+                      pointerEvents: isUsed ? 'none' as const : 'auto' as const,
                     }}
                   >
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 5, flexShrink: 0,
+                      background: isUsed ? 'rgba(0,0,0,0.06)' : 'rgba(123,111,168,0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Sparkles size={9} color={isUsed ? M.textMuted : M.accent} />
+                    </div>
                     {q.label}
-                    {isLocked && (
+                    {isLocked && !isUsed && (
                       <span style={{
                         padding: '1px 5px', borderRadius: 6, background: M.accentDim,
                         fontSize: 8, fontWeight: 700, color: M.accentDeep, fontFamily: FONT_BODY,
