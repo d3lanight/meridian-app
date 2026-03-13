@@ -1,4 +1,5 @@
 // ━━━ Briefing API ━━━
+// v1.1.0 · S206 · Sprint 42 — removed dead `revalidate` export (no effect on auth routes)
 // v1.0.0 · ca-story200 · 2026-03-12
 // GET /api/briefing — returns the current user's AI briefing from agent_briefings cache
 // Auth: required — 401 for unauthenticated requests
@@ -10,8 +11,6 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-export const revalidate = 60 // 60s cache TTL — avoids hammering DB on rapid refreshes
 
 export async function GET() {
   const supabase = await createClient()
