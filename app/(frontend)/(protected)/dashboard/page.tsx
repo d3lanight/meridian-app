@@ -1,5 +1,5 @@
 // ━━━ Today Page ━━━
-// v5.6.3 · S215-chatfix2 · Sprint 43 — Markdown in AI replies, ChipStrip shows all with accent/muted state + icons
+// v5.6.6 · Sprint 43 — Remove zIndex:1 from scroll container (was painting over layout BottomNav)
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
@@ -28,8 +28,8 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Home, Activity, Shield, User, TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
@@ -318,15 +318,6 @@ interface AskApiResponse {
   regime_window: number
 }
 
-// ── Nav config ─────────────────────────────────────────────────────────────
-
-const NAV_TABS = [
-  { id: 'home',     label: 'Today',    icon: Home,     href: '/dashboard' },
-  { id: 'market',   label: 'Pulse',    icon: Activity, href: '/market'    },
-  { id: 'exposure', label: 'Exposure', icon: Shield,   href: '/exposure'  },
-  { id: 'profile',  label: 'Profile',  icon: User,     href: '/profile'   },
-]
-
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -358,15 +349,7 @@ export default function DashboardPage() {
   // ── Sources sheet ──────────────────────────────────────────────────────
   const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
 
-  // ── Chat sheet ─────────────────────────────────────────────────────────
-  const [chatSheetOpen,    setChatSheetOpen]    = useState(false)
-  const [chatTyping,       setChatTyping]       = useState(false)
-  const [chatMessages,     setChatMessages]     = useState<Array<{
-    role: 'user' | 'ai'; text: string; generated_at: string; questionId?: string; isNew?: boolean
-  }>>([])
-  const [usedChips,        setUsedChips]        = useState<Set<string>>(new Set())
-  const [readingMode,      setReadingMode]      = useState(false)
-  const chatScrollRef = useRef<HTMLDivElement>(null)
+  // ── Chat sheet — global in layout via AskSheet ────────────────────────────
 
   // ── Mount animation ────────────────────────────────────────────────────
   const [mounted, setMounted] = useState(false)
@@ -506,50 +489,6 @@ export default function DashboardPage() {
     router.push('/profile')
   }, [router])
 
-  // ── Chat sheet: chip tap → POST /api/ask ──────────────────────────────
-  const handleChipTap = useCallback(async (q: Question) => {
-    if (isAnon) { openAuth('chat-chip'); return }
-    if (q.proOnly && !isPro) { router.push('/profile'); return }
-    if (usedChips.has(q.id)) return
-
-    const userMsg = { role: 'user' as const, text: q.label, generated_at: new Date().toISOString(), questionId: q.id }
-    setChatMessages(prev => [...prev, userMsg])
-    setUsedChips(prev => new Set([...prev, q.id]))
-    setReadingMode(true)
-    setChatTyping(true)
-
-    setTimeout(() => {
-      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' })
-    }, 50)
-
-    try {
-      const res  = await fetch('/api/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: q.id, regime_window: regimeWindow }),
-      })
-      if (!res.ok) throw new Error(`ask ${res.status}`)
-      const data = await res.json()
-      setChatTyping(false)
-      setChatMessages(prev => [...prev, {
-        role: 'ai', text: data.answer, generated_at: data.generated_at, isNew: true,
-      }])
-    } catch {
-      setChatTyping(false)
-      setChatMessages(prev => [...prev, {
-        role: 'ai', text: 'Sorry, something went wrong. Please try again.', generated_at: new Date().toISOString(), isNew: false,
-      }])
-    }
-  }, [isAnon, isPro, openAuth, regimeWindow, router, usedChips])
-
-  // Auto-scroll when new message added
-  useEffect(() => {
-    if (chatMessages.length > 0) {
-      setTimeout(() => {
-        chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' })
-      }, 100)
-    }
-  }, [chatMessages, chatTyping])
 
   // ── Derived display values ─────────────────────────────────────────────
   const name        = firstName(displayName)
@@ -602,10 +541,9 @@ export default function DashboardPage() {
       {/* ── Scrollable content ── */}
       <div style={{
         position: 'relative',
-        zIndex: 1,
         maxWidth: 430,
         margin: '0 auto',
-        paddingBottom: 96,
+        paddingBottom: 140,
         overflowX: 'hidden',
       }}>
 
@@ -1277,365 +1215,6 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          BOTTOM NAV — S214: Ask orb centred, elevated
-      ═══════════════════════════════════════════════════════════════════ */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: 428,
-        background: 'rgba(255,255,255,0.7)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: `1px solid ${M.borderSubtle}`,
-        padding: '10px 16px 18px',
-        zIndex: 30,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        boxSizing: 'border-box' as const,
-      }}>
-        {/* Left 2 tabs */}
-        {NAV_TABS.slice(0, 2).map(tab => {
-          const isActive = tab.id === 'home'
-          const Icon     = tab.icon
-          return (
-            <button
-              key={tab.id}
-              onClick={() => router.push(tab.href)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column' as const,
-                alignItems: 'center',
-                gap: 5,
-                flex: 1,
-                padding: '4px 16px',
-                position: 'relative',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-              }}
-            >
-              {isActive && (
-                <div style={{
-                  position: 'absolute',
-                  top: -10,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 32,
-                  height: 2,
-                  borderRadius: 2,
-                  background: M.accentGradient,
-                }} />
-              )}
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                background: isActive ? `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})` : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Icon size={20} color={isActive ? M.accentDeep : M.textMuted} strokeWidth={isActive ? 2.5 : 2} />
-              </div>
-              <span style={{
-                fontSize: 10,
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? M.text : M.textMuted,
-                opacity: isActive ? 1 : 0.8,
-                fontFamily: FONT_BODY,
-              }}>
-                {tab.label}
-              </span>
-            </button>
-          )
-        })}
-
-        {/* ── Ask Orb (centred, elevated) ── */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', position: 'relative' }}>
-          <button
-            onClick={() => setChatSheetOpen(true)}
-            style={{
-              position: 'absolute',
-              top: -36,
-              width: 52,
-              height: 52,
-              borderRadius: '50%',
-              background: chatSheetOpen
-                ? `linear-gradient(135deg, ${M.accentDeep}, #3D3366)`
-                : M.accentGradient,
-              border: '3px solid rgba(255,255,255,0.85)',
-              boxShadow: `0 4px 18px ${M.accentGlow}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'background 0.3s ease, box-shadow 0.3s ease',
-            }}
-          >
-            <Sparkles size={20} color="white" />
-          </button>
-        </div>
-
-        {/* Right 2 tabs */}
-        {NAV_TABS.slice(2).map(tab => {
-          const isActive = false
-          const Icon     = tab.icon
-          return (
-            <button
-              key={tab.id}
-              onClick={() => router.push(tab.href)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column' as const,
-                alignItems: 'center',
-                gap: 5,
-                flex: 1,
-                padding: '4px 16px',
-                position: 'relative',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-              }}
-            >
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                background: 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Icon size={20} color={M.textMuted} strokeWidth={2} />
-              </div>
-              <span style={{
-                fontSize: 10,
-                fontWeight: 500,
-                color: M.textMuted,
-                opacity: 0.8,
-                fontFamily: FONT_BODY,
-              }}>
-                {tab.label}
-              </span>
-            </button>
-          )
-        })}
-      </nav>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          CHAT SHEET — S215: Ask Meridian (76% height)
-      ═══════════════════════════════════════════════════════════════════ */}
-      <BottomSheet
-        isOpen={chatSheetOpen}
-        onClose={() => {
-          setChatSheetOpen(false)
-          setChatMessages(prev => prev.map(m => ({ ...m, isNew: false })))
-        }}
-        scrollable={false}
-        maxHeight="76vh"
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 20px 16px',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 10,
-              background: M.accentGradient,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 2px 8px ${M.accentGlow}`,
-            }}>
-              <Sparkles size={13} color="white" />
-            </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: M.text, fontFamily: FONT_DISPLAY }}>
-                Ask Meridian
-              </div>
-              <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>
-                Educational · Not financial advice
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setChatSheetOpen(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: M.textMuted }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Scrollable message area — flex:1 so it fills between fixed header + fixed footer */}
-        <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto' as const, overscrollBehavior: 'contain' }}>
-
-        {/* Empty state — before first chip tapped */}
-        {chatMessages.length === 0 && !chatTyping && (
-          <div style={{ padding: '12px 20px 20px', textAlign: 'center' as const }}>
-            <div style={{ fontSize: 28, marginBottom: 10 }}>✦</div>
-            <p style={{ fontSize: 13, color: M.textSecondary, fontFamily: FONT_BODY, lineHeight: 1.5, margin: 0 }}>
-              Tap a question below to get an educational read on your market context.
-            </p>
-          </div>
-        )}
-
-        {/* Message thread */}
-        <div>
-          {chatMessages.map((msg, i) => {
-            if (msg.role === 'user') {
-              return (
-                <div key={i} style={{ padding: '0 20px 10px', display: 'flex', justifyContent: 'flex-end' }}>
-                  <div style={{
-                    maxWidth: '80%',
-                    background: M.accentGradient,
-                    borderRadius: '16px 16px 4px 16px',
-                    padding: '10px 14px',
-                  }}>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'white', fontFamily: FONT_BODY }}>
-                      {msg.text}
-                    </p>
-                  </div>
-                </div>
-              )
-            }
-            return (
-              <AiMessage key={i} text={msg.text} generated_at={msg.generated_at} isNew={!!msg.isNew} />
-            )
-          })}
-          {chatTyping && <TypingDots />}
-        </div>
-
-        </div>{/* end scrollable message area */}
-
-        {/* Chip area — fixed footer, always visible */}
-        <div style={{
-          borderTop: `1px solid ${M.borderSubtle}`,
-          padding: '14px 20px 20px',
-          flexShrink: 0,
-        }}>
-          {readingMode && (
-            <button
-              onClick={() => setReadingMode(false)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: M.accent, fontFamily: FONT_BODY, fontSize: 12, fontWeight: 600,
-                marginBottom: 10, padding: 0,
-              }}
-            >
-              <ChevronLeft size={14} /> Ask another
-            </button>
-          )}
-
-          {/* ChipStack (pre-message / back pressed) */}
-          {!readingMode && (
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
-              {QUESTIONS.map(q => {
-                const isLocked  = q.proOnly && !isPro
-                const isUsed    = usedChips.has(q.id)
-                const isLoading = chatTyping
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => !isUsed && !isLoading && handleChipTap(q)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 14px',
-                      borderRadius: 14,
-                      border: `1px solid ${isUsed ? M.borderSubtle : M.border}`,
-                      background: isUsed ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
-                      cursor: isUsed || isLoading ? 'default' : 'pointer',
-                      opacity: isUsed ? 0.38 : 1,
-                      textAlign: 'left' as const,
-                      pointerEvents: isUsed || isLoading ? 'none' as const : 'auto' as const,
-                    }}
-                  >
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                      background: isLocked ? M.accentDim : 'rgba(123,111,168,0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Sparkles size={13} color={isLocked ? M.accentDeep : M.accent} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: isUsed ? M.textMuted : M.text, fontFamily: FONT_BODY }}>
-                        {q.label}
-                      </div>
-                      <div style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY }}>{q.sub}</div>
-                    </div>
-                    {isLocked && (
-                      <span style={{
-                        padding: '2px 7px', borderRadius: 8,
-                        background: M.accentDim, border: `1px solid ${M.borderAccent}`,
-                        fontSize: 9, fontWeight: 700, color: M.accentDeep, fontFamily: FONT_BODY,
-                        letterSpacing: '0.06em', textTransform: 'uppercase' as const, flexShrink: 0,
-                      }}>PRO</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* ChipStrip (reading mode) — all questions visible, used = muted, available = accent */}
-          {readingMode && (
-            <div style={{
-              display: 'flex', gap: 8,
-              overflowX: 'auto' as const, scrollbarWidth: 'none' as const,
-              paddingBottom: 2,
-            }}>
-              {QUESTIONS.map(q => {
-                const isUsed   = usedChips.has(q.id)
-                const isLocked = q.proOnly && !isPro
-                const canTap   = !isUsed && !chatTyping
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => canTap && handleChipTap(q)}
-                    style={{
-                      padding: '6px 10px 6px 8px', borderRadius: 20,
-                      border: `1px solid ${isUsed ? M.borderSubtle : M.borderAccent}`,
-                      background: isUsed ? 'rgba(0,0,0,0.03)' : M.accentDim,
-                      fontSize: 12, fontWeight: 500,
-                      color: isUsed ? M.textMuted : M.accentDeep,
-                      fontFamily: FONT_BODY, whiteSpace: 'nowrap' as const,
-                      cursor: canTap ? 'pointer' : 'default',
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      flexShrink: 0,
-                      opacity: isUsed ? 0.45 : chatTyping ? 0.6 : 1,
-                      transition: 'opacity 0.2s ease',
-                      pointerEvents: isUsed ? 'none' as const : 'auto' as const,
-                    }}
-                  >
-                    <div style={{
-                      width: 16, height: 16, borderRadius: 5, flexShrink: 0,
-                      background: isUsed ? 'rgba(0,0,0,0.06)' : 'rgba(123,111,168,0.15)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Sparkles size={9} color={isUsed ? M.textMuted : M.accent} />
-                    </div>
-                    {q.label}
-                    {isLocked && !isUsed && (
-                      <span style={{
-                        padding: '1px 5px', borderRadius: 6, background: M.accentDim,
-                        fontSize: 8, fontWeight: 700, color: M.accentDeep, fontFamily: FONT_BODY,
-                        letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-                      }}>PRO</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </BottomSheet>
 
       {/* ═══════════════════════════════════════════════════════════════════
           SOURCES SHEET — S216: (coming-soon gate via SOURCES_ENABLED)
