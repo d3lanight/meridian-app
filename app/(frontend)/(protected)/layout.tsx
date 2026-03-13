@@ -1,5 +1,5 @@
 // ━━━ Protected Layout ━━━
-// v1.4.0 · S214-fix · Sprint 43
+// v1.5.0 · S215-global · Sprint 43 — Render AskSheet globally (orb works on all screens)
 // Changelog:
 //   v1.4.0 — S214-fix: Wire onAskTap + askOpen to BottomNav. pb-[88px] → pb-[110px]
 //             (extra clearance for elevated orb). chatOpen state added.
@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import BottomNav from '@/components/navigation/BottomNav'
+import AskSheet from '@/components/shared/AskSheet'
 import AuthSheet from '@/components/auth/AuthSheet'
 import type { NavTab } from '@/types'
 import { PrivacyProvider } from '@/contexts/PrivacyContext'
@@ -72,6 +73,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
           onAskTap={() => setChatOpen(o => !o)}
           askOpen={chatOpen}
         />
+        <AskSheet isOpen={chatOpen} onClose={() => setChatOpen(false)} />
         <AuthSheet
           isOpen={showAuth}
           onClose={() => setShowAuth(false)}
