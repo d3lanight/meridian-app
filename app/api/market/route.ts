@@ -1,17 +1,14 @@
 // ━━━ Market Dashboard API ━━━
-// v2.3.0 · ca-story97 · 2026-02-28
-// Single endpoint for all dashboard data
-// Changelog (from v2.2.0):
-//   - Added market_sentiment fetch for real Fear & Greed, BTC Dominance, ALT Season
-//   - computeMetrics now receives sentiment row, uses real data with fallback
+// v3.0.0 · S207 · Sprint 42 — Split: user data (portfolio, signals) moved to /api/market-user.
+//                              Route is now public-only and CDN-cacheable.
+//                              Cache-Control: public, s-maxage=30, stale-while-revalidate=120
+// v2.3.0 · ca-story97 · 2026-02-28 — Added market_sentiment fetch for real Fear & Greed, BTC Dominance, ALT Season
+// v2.2.0 — computeMetrics now receives sentiment row, uses real data with fallback
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   mapRegime,
-  mapExposure,
-  emptyExposure,
-  mapSignals,
   computeMetrics,
   formatLastAnalysis,
 } from '@/lib/supabase/queries'
@@ -66,21 +63,17 @@ function computeConfidenceTrend(confidenceValues: number[]): ConfidenceTrend {
 export async function GET() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Parallel fetch all data (S97: added sentiment)
-  const [regimeRes, exposureRes, signalsRes, persistenceRes, trendRes, sentimentRes] = await Promise.all([
+  // Parallel fetch — public data only (no user queries)
+  const [regimeRes, persistenceRes, trendRes, sentimentRes] = await Promise.all([
     supabase.from('latest_regime').select('*').single(),
-    user ? supabase.from('latest_exposure').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null, error: null }),
-    user ? supabase.from('active_signals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: null, error: null }),
     supabase.rpc('regime_persistence_days'),
-    // S55: Fetch last 7 confidence values for trend computation
+    // Fetch last 7 confidence values for trend computation
     supabase
       .from('market_regimes')
       .select('confidence')
       .order('created_at', { ascending: false })
       .limit(7),
-    // S97: Fetch latest sentiment row
+    // Fetch latest sentiment row
     supabase
       .from('market_sentiment')
       .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, total_volume_usd, market_date')
@@ -98,13 +91,7 @@ export async function GET() {
   // Map regime (always present or fallback)
   const regime = regimeRaw ? mapRegime(regimeRaw) : null
 
-  // Map exposure (may not exist for new users)
-  const portfolio = exposureRes.data ? mapExposure(exposureRes.data) : emptyExposure()
-
-  // Map signals (may be empty)
-  const signals = signalsRes.data ? mapSignals(signalsRes.data) : []
-
-  // S97: Check sentiment freshness (stale if > 48h old)
+  // Check sentiment freshness (stale if > 48h old)
   const sentimentRow = sentimentRes.data ?? null
   let sentimentFresh = false
   if (sentimentRow?.market_date) {
@@ -117,28 +104,26 @@ export async function GET() {
   // Compute market metrics — pass real sentiment if fresh
   const metrics = computeMetrics(regimeRaw, sentimentFresh ? sentimentRow : null)
 
-  // S55: Compute confidence trend
+  // Compute confidence trend
   const confidenceValues = (trendRes.data ?? []).map((r: any) => r.confidence as number)
   const confidenceTrend = computeConfidenceTrend(confidenceValues)
 
-  // Latest timestamp from regime or exposure (use created_at, not timestamp)
-  const latestTimestamp = regimeRaw?.created_at ?? exposureRes.data?.created_at ?? null
+  // Latest timestamp from regime
+  const latestTimestamp = regimeRaw?.created_at ?? null
   const lastAnalysis = formatLastAnalysis(latestTimestamp)
 
   return NextResponse.json({
     regime,
-    portfolio,
-    signals,
     metrics,
     confidenceTrend,
     lastAnalysis,
     _meta: {
       hasRegime: !!regimeRes.data,
-      hasExposure: !!exposureRes.data,
-      signalCount: signals.length,
       sentimentFresh,
       sentimentDate: sentimentRow?.market_date ?? null,
       timestamp: new Date().toISOString(),
     },
+  }, {
+    headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' },
   })
 }

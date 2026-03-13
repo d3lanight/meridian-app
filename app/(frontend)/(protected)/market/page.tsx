@@ -1,6 +1,9 @@
 // ━━━ Market Pulse Page ━━━
-// v5.3.0 · S191 · Sprint 39
+// v5.4.0 · S207 · Sprint 42
 // Changelog:
+//   v5.4.0 — S207: /api/market split — public data from /api/market, per-user portfolio+signals
+//             from new /api/market-user (auth-gated). Authenticated users fetch both in parallel.
+//             Anonymous users unaffected — regime/metrics/sentiment render as before.
 //   v5.3.0 — S191: onWindowChange re-fetch now updates full regime state: regime, confidence,
 //             persistence, isVolatile, btcR7d, priceVol from the new window's latest row.
 //             btcChange/ethChange always come from current_prices (live 24h) — window-invariant.
@@ -500,10 +503,14 @@ export default function PulsePage() {
         }
         setRegimeWindowState(regimeWindow)   // S191: lift to state
 
-        const [mcRes, mRes] = await Promise.all([
+        // S207: Parallel fetch — public routes + auth-gated market-user for logged-in users
+        const fetches: Promise<Response>[] = [
           fetch(`/api/market-context?days=90&window=${regimeWindow}`),
           fetch('/api/market'),
-        ])
+        ]
+        if (_user) fetches.push(fetch('/api/market-user'))
+
+        const [mcRes, mRes, marketUserRes] = await Promise.all(fetches)
 
         if (mcRes.ok) {
           const mc = await mcRes.json()
@@ -553,6 +560,12 @@ export default function PulsePage() {
             setBtcDom(m.metrics.btcDominance ?? 50)
             setTotalVolume(m.metrics.totalVolume ?? null)
           }
+        }
+
+        // S207: Wire per-user data from new auth-gated endpoint (portfolio/signals for future use)
+        if (marketUserRes && _user && marketUserRes.ok) {
+          // Reserved for future portfolio/signals UI on Pulse — data available, not yet rendered
+          await marketUserRes.json()
         }
 
         setIsAnon(!_user)
