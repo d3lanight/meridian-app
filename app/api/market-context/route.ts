@@ -1,4 +1,6 @@
 // ━━━ Market Context API ━━━
+// v3.8.0 · S207-fix · Sprint 42 — swap createClient → createAnonClient so cookies() is never
+//                                  called; Vercel CDN cache now active for this route.
 // v3.7.0 · S205 · Sprint 42 — Cache-Control header added (s-maxage=60, stale-while-revalidate=300)
 // v3.6.0 · S187 · Sprint 38 — window param added; market_regimes filtered by ?window= (default 30)
 // v3.5.0 · S176 · Sprint 36 — is_volatile added to market_regimes select and regimes map
@@ -10,7 +12,7 @@
 //  v3.1.0 — S145: current_prices from asset_prices cache
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAnonClient } from '@/lib/supabase/anon';
 
 const VALID_DAYS = [7, 30, 90] as const;
 type ValidDays = (typeof VALID_DAYS)[number];
@@ -21,15 +23,14 @@ function parseDays(param: string | null): ValidDays {
   return 7;
 }
 
-// Valid regime windows — must exist as rows in market_regimes."window"
 const VALID_WINDOWS = [7, 30, 90, 180, 360] as const;
 type ValidWindow = (typeof VALID_WINDOWS)[number];
 
 function parseWindow(param: string | null): ValidWindow | null {
-  if (param === null) return 30; // default
+  if (param === null) return 30;
   const n = parseInt(param, 10);
   if (VALID_WINDOWS.includes(n as ValidWindow)) return n as ValidWindow;
-  return null; // invalid — caller returns 400
+  return null;
 }
 
 interface Transition {
@@ -41,7 +42,6 @@ interface Transition {
 
 function aggregateTransitions(regimes: any[]): Transition[] {
   const changes = regimes.filter(r => r.regime_changed && r.previous_regime);
-
   const map = new Map<string, { count: number; last_seen: string }>();
 
   for (const r of changes) {
@@ -64,19 +64,16 @@ function aggregateTransitions(regimes: any[]): Transition[] {
   }
 
   transitions.sort((a, b) => b.count - a.count || b.last_seen.localeCompare(a.last_seen));
-
   return transitions;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = createAnonClient();
 
     const { searchParams } = new URL(request.url);
     const days = parseDays(searchParams.get('days'));
 
-    // Window param — filters market_regimes by the "window" column
-    // Default: 30. Valid: 30 | 90. Others: 400.
     const window = parseWindow(searchParams.get('window'));
     if (window === null) {
       return NextResponse.json(
@@ -93,7 +90,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('market_regimes')
         .select('market_timestamp, regime, previous_regime, regime_changed, confidence, price_now, r_1d, r_7d, vol_7d, is_volatile, eth_price_now, eth_r_7d, eth_vol_7d, window')
-        .eq('window', window)                            // filter by requested window
+        .eq('window', window)
         .gte('created_at', cutoffISO)
         .order('created_at', { ascending: false }),
       supabase
@@ -138,7 +135,6 @@ export async function GET(request: NextRequest) {
       console.error('regime_duration_stats error:', durationResult.error);
     }
 
-    // Graceful empty: if the requested window has no rows, signal unavailable
     const available = (regimeResult.data ?? []).length > 0;
 
     const regimes = (regimeResult.data ?? []).map((r: any) => ({
@@ -177,8 +173,8 @@ export async function GET(request: NextRequest) {
       transition_count: transitions.reduce((sum, t) => sum + t.count, 0),
       row_count: regimes.length,
       days_requested: days,
-      window,                          // which window was served
-      available,                       // false if no rows for requested window
+      window,
+      available,
       generated_at: new Date().toISOString(),
       current_prices: currentPrices,
       intraday_signals: intradaySignals,
