@@ -1,10 +1,12 @@
 // ━━━ Protected Layout ━━━
-// v1.3.0 · Sprint 42 — S209: Wrap with UserProvider. Auth check reads from context
-//                            (getUser() removed — context owns auth state).
+// v1.4.0 · S214-fix · Sprint 43
+// Changelog:
+//   v1.4.0 — S214-fix: Wire onAskTap + askOpen to BottomNav. pb-[88px] → pb-[110px]
+//             (extra clearance for elevated orb). chatOpen state added.
+// v1.3.0 · Sprint 42 — S209: Wrap with UserProvider. Auth check reads from context.
 // v1.2.0 · S177 — Mount AuthSheetContext.Provider
 // v1.1.0 · S177 — Thread initialMode through openAuth to AuthSheet
 // v1.0.0 · S160 — Initial implementation
-// Auth-aware layout: anonymous users see AuthSheet on protected tab taps
 'use client'
 
 import { useState } from 'react'
@@ -26,15 +28,15 @@ function getTabFromPath(pathname: string): NavTab {
   return 'home'
 }
 
-// Inner component so it can consume UserContext
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const activeTab = getTabFromPath(pathname)
   const { isAnon } = useUser()
 
-  const [showAuth, setShowAuth] = useState(false)
+  const [showAuth,   setShowAuth]   = useState(false)
   const [authTrigger, setAuthTrigger] = useState('')
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [authMode,   setAuthMode]   = useState<'login' | 'signup'>('login')
+  const [chatOpen,   setChatOpen]   = useState(false)
 
   const openAuth = (trigger: string, mode: 'login' | 'signup' = 'login') => {
     setAuthTrigger(trigger)
@@ -49,10 +51,10 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       return
     }
     const routes: Record<NavTab, string> = {
-      home: '/dashboard',
+      home:     '/dashboard',
       exposure: '/exposure',
-      market: '/market',
-      profile: '/profile',
+      market:   '/market',
+      profile:  '/profile',
     }
     window.location.href = routes[tab]
   }
@@ -60,11 +62,16 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <AuthSheetContext.Provider value={{ openAuth }}>
       <div
-        className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[88px] overflow-hidden"
+        className="min-h-screen font-body text-text-primary max-w-[428px] mx-auto relative pb-[110px] overflow-hidden"
         style={{ background: M.bg }}
       >
         {children}
-        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          onAskTap={() => setChatOpen(o => !o)}
+          askOpen={chatOpen}
+        />
         <AuthSheet
           isOpen={showAuth}
           onClose={() => setShowAuth(false)}

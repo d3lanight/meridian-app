@@ -1,5 +1,5 @@
 // ━━━ Today Page ━━━
-// v5.6.0 · S214+S215+S216 · Sprint 43
+// v5.6.1 · S214-navfix · Sprint 43 — Match inline nav style to shared BottomNav
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
 // Changelog:
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
@@ -1218,20 +1218,20 @@ export default function DashboardPage() {
       <nav style={{
         position: 'fixed',
         bottom: 0,
-        left: 0,
-        right: 0,
-        maxWidth: 430,
-        margin: '0 auto',
-        height: 82,
-        background: 'rgba(236,234,239,.92)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '100%',
+        maxWidth: 428,
+        background: 'rgba(255,255,255,0.7)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,.5)',
+        borderTop: `1px solid ${M.borderSubtle}`,
+        padding: '10px 16px 18px',
+        zIndex: 30,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
-        padding: '0 8px 10px',
-        zIndex: 30,
+        boxSizing: 'border-box' as const,
       }}>
         {/* Left 2 tabs */}
         {NAV_TABS.slice(0, 2).map(tab => {
@@ -1245,10 +1245,9 @@ export default function DashboardPage() {
                 display: 'flex',
                 flexDirection: 'column' as const,
                 alignItems: 'center',
-                gap: 3,
-                opacity: isActive ? 1 : 0.32,
+                gap: 5,
                 flex: 1,
-                padding: '4px 0',
+                padding: '4px 16px',
                 position: 'relative',
                 cursor: 'pointer',
                 background: 'none',
@@ -1261,28 +1260,28 @@ export default function DashboardPage() {
                   top: -10,
                   left: '50%',
                   transform: 'translateX(-50%)',
-                  width: 28,
+                  width: 32,
                   height: 2,
                   borderRadius: 2,
-                  background: `linear-gradient(90deg,${M.accent},${M.accentDeep})`,
+                  background: M.accentGradient,
                 }} />
               )}
               <div style={{
-                width: 36,
-                height: 30,
-                borderRadius: 10,
-                background: isActive ? M.accentDim : 'transparent',
+                width: 40,
+                height: 40,
+                borderRadius: 14,
+                background: isActive ? `linear-gradient(135deg, ${M.accentDim}, ${M.accentMuted})` : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isActive ? M.accentDeep : M.textMuted,
               }}>
-                <Icon size={18} />
+                <Icon size={20} color={isActive ? M.accentDeep : M.textMuted} strokeWidth={isActive ? 2.5 : 2} />
               </div>
               <span style={{
-                fontSize: 9,
-                fontWeight: isActive ? 700 : 600,
-                color: isActive ? M.accentDeep : M.text,
+                fontSize: 10,
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? M.text : M.textMuted,
+                opacity: isActive ? 1 : 0.8,
                 fontFamily: FONT_BODY,
               }}>
                 {tab.label}
@@ -1304,7 +1303,7 @@ export default function DashboardPage() {
               background: chatSheetOpen
                 ? `linear-gradient(135deg, ${M.accentDeep}, #3D3366)`
                 : M.accentGradient,
-              border: '3px solid rgba(236,234,239,0.92)',
+              border: '3px solid rgba(255,255,255,0.85)',
               boxShadow: `0 4px 18px ${M.accentGlow}`,
               display: 'flex',
               alignItems: 'center',
@@ -1329,10 +1328,9 @@ export default function DashboardPage() {
                 display: 'flex',
                 flexDirection: 'column' as const,
                 alignItems: 'center',
-                gap: 3,
-                opacity: 0.32,
+                gap: 5,
                 flex: 1,
-                padding: '4px 0',
+                padding: '4px 16px',
                 position: 'relative',
                 cursor: 'pointer',
                 background: 'none',
@@ -1340,21 +1338,21 @@ export default function DashboardPage() {
               }}
             >
               <div style={{
-                width: 36,
-                height: 30,
-                borderRadius: 10,
+                width: 40,
+                height: 40,
+                borderRadius: 14,
                 background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: M.textMuted,
               }}>
-                <Icon size={18} />
+                <Icon size={20} color={M.textMuted} strokeWidth={2} />
               </div>
               <span style={{
-                fontSize: 9,
-                fontWeight: 600,
-                color: M.text,
+                fontSize: 10,
+                fontWeight: 500,
+                color: M.textMuted,
+                opacity: 0.8,
                 fontFamily: FONT_BODY,
               }}>
                 {tab.label}
