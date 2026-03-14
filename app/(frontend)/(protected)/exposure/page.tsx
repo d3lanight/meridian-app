@@ -1,4 +1,5 @@
 // ━━━ Exposure Page ━━━
+// v4.3.0 · Sprint 46 — S229: MessageFeed strip below AllocationCard (exposure screen, unread only).
 // v4.2.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 //   v4.1.0 — S195
 // Changelog:
@@ -41,6 +42,7 @@ import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
 import PostureHero from '@/components/exposure/PostureHero'
 import AllocationCard, { buildAllocations } from '@/components/exposure/AllocationCard'
+import { MessageFeed } from '@/components/shared'
 import HoldingsSection from '@/components/exposure/HoldingsSection'
 import { usePrivacy } from '@/contexts/PrivacyContext'
 import { useUser } from '@/contexts/UserContext'
@@ -239,7 +241,7 @@ export default function ExposurePage() {
   const [regimeWindow, setRegimeWindow] = useState<number>(30)
 
   // S209: user data from context
-  const { isPro, regimeWindow: ctxRegimeWindow, loading: userLoading } = useUser()
+  const { isPro, isAnon, regimeWindow: ctxRegimeWindow, loading: userLoading } = useUser()
   const [sheet, setSheet]       = useState<{ type: 'add' } | { type: 'edit'; holdingId: string } | null>(null)
   const [currentPrices, setCurrentPrices] = useState<Record<string, { price: number; change_24h: number }>>({})
   const [coinContext, setCoinContext]      = useState<Record<string, { sparkline?: number[]; high30d?: number; low30d?: number; change30d?: number; beta?: number }>>({})
@@ -563,6 +565,20 @@ export default function ExposurePage() {
                   <div key={i} style={{ height: 24, borderRadius: 6, background: M.surfaceLight }} />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Message strip — S229: unread exposure messages, hidden when empty */}
+          {!isAnon && (
+            <div style={{ paddingLeft: 10, marginBottom: 4 }}>
+              <MessageFeed
+                screen="exposure"
+                limit={3}
+                showHeader={false}
+                unreadOnly
+                hideWhenEmpty
+                onMessageRead={() => {}}
+              />
             </div>
           )}
 

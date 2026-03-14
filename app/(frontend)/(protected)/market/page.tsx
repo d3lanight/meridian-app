@@ -1,4 +1,5 @@
 // ━━━ Market Pulse Page ━━━
+// v5.7.0 · Sprint 46 — S229: MessageFeed strip below RegimeHero (pulse screen, unread only).
 // v5.6.0 · Sprint 42 — days param mirrors window for correct regime timeline depth.
 // v5.5.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 // v5.4.0 · S207 · Sprint 42
@@ -55,6 +56,7 @@ import {
 } from '@/components/pulse'
 
 import type { RegimeRow } from '@/lib/regime-utils'
+import { MessageFeed } from '@/components/shared'
 
 // ── Local intraday type ────────────────────────
 interface IntradaySignal {
@@ -637,6 +639,20 @@ export default function PulsePage() {
               }}
             />
           </div>
+
+          {/* Message strip — S229: unread pulse messages, hidden when empty */}
+          {!isAnon && (
+            <div style={{ paddingLeft: 10, marginBottom: 12 }}>
+              <MessageFeed
+                screen="pulse"
+                limit={3}
+                showHeader={false}
+                unreadOnly
+                hideWhenEmpty
+                onMessageRead={() => {}}
+              />
+            </div>
+          )}
 
           {/* BTC + ETH prices */}
           <div style={{ ...anim(mounted, 2), display: 'flex', gap: 10, marginBottom: 12 }}>
