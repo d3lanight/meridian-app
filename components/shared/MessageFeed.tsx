@@ -1,13 +1,16 @@
-// MessageFeed v1.1.0
-// Sprint 46 — ca-story228-today-message-integration
+// MessageFeed v1.2.0
+// Sprint 46 — ca-story230-mark-as-read-states
 // Updated: 2026-03-14
 // Changes:
+//   v1.2.0 — S230: Mark-as-read on row tap. DB write (UPDATE contextual_messages SET read=true).
+//             On success: unread dot disappears, row opacity → 0.7, onMessageRead callback fires.
+//             No full reload — local state patch only.
 //   v1.1.0 — S228: Added unreadOnly, severity, hideWhenEmpty props for inline strips
 //   v1.0.0 — S227: Initial build
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import * as LucideIcons from 'lucide-react'
 import { Check } from 'lucide-react'
 import { M } from '@/lib/meridian'
@@ -109,6 +112,8 @@ export function MessageFeed({
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(false)
 
+  // ── Fetch ──────────────────────────────────
+
   useEffect(() => {
     if (isAnon || !userId) { setLoading(false); return }
     const supabase = createClient()
@@ -140,9 +145,41 @@ export function MessageFeed({
     fetchMessages()
   }, [userId, isAnon, screen, limit, unreadOnly, severity])
 
+  // ── Mark single message read — S230 ───────
+
+  const handleRowTap = useCallback(async (id: string) => {
+    if (!userId) return
+
+    // Optimistic local update — dot disappears, opacity shifts immediately
+    setMessages(prev =>
+      prev.map(m => m.id === id ? { ...m, read: true, read_at: new Date().toISOString() } : m)
+    )
+
+    // DB write
+    try {
+      const supabase = createClient()
+      await supabase
+        .from('contextual_messages')
+        .update({ read: true, read_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', userId)
+    } catch (err) {
+      console.error('[MessageFeed] mark-read error:', err)
+      // Revert optimistic update on failure
+      setMessages(prev =>
+        prev.map(m => m.id === id ? { ...m, read: false, read_at: null } : m)
+      )
+      return
+    }
+
+    // Notify parent (e.g. decrement badge count) only after successful write
+    onMessageRead?.(id)
+  }, [userId, onMessageRead])
+
+  // ── Guards ─────────────────────────────────
+
   if (isAnon || !userId) return null
 
-  // Loading — inline strips with hideWhenEmpty skip skeleton to avoid layout flash
   if (loading) {
     if (hideWhenEmpty) return null
     return (
@@ -158,13 +195,11 @@ export function MessageFeed({
     )
   }
 
-  // Error
   if (error) {
     if (hideWhenEmpty) return null
     return <p style={{ fontFamily: FONT_BODY, fontSize: 13, color: M.textMuted, margin: 0, padding: '8px 0' }}>Could not load updates</p>
   }
 
-  // Empty
   if (messages.length === 0) {
     if (hideWhenEmpty) return null
     return (
@@ -175,7 +210,8 @@ export function MessageFeed({
     )
   }
 
-  // Message list
+  // ── Message list ───────────────────────────
+
   return (
     <div>
       {showHeader && (
@@ -191,11 +227,11 @@ export function MessageFeed({
           return (
             <button
               key={msg.id}
-              onClick={() => onMessageRead?.(msg.id)}
+              onClick={() => !msg.read && handleRowTap(msg.id)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12,
                 padding: '12px 0', background: 'none', border: 'none',
-                cursor: onMessageRead ? 'pointer' : 'default',
+                cursor: !msg.read ? 'pointer' : 'default',
                 textAlign: 'left', width: '100%',
                 borderBottom: `1px solid ${M.borderSubtle}`,
                 position: 'relative',
@@ -203,18 +239,23 @@ export function MessageFeed({
                 transition: 'opacity 0.2s ease',
               }}
             >
+              {/* Unread dot */}
               {!msg.read && (
                 <div style={{
                   position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)',
                   width: 6, height: 6, borderRadius: '50%', background: M.accent, flexShrink: 0,
                 }} />
               )}
+
+              {/* Severity badge */}
               <div style={{
                 width: 36, height: 36, borderRadius: '50%', background: cfg.badgeBg,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
                 <Icon size={16} color={cfg.iconColor} />
               </div>
+
+              {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: M.textSecondary, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   {msg.topic}
