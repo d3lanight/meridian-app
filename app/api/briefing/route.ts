@@ -1,4 +1,5 @@
 // ━━━ Briefing API ━━━
+// v1.2.0 · ca-story235 · 2026-03-14 — add trigger_source to response for debugging
 // v1.1.0 · S206 · Sprint 42 — removed dead `revalidate` export (no effect on auth routes)
 // v1.0.0 · ca-story200 · 2026-03-12
 // GET /api/briefing — returns the current user's AI briefing from agent_briefings cache
@@ -6,7 +7,7 @@
 // Never triggers generation — pipeline-only (ca-flow-phase7.1)
 //
 // Response:
-//   { status: 'ready', content, generated_at, tier, regime_type, regime_window }
+//   { status: 'ready', content, generated_at, tier, regime_type, regime_window, trigger_source }
 //   { status: 'pending', content: null }
 
 import { NextResponse } from 'next/server'
@@ -34,7 +35,7 @@ export async function GET() {
   // Fetch briefing for this user + window
   const { data: briefing, error: briefingError } = await supabase
     .from('agent_briefings')
-    .select('content, generated_at, expires_at, tier, regime_type, regime_window')
+    .select('content, generated_at, expires_at, tier, regime_type, regime_window, trigger_source')
     .eq('user_id', user.id)
     .eq('regime_window', regimeWindow)
     .single()
@@ -58,5 +59,6 @@ export async function GET() {
     tier: briefing.tier,
     regime_type: briefing.regime_type,
     regime_window: briefing.regime_window,
+    trigger_source: briefing.trigger_source,
   })
 }
