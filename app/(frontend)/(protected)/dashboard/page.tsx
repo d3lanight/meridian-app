@@ -1,7 +1,12 @@
 // ━━━ Today Page ━━━
-// v5.6.7 · Sprint 43 — Remove AgentPrompt + AnswerCard (superseded by global AskSheet)
-// Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet.
+// v5.7.0 · Sprint 46 — S228: Message feed integration
+// Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet, Message center.
 // Changelog:
+//   v5.7.0 — S228: ActivityBadge wired to unread count from contextual_messages.
+//             Message BottomSheet with MessageFeed (screen=today, limit=20).
+//             "Mark all read" button visible when unread > 0.
+//             Inline notice strip below Regime row (unread notice severity only,
+//             hidden when empty). onMessageRead decrements ActivityBadge count.
 //   v5.6.0 — S214: Ask orb centred in bottom nav (Sparkles, 52px, gradient, elevated -18px).
 //             Orb opens Chat sheet. Gradient shifts when chat open.
 //             S215: Chat sheet — BottomSheet shell, ChipStack (pre-message) / ChipStrip
@@ -38,6 +43,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/contexts/UserContext'
 import { useAuthSheet } from '@/contexts/AuthSheetContext'
 import BottomSheet from '@/components/shared/BottomSheet'
+import { MessageFeed } from '@/components/shared'
 import {
   ActivityBadge,
   InsightCard,
@@ -59,14 +65,13 @@ const SOURCES_ENABLED = false
 
 function regimeGradientWash(regimeCurrent: string): string {
   const r = regimeCurrent.toLowerCase()
-  if (r.includes('bull'))  return 'linear-gradient(180deg,rgba(42,157,143,.15) 0%,transparent 100%)'  // teal
-  if (r.includes('bear'))  return 'linear-gradient(180deg,rgba(231,111,81,.13) 0%,transparent 100%)'   // coral
-  if (r.includes('volat')) return 'linear-gradient(180deg,rgba(212,160,23,.13) 0%,transparent 100%)'   // amber
-  return 'linear-gradient(180deg,rgba(91,127,166,.13) 0%,transparent 100%)'                            // steel blue (range)
+  if (r.includes('bull'))  return 'linear-gradient(180deg,rgba(42,157,143,.15) 0%,transparent 100%)'
+  if (r.includes('bear'))  return 'linear-gradient(180deg,rgba(231,111,81,.13) 0%,transparent 100%)'
+  if (r.includes('volat')) return 'linear-gradient(180deg,rgba(212,160,23,.13) 0%,transparent 100%)'
+  return 'linear-gradient(180deg,rgba(91,127,166,.13) 0%,transparent 100%)'
 }
 
 // ── Briefing content parser ────────────────────────────────────────────────
-// Content is plain prose. Split into: headline (s[0]), preview (s[1]), bullets (s[2+]).
 
 interface ParsedBriefing {
   headline: string
@@ -87,12 +92,11 @@ function parseBriefing(content: string): ParsedBriefing {
 }
 
 // ── Signal colour helper ───────────────────────────────────────────────────
-// severity is 0-100 (stored as 0-1 × 100 in mapSignals)
 
 function signalColor(severity: number): string {
-  if (severity >= 70) return '#E76F51'   // coral — high
-  if (severity >= 40) return '#D4A017'   // amber — medium
-  return '#2A9D8F'                        // teal — informational
+  if (severity >= 70) return '#E76F51'
+  if (severity >= 40) return '#D4A017'
+  return '#2A9D8F'
 }
 
 function signalIcon(action: string) {
@@ -101,7 +105,7 @@ function signalIcon(action: string) {
   return Minus
 }
 
-// ── Mock sources (shown beneath overlay until SOURCES_ENABLED = true) ──────
+// ── Mock sources ──────────────────────────────────────────────────────────
 
 const MOCK_SOURCES = [
   { id: 1, dot: '#F4A261', source: 'COINDESK',   time: '14m ago', headline: 'Bitcoin ETF inflows hit $380M in a single session', tag: 'Market' },
@@ -109,7 +113,7 @@ const MOCK_SOURCES = [
   { id: 3, dot: '#2A9D8F', source: 'DECRYPT',    time: '2h ago',  headline: 'Ethereum staking rate climbs to 28% ahead of next upgrade', tag: 'ETH' },
 ]
 
-// ── Question registry (mirrors AgentPrompt + /api/ask) ────────────────────
+// ── Question registry ──────────────────────────────────────────────────────
 
 interface Question { id: string; label: string; sub: string; proOnly: boolean }
 
@@ -126,7 +130,7 @@ const QUESTIONS: Question[] = [
   { id: 'portfolio.watch_today',     label: 'What to watch in my portfolio',     sub: 'Daily watchlist',         proOnly: true  },
 ]
 
-// ── useTypewriter — character-by-character reveal ─────────────────────────
+// ── useTypewriter ─────────────────────────────────────────────────────────
 
 function useTypewriter(text: string, active: boolean, speed = 18): string {
   const [displayed, setDisplayed] = useState('')
@@ -144,7 +148,7 @@ function useTypewriter(text: string, active: boolean, speed = 18): string {
   return displayed
 }
 
-// ── Typing dots component (inline) ────────────────────────────────────────
+// ── TypingDots ────────────────────────────────────────────────────────────
 
 function TypingDots() {
   return (
@@ -152,8 +156,7 @@ function TypingDots() {
       {[0, 1, 2].map(i => (
         <div key={i} style={{
           width: 7, height: 7, borderRadius: '50%',
-          background: M.accent,
-          opacity: 0.4,
+          background: M.accent, opacity: 0.4,
           animation: `dotBounce 1.2s ${i * 0.2}s ease-in-out infinite`,
         }} />
       ))}
@@ -162,8 +165,6 @@ function TypingDots() {
 }
 
 // ── Markdown renderer ─────────────────────────────────────────────────────
-// Converts plain markdown to React nodes. Handles: **bold**, *italic*, `code`,
-// # headers, - bullets, 1. numbered lists, paragraphs.
 
 function renderMarkdown(text: string, fontBody: string, fontMono: string, textColor: string, mutedColor: string): React.ReactNode[] {
   const lines = text.split('\n')
@@ -200,14 +201,14 @@ function renderMarkdown(text: string, fontBody: string, fontMono: string, textCo
   }
 
   for (const line of lines) {
-    const hMatch = line.match(/^(#{1,3})\s+(.+)/)
+    const hMatch  = line.match(/^(#{1,3})\s+(.+)/)
     const ulMatch = line.match(/^[-*]\s+(.+)/)
     const olMatch = line.match(/^\d+\.\s+(.+)/)
 
     if (hMatch) {
       flushList()
       const level = hMatch[1].length
-      const size = level === 1 ? 16 : level === 2 ? 14 : 13
+      const size  = level === 1 ? 16 : level === 2 ? 14 : 13
       nodes.push(<div key={key++} style={{ fontSize: size, fontWeight: 700, color: textColor, fontFamily: fontBody, margin: '10px 0 4px', lineHeight: 1.3 }}>{inlineFormat(hMatch[2])}</div>)
     } else if (ulMatch) {
       if (listType !== 'ul') { flushList(); listType = 'ul' }
@@ -226,7 +227,7 @@ function renderMarkdown(text: string, fontBody: string, fontMono: string, textCo
   return nodes
 }
 
-// ── AiMessage component (inline) ──────────────────────────────────────────
+// ── AiMessage ─────────────────────────────────────────────────────────────
 
 function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: string; isNew: boolean }) {
   const displayed = useTypewriter(text, isNew)
@@ -234,12 +235,7 @@ function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: 
   const ts = new Date(generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   return (
     <div style={{ padding: '0 20px 16px' }}>
-      <div style={{
-        background: 'rgba(123,111,168,0.06)',
-        border: `1px solid ${M.borderAccent}`,
-        borderRadius: 16,
-        padding: '14px 16px',
-      }}>
+      <div style={{ background: 'rgba(123,111,168,0.06)', border: `1px solid ${M.borderAccent}`, borderRadius: 16, padding: '14px 16px' }}>
         <div style={{ marginBottom: 8 }}>
           {renderMarkdown(content, FONT_BODY, FONT_MONO, M.text, M.textMuted)}
           {isNew && content.length < text.length && (
@@ -252,7 +248,7 @@ function AiMessage({ text, generated_at, isNew }: { text: string; generated_at: 
   )
 }
 
-// ── Placeholder source cards (SOURCES_ENABLED = false) ────────────────────
+// ── Placeholder sources ────────────────────────────────────────────────────
 
 const PLACEHOLDER_SOURCES = [
   { id: 1, dot: '#F4A261', source: 'COINDESK',  time: '—', headline: 'Market analysis and crypto news will appear here', tag: 'Market' },
@@ -262,13 +258,11 @@ const PLACEHOLDER_SOURCES = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Returns first word of a free-text display name, or full string if no space. */
 function firstName(name: string | null | undefined): string {
   if (!name) return ''
   return name.trim().split(/\s+/)[0]
 }
 
-/** Returns "Good morning / afternoon / evening" based on local hour. */
 function greeting(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Good morning'
@@ -276,24 +270,19 @@ function greeting(): string {
   return 'Good evening'
 }
 
-/** Formats today as "Friday · March 13" */
 function todayLabel(): string {
-  const now = new Date()
+  const now  = new Date()
   const day  = now.toLocaleDateString('en-US', { weekday: 'long' })
   const date = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
   return `${day} · ${date}`
 }
 
-/** Format USD price compactly. */
 function formatPrice(n: number): string {
   if (n >= 1000) return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
   if (n >= 1)    return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 })
   return '$' + n.toPrecision(3)
 }
 
-/** Uppercase regime label from raw DB key — not needed, mapRegime already returns the full label. */
-
-/** Colour for the regime label text — matches against full label string from mapRegime. */
 function regimeLabelColor(regimeCurrent: string): string {
   const r = regimeCurrent.toLowerCase()
   if (r.includes('bull'))  return M.positive
@@ -312,34 +301,34 @@ interface BriefingApiResponse {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const router        = useRouter()
+  const router       = useRouter()
   const { userId, displayName, tier, isAnon, loading: userLoading, regimeWindow } = useUser()
-  const { openAuth }  = useAuthSheet()
-  const isPro         = tier === 'pro'
+  const { openAuth } = useAuthSheet()
+  const isPro        = tier === 'pro'
   const handleOpenAuth = () => openAuth('dashboard-cta')
 
   // ── Market data ────────────────────────────────────────────────────────
-  const [regime,  setRegime]  = useState<RegimeData | null>(null)
-  const [metrics, setMetrics] = useState<MarketMetrics | null>(null)
-  const [signals, setSignals] = useState<Signal[]>([])
+  const [regime,    setRegime]    = useState<RegimeData | null>(null)
+  const [metrics,   setMetrics]   = useState<MarketMetrics | null>(null)
+  const [signals,   setSignals]   = useState<Signal[]>([])
   const [regimeDay, setRegimeDay] = useState<number | null>(null)
 
   // ── Briefing ───────────────────────────────────────────────────────────
-  const [briefingContent,  setBriefingContent]  = useState<string | undefined>(undefined)
-  const [briefingPending,  setBriefingPending]  = useState(true)
-  const [briefExpanded,    setBriefExpanded]    = useState(false)
-
+  const [briefingContent, setBriefingContent] = useState<string | undefined>(undefined)
+  const [briefingPending, setBriefingPending]  = useState(true)
+  const [briefExpanded,   setBriefExpanded]    = useState(false)
 
   // ── Posture ────────────────────────────────────────────────────────────
   const [postureLabel, setPostureLabel] = useState<string | null>(null)
 
+  // ── Message center — S228 ──────────────────────────────────────────────
+  const [unreadCount,   setUnreadCount]   = useState(0)
+  const [msgSheetOpen,  setMsgSheetOpen]  = useState(false)
+
   // ── Sources sheet ──────────────────────────────────────────────────────
   const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
 
-  // ── Chat sheet — global in layout via AskSheet ────────────────────────────
-
-
-  // ── Fetch: regime — same source + window as Pulse page ────────────────
+  // ── Fetch: regime ─────────────────────────────────────────────────────
   useEffect(() => {
     if (userLoading) return
     fetch(`/api/market-context?window=${regimeWindow}&days=${regimeWindow}`)
@@ -353,9 +342,9 @@ export default function DashboardPage() {
           range: 'Range', volatility: 'High Volatility',
           insufficient_data: 'Insufficient Data',
         }
-        const r1d  = (latest.r_1d  ?? 0) * 100
-        const r7d  = (latest.r_7d  ?? 0) * 100
-        const vol  = (latest.vol_7d ?? 0) * 100
+        const r1d = (latest.r_1d  ?? 0) * 100
+        const r7d = (latest.r_7d  ?? 0) * 100
+        const vol = (latest.vol_7d ?? 0) * 100
         const regimeData: RegimeData = {
           current:     REGIME_LABELS[latest.regime] ?? latest.regime ?? 'Unknown',
           confidence:  Math.round((latest.confidence ?? 0) * 100),
@@ -377,7 +366,7 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [userLoading, regimeWindow])
 
-  // ── Fetch: metrics from /api/market (window-invariant) ────────────────
+  // ── Fetch: metrics ────────────────────────────────────────────────────
   useEffect(() => {
     const fetches: Promise<Response>[] = [fetch('/api/market')]
     if (!isAnon) fetches.push(fetch('/api/market-user'))
@@ -396,7 +385,7 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [isAnon])
 
-  // ── Fetch: briefing (auth only) ────────────────────────────────────────
+  // ── Fetch: briefing ───────────────────────────────────────────────────
   useEffect(() => {
     if (isAnon) { setBriefingPending(false); return }
     fetch('/api/briefing')
@@ -413,7 +402,7 @@ export default function DashboardPage() {
       .catch(() => setBriefingPending(false))
   }, [isAnon])
 
-  // ── Fetch: portfolio snapshot for posture label ────────────────────────
+  // ── Fetch: posture ────────────────────────────────────────────────────
   useEffect(() => {
     if (isAnon) return
     fetch('/api/portfolio-snapshot')
@@ -429,9 +418,37 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [isAnon])
 
-  // ── Handle question chip tap ───────────────────────────────────────────
+  // ── Fetch: unread count — S228 ────────────────────────────────────────
+  useEffect(() => {
+    if (isAnon || !userId) return
+    const supabase = createClient()
+    supabase
+      .from('contextual_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('read', false)
+      .contains('screens', ['today'])
+      .then(({ count }) => setUnreadCount(count ?? 0))
+      .catch(() => {})
+  }, [isAnon, userId])
 
-  // ── Chat sheet — global in layout via AskSheet ────────────────────────────
+  // ── Mark all read — S228 ──────────────────────────────────────────────
+  async function markAllRead() {
+    if (!userId) return
+    const supabase = createClient()
+    await supabase
+      .from('contextual_messages')
+      .update({ read: true, read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('read', false)
+      .contains('screens', ['today'])
+    setUnreadCount(0)
+  }
+
+  // ── Handle single message read — S228 ─────────────────────────────────
+  function handleMessageRead(id: string) {
+    setUnreadCount(prev => Math.max(0, prev - 1))
+  }
 
   // ── Mount animation ────────────────────────────────────────────────────
   const [mounted, setMounted] = useState(false)
@@ -440,252 +457,88 @@ export default function DashboardPage() {
     return () => clearTimeout(t)
   }, [])
 
-  // ── Fetch: regime — same source + window as Pulse page ────────────────
-  useEffect(() => {
-    if (userLoading) return
-    fetch(`/api/market-context?window=${regimeWindow}&days=${regimeWindow}`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data?.regimes?.length) return
-        const latest = data.regimes[0]
-        if (!latest) return
-        const REGIME_LABELS: Record<string, string> = {
-          bull: 'Bull Market', bear: 'Bear Market',
-          range: 'Range', volatility: 'High Volatility',
-          insufficient_data: 'Insufficient Data',
-        }
-        const r1d  = (latest.r_1d  ?? 0) * 100
-        const r7d  = (latest.r_7d  ?? 0) * 100
-        const vol  = (latest.vol_7d ?? 0) * 100
-        const regimeData: RegimeData = {
-          current:     REGIME_LABELS[latest.regime] ?? latest.regime ?? 'Unknown',
-          confidence:  Math.round((latest.confidence ?? 0) * 100),
-          persistence: 0,
-          trend:       `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
-          dailyShift:  r1d > 3 ? 'High' : r1d > -3 ? 'Moderate' : 'Low',
-          volatility:  `${vol.toFixed(0)}%`,
-        }
-        setRegime(regimeData)
-        const rows  = data.regimes as { regime: string }[]
-        const first = rows[0]?.regime
-        let count = 0
-        for (const row of rows) {
-          if (row.regime !== first) break
-          count++
-        }
-        setRegimeDay(count)
-      })
-      .catch(() => {})
-  }, [userLoading, regimeWindow])
-
-  // ── Fetch: metrics from /api/market (window-invariant) ────────────────
-  useEffect(() => {
-    const fetches: Promise<Response>[] = [fetch('/api/market')]
-    if (!isAnon) fetches.push(fetch('/api/market-user'))
-
-    Promise.all(fetches)
-      .then(async ([mRes, muRes]) => {
-        if (mRes?.ok) {
-          const data = await mRes.json()
-          setMetrics(data.metrics ?? null)
-        }
-        if (muRes?.ok) {
-          const data = await muRes.json()
-          setSignals(data.signals ?? [])
-        }
-      })
-      .catch(() => {})
-  }, [isAnon])
-
-  // ── Fetch: briefing (auth only) ────────────────────────────────────────
-  useEffect(() => {
-    if (isAnon) { setBriefingPending(false); return }
-    fetch('/api/briefing')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: BriefingApiResponse | null) => {
-        if (!data) { setBriefingPending(false); return }
-        if (data.status === 'ready') {
-          setBriefingContent(data.content)
-          setBriefingPending(false)
-        } else {
-          setBriefingPending(true)
-        }
-      })
-      .catch(() => setBriefingPending(false))
-  }, [isAnon])
-
-  // ── Fetch: portfolio snapshot for posture label ────────────────────────
-  useEffect(() => {
-    if (isAnon) return
-    fetch('/api/portfolio-snapshot')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data) return
-        const score = data.posture_score ?? null
-        if (score === null) return
-        if      (score >= 80) setPostureLabel('Aligned')
-        else if (score >= 50) setPostureLabel('On track')
-        else                  setPostureLabel('Off target')
-      })
-      .catch(() => {})
-  }, [isAnon])
-
-  // ── Derived display values ─────────────────────────────────────────────
-  const name        = firstName(displayName)
-  const greetText   = greeting()
-  const dateText    = todayLabel()
-  const regimeType  = regime?.current ?? ''           // already full label from mapRegime
-  const labelText   = regimeType
-  const labelColor  = regimeLabelColor(regimeType)
-
-  // Gain % — regime.trend is already formatted like "+4.1%" from mapRegime
-  const gainLabel   = regime?.trend ?? null
-
-  const btcDom      = metrics?.btcDominance ?? null   // camelCase per MarketMetrics type
-
-  // BTC + ETH prices from /api/market-context current_prices record
+  // ── BTC / ETH prices ──────────────────────────────────────────────────
   const [btcPrice, setBtcPrice] = useState<number | null>(null)
   const [ethPrice,  setEthPrice] = useState<number | null>(null)
   useEffect(() => {
     fetch('/api/market-context?window=30&days=7')
       .then(r => r.ok ? r.json() : null)
       .then((data: any) => {
-        const prices = data?.current_prices ?? {}   // snake_case per route.ts payload
+        const prices = data?.current_prices ?? {}
         if (prices['BTC']?.price) setBtcPrice(prices['BTC'].price)
         if (prices['ETH']?.price) setEthPrice(prices['ETH'].price)
       })
       .catch(() => {})
   }, [])
 
+  // ── Derived display values ─────────────────────────────────────────────
+  const name       = firstName(displayName)
+  const greetText  = greeting()
+  const dateText   = todayLabel()
+  const regimeType = regime?.current ?? ''
+  const labelText  = regimeType
+  const labelColor = regimeLabelColor(regimeType)
+  const gainLabel  = regime?.trend ?? null
+  const btcDom     = metrics?.btcDominance ?? null
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      background: M.bg,
-      fontFamily: FONT_BODY,
-      position: 'relative',
-    }}>
+    <div style={{ minHeight: '100dvh', background: M.bg, fontFamily: FONT_BODY, position: 'relative' }}>
 
-      {/* ── Regime wash — colour reacts to current regime ── */}
+      {/* Regime wash */}
       <div style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0,
-        height: 320,
+        position: 'fixed', top: 0, left: 0, right: 0, height: 320,
         background: regimeGradientWash(regimeType),
-        pointerEvents: 'none',
-        zIndex: 0,
-        transition: 'background 0.6s ease',
+        pointerEvents: 'none', zIndex: 0, transition: 'background 0.6s ease',
       }} />
 
-      {/* ── Scrollable content ── */}
-      <div style={{
-        position: 'relative',
-        maxWidth: 430,
-        margin: '0 auto',
-        paddingBottom: 140,
-        overflowX: 'hidden',
-      }}>
+      {/* Scrollable content */}
+      <div style={{ position: 'relative', maxWidth: 430, margin: '0 auto', paddingBottom: 140, overflowX: 'hidden' }}>
 
         {/* ═══════════════════════════════════════════════════════════════
             HEADER — S211
         ════════════════════════════════════════════════════════════════ */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          padding: '14px 20px 8px',
-          ...anim(mounted, 0),
-        }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 20px 8px', ...anim(mounted, 0) }}>
           <div>
-            <div style={{
-              fontSize: 11,
-              color: M.textMuted,
-              fontWeight: 500,
-              fontFamily: FONT_BODY,
-              marginBottom: 4,
-            }}>
+            <div style={{ fontSize: 11, color: M.textMuted, fontWeight: 500, fontFamily: FONT_BODY, marginBottom: 4 }}>
               {dateText}
             </div>
-            <div style={{
-              fontFamily: FONT_DISPLAY,
-              fontSize: 26,
-              fontWeight: 600,
-              color: M.text,
-              lineHeight: 1.2,
-              letterSpacing: '-0.02em',
-            }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, color: M.text, lineHeight: 1.2, letterSpacing: '-0.02em' }}>
               {greetText}{name ? `,\n${name}.` : '.'}
             </div>
           </div>
 
-          {/* Bell — uses existing ActivityBadge */}
-          <div style={{ marginTop: 4, flexShrink: 0 }}>
-            <ActivityBadge count={1} />
-          </div>
+          {/* ActivityBadge — tappable, wired to unread count — S228 */}
+          {!isAnon && (
+            <div
+              onClick={() => setMsgSheetOpen(true)}
+              style={{ marginTop: 4, flexShrink: 0, cursor: 'pointer' }}
+            >
+              <ActivityBadge count={unreadCount} />
+            </div>
+          )}
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════
             REGIME ROW — S211
         ════════════════════════════════════════════════════════════════ */}
         {regime && (
-          <div style={{
-            padding: '2px 20px 4px',
-            ...anim(mounted, 1),
-          }}>
-            {/* Regime label */}
-            <div style={{
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase' as const,
-              color: labelColor,
-              marginBottom: 4,
-            }}>
+          <div style={{ padding: '2px 20px 4px', ...anim(mounted, 1) }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' as const, color: labelColor, marginBottom: 4 }}>
               {labelText}
             </div>
-
-            {/* Stats row */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              flexWrap: 'wrap' as const,
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
               {regimeDay !== null && (
-                <span style={{
-                  fontSize: 12,
-                  color: M.textMuted,
-                }}>
-                  {regimeDay}th day
-                </span>
+                <span style={{ fontSize: 12, color: M.textMuted }}>{regimeDay}th day</span>
               )}
               {gainLabel && (
                 <>
                   <span style={{ fontSize: 12, color: M.textMuted, opacity: 0.4 }}>·</span>
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: M.positive,
-                    fontFamily: FONT_BODY,
-                  }}>
-                    {gainLabel}
-                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: M.positive, fontFamily: FONT_BODY }}>{gainLabel}</span>
                 </>
               )}
-              {/* Window badge */}
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '1px 7px',
-                borderRadius: 9,
-                background: 'rgba(255,255,255,0.52)',
-                color: M.textSecondary,
-                fontSize: 10,
-                fontWeight: 600,
-                fontFamily: FONT_BODY,
-                border: `1px solid rgba(255,255,255,0.7)`,
-              }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: 9, background: 'rgba(255,255,255,0.52)', color: M.textSecondary, fontSize: 10, fontWeight: 600, fontFamily: FONT_BODY, border: `1px solid rgba(255,255,255,0.7)` }}>
                 {regimeWindow}d
               </span>
             </div>
@@ -693,51 +546,40 @@ export default function DashboardPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
+            INLINE NOTICE STRIP — S228
+            Unread notice-severity messages only. Hidden when empty.
+        ════════════════════════════════════════════════════════════════ */}
+        {!isAnon && (
+          <div style={{ padding: '8px 20px 0', paddingLeft: 30 /* room for unread dot */ }}>
+            <MessageFeed
+              screen="today"
+              limit={3}
+              showHeader={false}
+              unreadOnly
+              severity="notice"
+              hideWhenEmpty
+              onMessageRead={handleMessageRead}
+            />
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
             PRICES TRIO — S211
         ════════════════════════════════════════════════════════════════ */}
         {(btcPrice || ethPrice || btcDom) && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '8px 20px 14px',
-            ...anim(mounted, 2),
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 20px 14px', ...anim(mounted, 2) }}>
             {[
-              { sym: 'BTC',   val: btcPrice  !== null ? formatPrice(btcPrice)               : null },
-              { sym: 'ETH',   val: ethPrice  !== null ? formatPrice(ethPrice)               : null },
-              { sym: 'BTC.D', val: btcDom    !== null ? `${btcDom.toFixed(1)}%`             : null },
+              { sym: 'BTC',   val: btcPrice !== null ? formatPrice(btcPrice) : null },
+              { sym: 'ETH',   val: ethPrice !== null ? formatPrice(ethPrice) : null },
+              { sym: 'BTC.D', val: btcDom   !== null ? `${btcDom.toFixed(1)}%` : null },
             ]
               .filter(item => item.val !== null)
               .map((item, i) => (
                 <div key={item.sym} style={{ display: 'flex', alignItems: 'center' }}>
-                  {i > 0 && (
-                    <div style={{
-                      width: 1,
-                      height: 24,
-                      background: `rgba(45,36,22,.1)`,
-                      margin: '0 18px',
-                    }} />
-                  )}
+                  {i > 0 && <div style={{ width: 1, height: 24, background: `rgba(45,36,22,.1)`, margin: '0 18px' }} />}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <div style={{
-                      fontSize: 10,
-                      textTransform: 'uppercase' as const,
-                      letterSpacing: '0.1em',
-                      color: M.textMuted,
-                      fontWeight: 600,
-                      fontFamily: FONT_BODY,
-                    }}>
-                      {item.sym}
-                    </div>
-                    <div style={{
-                      fontSize: 15,
-                      fontWeight: 600,
-                      color: M.text,
-                      letterSpacing: '-0.01em',
-                      fontFamily: FONT_BODY,
-                    }}>
-                      {item.val}
-                    </div>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '0.1em', color: M.textMuted, fontWeight: 600, fontFamily: FONT_BODY }}>{item.sym}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: M.text, letterSpacing: '-0.01em', fontFamily: FONT_BODY }}>{item.val}</div>
                   </div>
                 </div>
               ))}
@@ -749,153 +591,55 @@ export default function DashboardPage() {
         ════════════════════════════════════════════════════════════════ */}
         {!isAnon && (
           <div style={{ padding: '0 20px 20px', ...anim(mounted, 3) }}>
-
-            {/* Date separator */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              marginBottom: 14,
-            }}>
-              <span style={{
-                fontSize: 10,
-                fontFamily: FONT_MONO,
-                fontWeight: 500,
-                color: M.textMuted,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const,
-                whiteSpace: 'nowrap' as const,
-              }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500, color: M.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const }}>
                 {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
               </span>
               <div style={{ flex: 1, height: 1, background: M.borderSubtle }} />
             </div>
 
-            {/* Briefing body */}
             {briefingPending || !briefingContent ? (
-              /* Pending skeleton */
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                <p style={{
-                  fontSize: 12,
-                  color: M.textMuted,
-                  margin: '0 0 6px',
-                  fontFamily: FONT_BODY,
-                  fontStyle: 'italic',
-                }}>
-                  Your briefing is being prepared…
-                </p>
+                <p style={{ fontSize: 12, color: M.textMuted, margin: '0 0 6px', fontFamily: FONT_BODY, fontStyle: 'italic' }}>Your briefing is being prepared…</p>
                 {[1, 0.9, 0.72].map((w, i) => (
-                  <div key={i} style={{
-                    height: 12,
-                    borderRadius: 6,
-                    width: `${w * 100}%`,
-                    background: M.borderSubtle,
-                    opacity: 0.5,
-                  }} />
+                  <div key={i} style={{ height: 12, borderRadius: 6, width: `${w * 100}%`, background: M.borderSubtle, opacity: 0.5 }} />
                 ))}
               </div>
             ) : (() => {
               const { headline, preview, bullets } = parseBriefing(briefingContent)
               return (
                 <>
-                  {/* Headline — clickable to toggle */}
-                  <div
-                    onClick={() => setBriefExpanded(e => !e)}
-                    style={{ cursor: 'pointer', marginBottom: 10 }}
-                  >
-                    <p style={{
-                      fontFamily: FONT_DISPLAY,
-                      fontSize: 19,
-                      fontWeight: 500,
-                      color: M.text,
-                      lineHeight: 1.35,
-                      margin: 0,
-                      letterSpacing: '-0.01em',
-                    }}>
+                  <div onClick={() => setBriefExpanded(e => !e)} style={{ cursor: 'pointer', marginBottom: 10 }}>
+                    <p style={{ fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 500, color: M.text, lineHeight: 1.35, margin: 0, letterSpacing: '-0.01em' }}>
                       {headline}
                     </p>
                   </div>
-
-                  {/* Collapsed: italic preview + Read more */}
                   {!briefExpanded && (
                     <div>
                       {preview && (
-                        <p style={{
-                          fontFamily: FONT_BODY,
-                          fontSize: 14,
-                          fontStyle: 'italic',
-                          color: M.textSecondary,
-                          lineHeight: 1.6,
-                          margin: '0 0 8px',
-                        }}>
-                          {preview}
-                        </p>
+                        <p style={{ fontFamily: FONT_BODY, fontSize: 14, fontStyle: 'italic', color: M.textSecondary, lineHeight: 1.6, margin: '0 0 8px' }}>{preview}</p>
                       )}
-                      <span
-                        onClick={() => setBriefExpanded(true)}
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: M.accent,
-                          cursor: 'pointer',
-                          fontFamily: FONT_BODY,
-                        }}
-                      >
+                      <span onClick={() => setBriefExpanded(true)} style={{ fontSize: 13, fontWeight: 600, color: M.accent, cursor: 'pointer', fontFamily: FONT_BODY }}>
                         Read more →
                       </span>
                     </div>
                   )}
-
-                  {/* Expanded: full body + bullets + Collapse */}
                   {briefExpanded && (
                     <div>
                       {preview && (
-                        <p style={{
-                          fontFamily: FONT_BODY,
-                          fontSize: 14,
-                          color: M.textSecondary,
-                          lineHeight: 1.65,
-                          margin: '0 0 12px',
-                        }}>
-                          {preview}
-                        </p>
+                        <p style={{ fontFamily: FONT_BODY, fontSize: 14, color: M.textSecondary, lineHeight: 1.65, margin: '0 0 12px' }}>{preview}</p>
                       )}
                       {bullets.length > 0 && (
                         <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                           {bullets.map((b, i) => (
                             <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                              <span style={{
-                                width: 5,
-                                height: 5,
-                                borderRadius: '50%',
-                                background: M.accent,
-                                opacity: 0.4,
-                                flexShrink: 0,
-                                marginTop: 7,
-                              }} />
-                              <span style={{
-                                fontFamily: FONT_BODY,
-                                fontSize: 14,
-                                color: M.textSecondary,
-                                lineHeight: 1.6,
-                              }}>
-                                {b}
-                              </span>
+                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: M.accent, opacity: 0.4, flexShrink: 0, marginTop: 7 }} />
+                              <span style={{ fontFamily: FONT_BODY, fontSize: 14, color: M.textSecondary, lineHeight: 1.6 }}>{b}</span>
                             </li>
                           ))}
                         </ul>
                       )}
-                      <span
-                        onClick={() => setBriefExpanded(false)}
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: M.accent,
-                          cursor: 'pointer',
-                          fontFamily: FONT_BODY,
-                          opacity: 0.7,
-                        }}
-                      >
+                      <span onClick={() => setBriefExpanded(false)} style={{ fontSize: 13, fontWeight: 600, color: M.accent, cursor: 'pointer', fontFamily: FONT_BODY, opacity: 0.7 }}>
                         Collapse ↑
                       </span>
                     </div>
@@ -907,198 +651,66 @@ export default function DashboardPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            POSTURE ROW — S212 upgraded pill colours
+            POSTURE ROW — S212
         ════════════════════════════════════════════════════════════════ */}
         {!isAnon && postureLabel && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '0 20px 20px',
-            ...anim(mounted, 4),
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 20px 20px', ...anim(mounted, 4) }}>
             <Shield size={16} color={M.textMuted} />
-            <span style={{ fontSize: 13, color: M.textSecondary, fontFamily: FONT_BODY }}>
-              Positions aligned with regime
-            </span>
+            <span style={{ fontSize: 13, color: M.textSecondary, fontFamily: FONT_BODY }}>Positions aligned with regime</span>
             <div style={{
-              marginLeft: 'auto',
-              padding: '3px 10px',
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: 'nowrap' as const,
-              fontFamily: FONT_BODY,
-              ...(postureLabel === 'Aligned'    ? { background: 'rgba(42,157,143,.12)',  color: M.positive,   border: '1px solid rgba(42,157,143,.25)' }  :
-                  postureLabel === 'On track'   ? { background: `rgba(123,111,168,.12)`, color: M.accent,     border: `1px solid rgba(123,111,168,.25)` }  :
-                  /* Off target */                { background: M.volatilityDim,         color: M.volatility, border: '1px solid rgba(212,160,23,.25)' }),
+              marginLeft: 'auto', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, fontFamily: FONT_BODY,
+              ...(postureLabel === 'Aligned'  ? { background: 'rgba(42,157,143,.12)',  color: M.positive,   border: '1px solid rgba(42,157,143,.25)' }  :
+                  postureLabel === 'On track' ? { background: `rgba(123,111,168,.12)`, color: M.accent,     border: `1px solid rgba(123,111,168,.25)` }  :
+                                                { background: M.volatilityDim,         color: M.volatility, border: '1px solid rgba(212,160,23,.25)' }),
             }}>
               {postureLabel}
             </div>
           </div>
         )}
 
-
-
         {/* ═══════════════════════════════════════════════════════════════
-            SOURCES CAROUSEL — S213 (coming-soon gate via SOURCES_ENABLED)
+            SOURCES CAROUSEL — S213
         ════════════════════════════════════════════════════════════════ */}
         <div style={{ padding: '0 0 20px', ...anim(mounted, 7) }}>
-          {/* Header row */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 20px 10px',
-          }}>
-            <span style={{
-              fontSize: 10,
-              fontFamily: FONT_MONO,
-              fontWeight: 500,
-              color: M.textMuted,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase' as const,
-            }}>
-              From the web
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 10px' }}>
+            <span style={{ fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500, color: M.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>From the web</span>
             <button
               onClick={() => SOURCES_ENABLED && setSourcesSheetOpen(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '5px 12px',
-                borderRadius: 20,
-                border: `1.5px solid ${M.border}`,
-                background: 'rgba(255,255,255,0.6)',
-                fontSize: 12,
-                fontWeight: 700,
-                color: M.text,
-                cursor: SOURCES_ENABLED ? 'pointer' : 'default',
-                fontFamily: FONT_BODY,
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${M.border}`, background: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, color: M.text, cursor: SOURCES_ENABLED ? 'pointer' : 'default', fontFamily: FONT_BODY }}
             >
               See all <span style={{ fontSize: 11 }}>›</span>
             </button>
           </div>
 
-          {/* Carousel + coming-soon overlay wrapper */}
           <div style={{ position: 'relative' }}>
-            {/* Horizontal scroll cards */}
-            <div style={{
-              display: 'flex',
-              gap: 12,
-              overflowX: 'auto' as const,
-              scrollbarWidth: 'none' as const,
-              padding: '0 20px 4px',
-            }}>
+            <div style={{ display: 'flex', gap: 12, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, padding: '0 20px 4px' }}>
               {MOCK_SOURCES.map(src => (
-                <div key={src.id} style={{
-                  ...card({ padding: 16 }),
-                  flexShrink: 0,
-                  width: 220,
-                  display: 'flex',
-                  flexDirection: 'column' as const,
-                  gap: 8,
-                }}>
-                  {/* Dot + source + time */}
+                <div key={src.id} style={{ ...card({ padding: 16 }), flexShrink: 0, width: 220, display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: '50%',
-                      background: src.dot,
-                      flexShrink: 0,
-                    }} />
-                    <span style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      color: M.textMuted,
-                      fontFamily: FONT_MONO,
-                      textTransform: 'uppercase' as const,
-                      flex: 1,
-                    }}>
-                      {src.source}
-                    </span>
-                    <span style={{
-                      fontSize: 10,
-                      color: M.textMuted,
-                      fontFamily: FONT_MONO,
-                    }}>
-                      {src.time}
-                    </span>
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: src.dot, flexShrink: 0 }} />
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: M.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase' as const, flex: 1 }}>{src.source}</span>
+                    <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{src.time}</span>
                   </div>
-                  {/* Headline */}
-                  <p style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: M.text,
-                    lineHeight: 1.45,
-                    margin: 0,
-                    fontFamily: FONT_BODY,
-                  }}>
-                    {src.headline}
-                  </p>
-                  {/* Tag chip */}
-                  <div style={{
-                    alignSelf: 'flex-start' as const,
-                    padding: '2px 8px',
-                    borderRadius: 8,
-                    background: 'rgba(255,193,7,0.12)',
-                    color: '#D4A017',
-                    fontSize: 10,
-                    fontWeight: 600,
-                    fontFamily: FONT_BODY,
-                  }}>
-                    {src.tag}
-                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: M.text, lineHeight: 1.45, margin: 0, fontFamily: FONT_BODY }}>{src.headline}</p>
+                  <div style={{ alignSelf: 'flex-start' as const, padding: '2px 8px', borderRadius: 8, background: 'rgba(255,193,7,0.12)', color: '#D4A017', fontSize: 10, fontWeight: 600, fontFamily: FONT_BODY }}>{src.tag}</div>
                 </div>
               ))}
             </div>
 
-            {/* Coming-soon overlay — removed when SOURCES_ENABLED = true */}
             {!SOURCES_ENABLED && (
-              <div style={{
-                position: 'absolute' as const,
-                inset: 0,
-                borderRadius: 16,
-                backdropFilter: 'blur(6px)',
-                WebkitBackdropFilter: 'blur(6px)',
-                background: 'rgba(236,234,239,0.72)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'all' as const,
-              }}>
-                <span style={{
-                  fontSize: 11,
-                  fontFamily: FONT_MONO,
-                  color: M.textMuted,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase' as const,
-                }}>
-                  Coming soon
-                </span>
+              <div style={{ position: 'absolute' as const, inset: 0, borderRadius: 16, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', background: 'rgba(236,234,239,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all' as const }}>
+                <span style={{ fontSize: 11, fontFamily: FONT_MONO, color: M.textMuted, letterSpacing: '0.12em', textTransform: 'uppercase' as const }}>Coming soon</span>
               </div>
             )}
           </div>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════
-            SIGNALS — S213 live from /api/market-user with coloured badges
+            SIGNALS — S213
         ════════════════════════════════════════════════════════════════ */}
         {!isAnon && signals.length > 0 && (
           <div style={{ padding: '0 20px 8px', ...anim(mounted, 8) }}>
-            <div style={{
-              fontSize: 10,
-              fontFamily: FONT_MONO,
-              fontWeight: 500,
-              color: M.textMuted,
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.1em',
-              marginBottom: 12,
-            }}>
+            <div style={{ fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500, color: M.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: 12 }}>
               Signals &amp; context
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1106,57 +718,16 @@ export default function DashboardPage() {
                 const color = signalColor(sig.severity)
                 const Icon  = signalIcon(sig.action)
                 return (
-                  <div key={sig.id ?? i} style={{
-                    ...card({ padding: '14px 16px' }),
-                    display: 'flex',
-                    gap: 12,
-                    alignItems: 'flex-start',
-                  }}>
-                    {/* Coloured icon badge */}
-                    <div style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 10,
-                      background: `${color}18`,
-                      border: `1px solid ${color}30`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
+                  <div key={sig.id ?? i} style={{ ...card({ padding: '14px 16px' }), display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Icon size={15} color={color} />
                     </div>
-                    {/* Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: M.text,
-                        lineHeight: 1.5,
-                        margin: '0 0 5px',
-                        fontFamily: FONT_BODY,
-                      }}>
-                        {sig.reason}
-                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: M.text, lineHeight: 1.5, margin: '0 0 5px', fontFamily: FONT_BODY }}>{sig.reason}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: '0.1em',
-                          color: M.textMuted,
-                          fontFamily: FONT_MONO,
-                          textTransform: 'uppercase' as const,
-                        }}>
-                          {sig.asset}
-                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: M.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase' as const }}>{sig.asset}</span>
                         <span style={{ fontSize: 10, color: M.textMuted, opacity: 0.5 }}>·</span>
-                        <span style={{
-                          fontSize: 10,
-                          color: M.textMuted,
-                          fontFamily: FONT_MONO,
-                        }}>
-                          {sig.time}
-                        </span>
+                        <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{sig.time}</span>
                       </div>
                     </div>
                   </div>
@@ -1167,45 +738,16 @@ export default function DashboardPage() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            ANONYMOUS CTA — shown only for anon users
+            ANONYMOUS CTA
         ════════════════════════════════════════════════════════════════ */}
         {isAnon && (
           <div style={{ padding: '0 16px 16px', ...anim(mounted, 5) }}>
-            <div style={{
-              ...card({ padding: 20 }),
-              textAlign: 'center' as const,
-            }}>
-              <div style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 16,
-                fontWeight: 600,
-                color: M.text,
-                marginBottom: 6,
-              }}>
-                Sign in for your full briefing
-              </div>
-              <p style={{
-                fontSize: 13,
-                color: M.textSecondary,
-                lineHeight: 1.6,
-                marginBottom: 16,
-              }}>
-                Personalised regime analysis, portfolio posture, and AI-powered answers.
-              </p>
+            <div style={{ ...card({ padding: 20 }), textAlign: 'center' as const }}>
+              <div style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 600, color: M.text, marginBottom: 6 }}>Sign in for your full briefing</div>
+              <p style={{ fontSize: 13, color: M.textSecondary, lineHeight: 1.6, marginBottom: 16 }}>Personalised regime analysis, portfolio posture, and AI-powered answers.</p>
               <button
                 onClick={handleOpenAuth}
-                style={{
-                  background: M.accentGradient,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 16,
-                  padding: '11px 24px',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: FONT_BODY,
-                  boxShadow: `0 4px 14px ${M.accentGlow}`,
-                }}
+                style={{ background: M.accentGradient, color: 'white', border: 'none', borderRadius: 16, padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: FONT_BODY, boxShadow: `0 4px 14px ${M.accentGlow}` }}
               >
                 Sign in
               </button>
@@ -1213,60 +755,62 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════
-            DISCLAIMER
-        ════════════════════════════════════════════════════════════════ */}
+        {/* Disclaimer */}
         {!isAnon && (
-          <div style={{
-            textAlign: 'center' as const,
-            padding: '8px 20px 20px',
-            fontSize: 10,
-            color: M.textMuted,
-            fontFamily: FONT_MONO,
-            letterSpacing: '0.04em',
-          }}>
+          <div style={{ textAlign: 'center' as const, padding: '8px 20px 20px', fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO, letterSpacing: '0.04em' }}>
             Educational only · Not financial advice
           </div>
         )}
 
       </div>
 
-
       {/* ═══════════════════════════════════════════════════════════════════
-          SOURCES SHEET — S216: (coming-soon gate via SOURCES_ENABLED)
+          MESSAGE SHEET — S228
       ═══════════════════════════════════════════════════════════════════ */}
       <BottomSheet
-        isOpen={sourcesSheetOpen}
-        onClose={() => setSourcesSheetOpen(false)}
+        isOpen={msgSheetOpen}
+        onClose={() => setMsgSheetOpen(false)}
         scrollable={true}
         maxHeight="82vh"
       >
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 20px 16px',
-        }}>
-          <span style={{
-            fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500,
-            color: M.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-          }}>From the web</span>
-          <button
-            onClick={() => setSourcesSheetOpen(false)}
-            style={{
-              padding: '5px 14px', borderRadius: 20,
-              border: `1px solid ${M.border}`, background: 'rgba(255,255,255,0.6)',
-              fontSize: 12, fontWeight: 700, color: M.text, cursor: 'pointer', fontFamily: FONT_BODY,
-            }}
-          >Done</button>
+        {/* Sheet header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 4px', flexShrink: 0 }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' as const, color: M.text }}>
+            Updates
+          </span>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              style={{ background: 'none', border: 'none', padding: '6px 0', fontSize: 13, fontWeight: 600, color: M.accent, cursor: 'pointer', fontFamily: FONT_BODY }}
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        {/* Feed */}
+        <div style={{ padding: '8px 20px 24px', paddingLeft: 30 /* room for unread dot */ }}>
+          <MessageFeed
+            screen="today"
+            limit={20}
+            showHeader={false}
+            onMessageRead={handleMessageRead}
+          />
+        </div>
+      </BottomSheet>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SOURCES SHEET — S216
+      ═══════════════════════════════════════════════════════════════════ */}
+      <BottomSheet isOpen={sourcesSheetOpen} onClose={() => setSourcesSheetOpen(false)} scrollable={true} maxHeight="82vh">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 16px' }}>
+          <span style={{ fontSize: 10, fontFamily: FONT_MONO, fontWeight: 500, color: M.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase' as const }}>From the web</span>
+          <button onClick={() => setSourcesSheetOpen(false)} style={{ padding: '5px 14px', borderRadius: 20, border: `1px solid ${M.border}`, background: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, color: M.text, cursor: 'pointer', fontFamily: FONT_BODY }}>Done</button>
         </div>
 
         {!SOURCES_ENABLED && (
-          <div style={{
-            margin: '0 20px 16px', padding: '12px 16px', borderRadius: 12,
-            background: 'rgba(123,111,168,0.06)', border: `1px solid ${M.borderAccent}`,
-          }}>
-            <p style={{ margin: 0, fontSize: 12, color: M.textMuted, fontFamily: FONT_BODY, lineHeight: 1.5 }}>
-              Web sources are on the way. These cards show you what's coming.
-            </p>
+          <div style={{ margin: '0 20px 16px', padding: '12px 16px', borderRadius: 12, background: 'rgba(123,111,168,0.06)', border: `1px solid ${M.borderAccent}` }}>
+            <p style={{ margin: 0, fontSize: 12, color: M.textMuted, fontFamily: FONT_BODY, lineHeight: 1.5 }}>Web sources are on the way. These cards show you what's coming.</p>
           </div>
         )}
 
@@ -1275,24 +819,13 @@ export default function DashboardPage() {
             <div key={src.id} style={{ ...card({ padding: '16px' }), opacity: SOURCES_ENABLED ? 1 : 0.65 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: src.dot, flexShrink: 0 }} />
-                <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: M.textMuted,
-                  fontFamily: FONT_MONO, textTransform: 'uppercase' as const, flex: 1,
-                }}>{src.source}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: M.textMuted, fontFamily: FONT_MONO, textTransform: 'uppercase' as const, flex: 1 }}>{src.source}</span>
                 <span style={{ fontSize: 10, color: M.textMuted, fontFamily: FONT_MONO }}>{src.time}</span>
               </div>
-              <p style={{ fontSize: 14, fontWeight: 500, color: M.text, lineHeight: 1.45, margin: '0 0 6px', fontFamily: FONT_BODY }}>
-                {src.headline}
-              </p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: M.text, lineHeight: 1.45, margin: '0 0 6px', fontFamily: FONT_BODY }}>{src.headline}</p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{
-                  padding: '2px 8px', borderRadius: 8,
-                  background: 'rgba(255,193,7,0.12)', color: '#D4A017',
-                  fontSize: 10, fontWeight: 600, fontFamily: FONT_BODY,
-                }}>{src.tag}</div>
-                <span style={{
-                  fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY, fontWeight: 600, opacity: 0.4,
-                }}>Coming soon</span>
+                <div style={{ padding: '2px 8px', borderRadius: 8, background: 'rgba(255,193,7,0.12)', color: '#D4A017', fontSize: 10, fontWeight: 600, fontFamily: FONT_BODY }}>{src.tag}</div>
+                <span style={{ fontSize: 11, color: M.textMuted, fontFamily: FONT_BODY, fontWeight: 600, opacity: 0.4 }}>Coming soon</span>
               </div>
             </div>
           ))}
