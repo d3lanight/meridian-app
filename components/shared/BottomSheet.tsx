@@ -1,6 +1,9 @@
 // ━━━ BottomSheet — Shared bottom sheet shell ━━━
-// v1.0.0 · S177 · Sprint 36
+// v1.1.0 · bug fix — full bleed + bottom breathing room
 // Changelog:
+//   v1.1.0 — Remove side margin (0 12px → 0). Sheet now touches screen edges.
+//             Add paddingBottom to inner scroll container: env(safe-area-inset-bottom)
+//             + 24px fixed offset. Last item no longer abuts the screen edge.
 //   v1.0.0 — S177: Initial implementation. Extracted from AuthSheet / inline sheet wrappers.
 //             scrollable prop controls inner scroll behaviour.
 //             Scroll lock always active (body overflow hidden).
@@ -89,13 +92,12 @@ export default function BottomSheet({
         }}
       />
 
-      {/* Sheet container — always clips, never scrolls itself */}
+      {/* Sheet container — full bleed, no side margin */}
       <div
         style={{
           position: 'relative',
           background: 'rgba(255,255,255,0.9)',
           borderRadius: '24px 24px 0 0',
-          margin: '0 12px',
           padding: '12px 0 0',
           boxShadow: '0 -4px 24px rgba(0,0,0,0.08)',
           backdropFilter: 'blur(20px)',
@@ -120,6 +122,7 @@ export default function BottomSheet({
 
         {scrollable ? (
           // Scrollable inner body — the ONLY scroll surface
+          // paddingBottom leaves breathing room above the screen edge
           <div
             ref={sheetRef}
             onWheel={handleWheel}
@@ -128,6 +131,7 @@ export default function BottomSheet({
               flex: 1,
               overflowY: 'auto',
               overscrollBehavior: 'contain',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
             }}
           >
             {children}
@@ -142,6 +146,7 @@ export default function BottomSheet({
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
             }}
           >
             {children}
