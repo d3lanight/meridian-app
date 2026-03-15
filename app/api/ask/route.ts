@@ -1,9 +1,13 @@
 // ━━━ Ask API ━━━
-// v1.0.0 · ca-story201 · 2026-03-12
+// v2.0.0 · ca-story234 · 2026-03-15
 // POST /api/ask — handles preset question taps from AgentPrompt
 // Auth: required — 401 for unauthenticated
 // Request:  { question_id: string, regime_window: number }
 // Response: { answer, question_id, generated_at, regime_window }
+//
+// v2.0.0 — reads ca-doc-agent-config from payload_project_docs at runtime.
+//   Falls back to hardcoded values if config fetch fails (logs config=fallback).
+//   question registry remains in code (not moved to config).
 //
 // Question registry:
 //   Market (free + pro): market.regime_today, market.regime_duration,
@@ -42,7 +46,85 @@ function parseWindow(val: unknown): ValidWindow {
   return (VALID_WINDOWS as readonly number[]).includes(n) ? (n as ValidWindow) : 30
 }
 
-// ─── 2. Context Fetchers ─────────────────────────────────────────────────────
+// ─── 2. Agent Config ─────────────────────────────────────────────────────────
+
+interface AgentConfig {
+  identity: string
+  toneRules: string
+  outputFormatRules: string
+  wordLimit: number
+  model: string
+  maxTokens: number
+}
+
+const CONFIG_FALLBACK: AgentConfig = {
+  identity:
+    'You are Meridian, an educational crypto market intelligence assistant. You help users understand their portfolio and market context. You never recommend buying or selling.',
+  toneRules:
+    'Calm and educational. Plain English. Specific to the data provided. Non-prescriptive.',
+  outputFormatRules:
+    'Flowing prose only. No headings or bullet points. Do not mention "Meridian" in the response text. No price targets or percentage predictions.',
+  wordLimit: 150,
+  model: 'claude-haiku-4-5-20251001',
+  maxTokens: 300,
+}
+
+function parseSection(markdown: string, heading: string): string {
+  const re = new RegExp(`## ${heading}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i')
+  const match = markdown.match(re)
+  return match ? match[1].trim() : ''
+}
+
+function parseWordLimit(markdown: string, key: string): number {
+  const section = parseSection(markdown, 'Word Limits')
+  const re = new RegExp(`\\|\\s*${key}\\s*\\|\\s*(\\d+)`)
+  const match = section.match(re)
+  return match ? parseInt(match[1], 10) : CONFIG_FALLBACK.wordLimit
+}
+
+function parseModel(markdown: string): { model: string; maxTokens: number } {
+  const section = parseSection(markdown, 'Model')
+  const modelMatch = section.match(/model:\s*(\S+)/)
+  const tokensMatch = section.match(/max_tokens_ask:\s*(\d+)/)
+  return {
+    model: modelMatch ? modelMatch[1] : CONFIG_FALLBACK.model,
+    maxTokens: tokensMatch ? parseInt(tokensMatch[1], 10) : CONFIG_FALLBACK.maxTokens,
+  }
+}
+
+async function fetchAgentConfig(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<AgentConfig> {
+  try {
+    const { data, error } = await supabase
+      .from('payload_project_docs')
+      .select('raw_markdown')
+      .eq('slug', 'ca-doc-agent-config')
+      .single()
+
+    if (error || !data?.raw_markdown) {
+      console.warn('[/api/ask] config=fallback — fetch error or empty doc', error?.message)
+      return CONFIG_FALLBACK
+    }
+
+    const md = data.raw_markdown
+    const { model, maxTokens } = parseModel(md)
+
+    return {
+      identity: parseSection(md, 'Identity') || CONFIG_FALLBACK.identity,
+      toneRules: parseSection(md, 'Tone Rules') || CONFIG_FALLBACK.toneRules,
+      outputFormatRules: parseSection(md, 'Output Format Rules') || CONFIG_FALLBACK.outputFormatRules,
+      wordLimit: parseWordLimit(md, 'ask_response'),
+      model,
+      maxTokens,
+    }
+  } catch (err) {
+    console.warn('[/api/ask] config=fallback — unexpected error', err)
+    return CONFIG_FALLBACK
+  }
+}
+
+// ─── 3. Context Fetchers ─────────────────────────────────────────────────────
 
 async function fetchMarketContext(supabase: Awaited<ReturnType<typeof createClient>>, window: ValidWindow) {
   const { data } = await supabase
@@ -67,7 +149,6 @@ async function fetchSentiment(supabase: Awaited<ReturnType<typeof createClient>>
 }
 
 async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, window: ValidWindow) {
-  // Snapshot from portfolio-snapshot route logic — read holdings + prices for key metrics
   const { data: holdings } = await supabase
     .from('portfolio_holdings')
     .select('quantity, include_in_exposure, asset_mapping(symbol, name, category)')
@@ -90,9 +171,10 @@ async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createC
   return { holdings, snapshot, riskProfile: riskPref?.value ?? 'neutral' }
 }
 
-// ─── 3. Prompt Builder ───────────────────────────────────────────────────────
+// ─── 4. Prompt Builder ───────────────────────────────────────────────────────
 
 function buildPrompt(
+  config: AgentConfig,
   questionId: string,
   questionText: string,
   regime: NonNullable<Awaited<ReturnType<typeof fetchMarketContext>>>,
@@ -110,7 +192,7 @@ function buildPrompt(
   const fgIndex = sentiment?.fear_greed_index ?? 'N/A'
   const altSeason = sentiment?.alt_season_index ?? 'N/A'
 
-  let marketCtx = `
+  const marketCtx = `
 Current market data (${window}d window):
 - Regime: ${regimeLabel} (confidence: ${confidencePct}%)
 - Volatile modifier: ${isVolatile}
@@ -132,17 +214,20 @@ User portfolio context:
 `.trim()
   }
 
-  return `You are Meridian, an educational crypto intelligence assistant. You help users understand their portfolio and market context — you never recommend buying or selling.
+  return `${config.identity}
+
+Tone: ${config.toneRules}
+Format: ${config.outputFormatRules}
 
 ${marketCtx}
 ${portfolioCtx ? '\n' + portfolioCtx : ''}
 
 The user asked: "${questionText}"
 
-Answer in 150 words or fewer. Be calm, educational, and specific to the data above. End with something the user can observe or understand — not an action to take. No trade recommendations. No "you should buy/sell". Write in plain English.`
+Answer in ${config.wordLimit} words or fewer.`
 }
 
-// ─── 4. Route Handler ────────────────────────────────────────────────────────
+// ─── 5. Route Handler ────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -185,6 +270,9 @@ export async function POST(request: NextRequest) {
   const window = parseWindow(regime_window)
   const questionText = ALL_QUESTIONS[question_id]
 
+  // Fetch agent config at runtime
+  const config = await fetchAgentConfig(supabase)
+
   // Fetch market context
   const regime = await fetchMarketContext(supabase, window)
   if (!regime) {
@@ -199,10 +287,10 @@ export async function POST(request: NextRequest) {
     portfolioCtx = await fetchPortfolioContext(supabase, user.id, window)
   }
 
-  // Build prompt
-  const prompt = buildPrompt(question_id, questionText, regime, sentiment, portfolioCtx, window)
+  // Build prompt with config
+  const prompt = buildPrompt(config, question_id, questionText, regime, sentiment, portfolioCtx, window)
 
-  // Call Claude Haiku
+  // Call Claude model from config
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -211,8 +299,8 @@ export async function POST(request: NextRequest) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      model: config.model,
+      max_tokens: config.maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   })
@@ -220,7 +308,8 @@ export async function POST(request: NextRequest) {
   if (!anthropicRes.ok) {
     const err = await anthropicRes.text()
     console.error('[/api/ask] Anthropic error:', err)
-    return NextResponse.json({ error: 'AI unavailable' }, { status: 502 })
+    return NextResponse.json({ error: 'AI unavailable' }, { status: 502 }
+    )
   }
 
   const anthropicData = await anthropicRes.json()
