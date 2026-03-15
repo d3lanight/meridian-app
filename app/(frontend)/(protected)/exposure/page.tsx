@@ -1,35 +1,27 @@
 // ━━━ Exposure Page ━━━
+// v4.4.0 · bug fix — remove Shield InsightCards, ProFeaturesCta; move MessageFeed to Signals & Context
 // v4.3.0 · Sprint 46 — S229: MessageFeed strip below AllocationCard (exposure screen, unread only).
 // v4.2.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
-//   v4.1.0 — S195
 // Changelog:
-// v4.2.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
+//   v4.4.0 — Remove Shield InsightCards ("Your allocation..." / "All categories...") — no real data behind them.
+//             Keep Zap/TrendingUp warning InsightCards for misaligned state.
+//             Rename Analysis divider → Signals & Context.
+//             Move MessageFeed strip into Signals & Context section (was between AllocationCard and Holdings).
+//             Remove ProFeaturesCta (Exposure Pro card) — empty, no content yet.
+//             Remove ProFeaturesCta import.
+//   v4.3.0 — S229: MessageFeed strip below AllocationCard (exposure screen, unread only).
+//   v4.2.0 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 //   v4.1.0 — S195-fix: initPage extracted + visibilitychange listener added.
 //             Exposure now re-reads regime_display_window when user returns from Profile.
 //   v4.0.0 — S194: Resolve regimeWindow before fetching snapshot.
-//             fetchSnapshot() now accepts optional window param and passes ?window= to
-//             /api/portfolio-snapshot. market-context and snapshot calls use the same
-//             resolved window. Free users always use window=30 (downgrade guard).
-//   v3.9.0 — S188: Reads regime_display_window from user_preferences KV, passes ?window= to
-//             /api/market-context. Anonymous users always use window=30.
-//   v3.8.0 — S-fix-exposure: Regression fixes:
-//            1. patchSnapshotHolding now matches enriched_holdings by asset symbol
-//               directly (via EditHoldingSheet holding.asset), not via portfolioHoldings
-//               lookup — eliminates silent match failure when portfolioHoldings is stale.
-//            2. ExposureEmptyState CTA now calls setSheet({type:'add'}) instead of
-//               navigating to /portfolio (inactive route) which was causing page reload.
-//            3. onAdd sequences await refresh() before fetchSnapshot() to ensure
-//               portfolioHoldings is populated before snapshot resolves.
-//            4. onRemove/onUpdate patchSnapshotHolding call uses holding.asset directly.
-//   v3.7.0 — S189f: Weights + score derived from enriched_holdings directly (not snapshot
-//            server fields). Reacts instantly to patchSnapshotHolding — posture toggle,
-//            qty edit, add all recalculate score/AllocationCard/sectionHeader immediately.
-//            computeRiskScore replicated client-side from route.ts logic.
+//   v3.9.0 — S188: Reads regime_display_window from user_preferences KV.
+//   v3.8.0 — S-fix-exposure: Multiple regression fixes.
+//   v3.7.0 — S189f: Weights + score derived from enriched_holdings directly.
 //   v3.6.0 — S189: Optimistic snapshot patch after edit.
-//   v3.5.0 — S178: fetchSnapshot() added to onRemove handler — snapshot refreshes after coin deletion.
+//   v3.5.0 — S178: fetchSnapshot() added to onRemove handler.
 //   v3.4.0 — S177: Replace inline sheet wrappers with shared BottomSheet component.
-//   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch; sheet wrappers inset 12px margin.
-//   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired; RegimeTimeline removed.
+//   v3.3.0 — S169: fetchSnapshot extracted; onAdd triggers refetch.
+//   v3.2.0 — S173: + button → AddHoldingSheet; Edit holding wired.
 //   v3.0.0 — S163/S164: Full v4 redesign.
 'use client'
 
@@ -50,7 +42,6 @@ import { usePortfolio } from '@/hooks/usePortfolio'
 import InsightCard from '@/components/exposure/InsightCard'
 import AddHoldingSheet from '@/components/portfolio/AddHoldingSheet'
 import EditHoldingSheet from '@/components/portfolio/EditHoldingSheet'
-import ProFeaturesCta from '@/components/exposure/ProFeaturesCta'
 import type { PortfolioSnapshot, AltHolding } from '@/types'
 import type { TargetBands } from '@/lib/risk-profiles'
 import Link from 'next/link'
@@ -135,13 +126,13 @@ function ExposureEmptyState({
   confidence,
   persistence,
   mounted,
-  onAddHolding,           // FIX: callback instead of /portfolio link
+  onAddHolding,
 }: {
   regime: string
   confidence: number
   persistence: number
   mounted: boolean
-  onAddHolding: () => void  // FIX: open AddHoldingSheet directly
+  onAddHolding: () => void
 }) {
   const rc = getRegimeConfig(regime)
   const regimeKey = regime as import('@/lib/risk-profiles').RegimeKey
@@ -206,7 +197,7 @@ function ExposureEmptyState({
         />
       </div>
 
-      {/* CTA — FIX: was <Link href="/portfolio"> which navigated away and reloaded page */}
+      {/* CTA */}
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <button
           onClick={onAddHolding}
@@ -240,7 +231,6 @@ export default function ExposurePage() {
   const [regimeHistory, setRegimeHistory] = useState<RegimeRow[]>([])
   const [regimeWindow, setRegimeWindow] = useState<number>(30)
 
-  // S209: user data from context
   const { isPro, isAnon, regimeWindow: ctxRegimeWindow, loading: userLoading } = useUser()
   const [sheet, setSheet]       = useState<{ type: 'add' } | { type: 'edit'; holdingId: string } | null>(null)
   const [currentPrices, setCurrentPrices] = useState<Record<string, { price: number; change_24h: number }>>({})
@@ -249,8 +239,6 @@ export default function ExposurePage() {
   const { holdings: portfolioHoldings, assets, addHolding, updateHolding, removeHolding, refresh } = usePortfolio()
 
 
-  // S194: fetchSnapshot accepts optional window param — both market-context and snapshot
-  // use the same resolved window so regime display and scoring are always consistent.
   const fetchSnapshot = (window: number = 30) => {
     fetch(`/api/portfolio-snapshot?window=${window}`)
       .then(r => r.ok ? r.json() : null)
@@ -271,7 +259,6 @@ export default function ExposurePage() {
       .catch(() => {})
   }
 
-  // FIX: Match enriched holding by asset symbol directly.
   const patchSnapshotHolding = (
     assetSymbol: string,
     updates: { quantity?: number; cost_basis?: number | null; include_in_exposure?: boolean }
@@ -301,12 +288,9 @@ export default function ExposurePage() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100)
 
-    // S195-fix: extracted into named fn so visibilitychange can re-run it
-    // when user returns from Profile after changing regime_display_window.
     const initPage = async () => {
       if (userLoading) return
       try {
-        // S209: user data already loaded by context — no getUser() or pref fetch needed
         const resolvedWindow = ctxRegimeWindow
         setRegimeWindow(resolvedWindow)
         fetchSnapshot(resolvedWindow)
@@ -335,7 +319,6 @@ export default function ExposurePage() {
     initPage()
     fetchCoinContext()
 
-    // Re-init when user returns to this tab (e.g. after changing window in Profile)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') initPage()
     }
@@ -361,7 +344,6 @@ export default function ExposurePage() {
   const ethIconUrl     = snapshot?.eth_icon_url ?? null
   const altBreakdown   = snapshot?.alt_breakdown ?? []
 
-  // ── Derive weights + score from enriched_holdings (live, post-patch) ──
   const enrichedHoldings = snapshot?.enriched_holdings ?? []
   const inPostureHoldings = enrichedHoldings.filter((h: any) => h.include_in_exposure !== false)
   const postureTotal = inPostureHoldings.reduce((s: number, h: any) => s + (h.value_usd ?? 0), 0)
@@ -418,7 +400,7 @@ export default function ExposurePage() {
       padding: '24px 20px 100px',
     }}>
 
-      {/* ── Header (v4) ── */}
+      {/* ── Header ── */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -519,7 +501,7 @@ export default function ExposurePage() {
           confidence={regimeConfidence}
           persistence={regimePersistence}
           mounted={mounted}
-          onAddHolding={() => setSheet({ type: 'add' })}  // FIX: was Link to /portfolio
+          onAddHolding={() => setSheet({ type: 'add' })}
         />
       ) : (
         <>
@@ -535,7 +517,7 @@ export default function ExposurePage() {
               />
             </div>
           ) : (
-            <div className="animate-pulse" style={{ ...card(), marginBottom: 16,  }}>
+            <div className="animate-pulse" style={{ ...card(), marginBottom: 16 }}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ width: 72, height: 52, borderRadius: 8, background: M.surfaceLight, marginBottom: 8 }} />
                 <div style={{ width: 56, height: 12, borderRadius: 6, background: M.surfaceLight }} />
@@ -548,9 +530,9 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Allocation vs Target (S164) ── */}
+          {/* ── Allocation vs Target ── */}
           {snapshot ? (
-            <div >
+            <div>
               <AllocationCard
                 allocations={allocations}
                 regime={regime}
@@ -568,28 +550,14 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* Message strip — S229: unread exposure messages, hidden when empty */}
-          {!isAnon && (
-            <div style={{ paddingLeft: 10, marginBottom: 4 }}>
-              <MessageFeed
-                screen="exposure"
-                limit={3}
-                showHeader={false}
-                unreadOnly
-                hideWhenEmpty
-                onMessageRead={() => {}}
-              />
-            </div>
-          )}
-
           {/* ── Holdings ── */}
           {snapshot && (
-            <div >
+            <div>
               <Divider label={isMisaligned ? 'Most Exposed' : 'Holdings'} />
             </div>
           )}
           {snapshot ? (
-            <div >
+            <div>
               <HoldingsSection
                 btcWeight={btcWeight}
                 ethWeight={ethWeight}
@@ -625,14 +593,15 @@ export default function ExposurePage() {
             </div>
           )}
 
-          {/* ── Analysis ── */}
+          {/* ── Signals & Context ── */}
           {snapshot && (
             <>
-              <div >
-                <Divider label="Analysis" />
+              <div>
+                <Divider label="Signals & Context" />
               </div>
-              <div >
-                {isMisaligned ? (
+              <div>
+                {/* Misalignment warnings — only shown when portfolio is off-target */}
+                {isMisaligned && (
                   <>
                     <InsightCard
                       icon={Zap}
@@ -646,27 +615,24 @@ export default function ExposurePage() {
                       text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
                     />
                   </>
-                ) : score >= 60 ? (
-                  <InsightCard
-                    icon={Shield}
-                    variant="positive"
-                    text={`All categories within target bands. BTC at ${allocations[0]?.current}% anchors the portfolio with room to increase if confidence holds above 70%.`}
-                  />
-                ) : (
-                  <InsightCard
-                    icon={Shield}
-                    variant="neutral"
-                    text="Your allocation is moderately aligned. Some buckets are near the edge of their target bands."
-                  />
                 )}
               </div>
+
+              {/* Message strip — unread exposure messages, hidden when empty */}
+              {!isAnon && (
+                <div style={{ paddingLeft: 10 }}>
+                  <MessageFeed
+                    screen="exposure"
+                    limit={3}
+                    showHeader={false}
+                    unreadOnly
+                    hideWhenEmpty
+                    onMessageRead={() => {}}
+                  />
+                </div>
+              )}
             </>
           )}
-
-          {/* ── Pro CTA ── */}
-          <div >
-            <ProFeaturesCta />
-          </div>
 
           {/* Footer */}
           <div style={{

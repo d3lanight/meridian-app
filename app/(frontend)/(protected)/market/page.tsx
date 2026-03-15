@@ -1,9 +1,12 @@
 // ━━━ Market Pulse Page ━━━
+// v5.8.0 · bug fix — remove Signal Coherence card (hardcoded, no real signal data)
 // v5.7.0 · Sprint 46 — S229: MessageFeed strip below RegimeHero (pulse screen, unread only).
 // v5.6.0 · Sprint 42 — days param mirrors window for correct regime timeline depth.
 // v5.5.0 · Sprint 42 — S209: Replace per-page getUser()+pref fetch with useUser() context.
 // v5.4.0 · S207 · Sprint 42
 // Changelog:
+//   v5.8.0 — Remove CoherenceCard + buildCoherence. Text was locally computed from hardcoded
+//             logic — no real signal data behind it. Card and helper function removed entirely.
 //   v5.4.0 — S207: /api/market split — public data from /api/market, per-user portfolio+signals
 //             from new /api/market-user (auth-gated). Authenticated users fetch both in parallel.
 //             Anonymous users unaffected — regime/metrics/sentiment render as before.
@@ -51,7 +54,6 @@ import {
   RegimeHero,
   PriceCard,
   MoversCard,
-  CoherenceCard,
   EthConfirmationCard,
 } from '@/components/pulse'
 
@@ -86,18 +88,6 @@ function deriveVolumeProfile(vol: number | null): { label: string; color: string
   if (b < 60)  return { label: 'Low',    color: M.accent }
   if (b < 120) return { label: 'Normal', color: M.accent }
   return              { label: 'High',   color: M.negative }
-}
-
-function buildCoherence(regime: string, fearGreed: number, altSeason: number): string {
-  const regimeLabel = regime.charAt(0).toUpperCase() + regime.slice(1)
-  const fgDesc = fearGreed > 60 ? 'Greed present' : fearGreed < 40 ? 'Fear dominant' : 'Neutral sentiment'
-  if (regime === 'bull') {
-    return `${regimeLabel} regime with ${fgDesc.toLowerCase()}. ${altSeason < 50 ? "Capital hasn't rotated yet — this is a BTC-first environment with breakout potential." : 'Alt rotation underway — broader market participation confirms the trend.'}`
-  }
-  if (regime === 'bear') {
-    return `${regimeLabel} regime. ${fgDesc} with altcoins underperforming. Risk management is key — watch for regime transitions.`
-  }
-  return `${regimeLabel} regime. ${fgDesc}. Mixed signals suggest patience.`
 }
 
 function formatIntradayTime(iso: string): string {
@@ -314,12 +304,10 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
     : 'BTC Dom'
 
   // ── BTC Volatility 7d (visible row) ──
-  // % number: always M.text (metric, not directional)
-  // Pill: accent for calm/normal, amber for elevated, coral for extreme
   const pvPillColor = priceVol !== null
     ? priceVol > 0.05 ? M.negative
     : priceVol > 0.04 ? M.volatility
-    : M.accent   // Normal + Calm → accent
+    : M.accent
     : M.textMuted
   const pvLabel = priceVol !== null
     ? priceVol > 0.05 ? 'Extreme'
@@ -329,12 +317,11 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
     : '—'
 
   // ── BTC 7d return (collapsed tile 3) ──
-  // Directional color is valid here — it's a price return
   const r7dPct = btcR7d !== null ? btcR7d * 100 : null
   const r7dColor = r7dPct === null ? M.textMuted
     : r7dPct > 2  ? M.positive
     : r7dPct < -2 ? M.negative
-    : M.accent   // Near-zero → accent
+    : M.accent
   const r7dDisplay = r7dPct !== null
     ? `${r7dPct >= 0 ? '+' : ''}${r7dPct.toFixed(1)}%`
     : '—'
@@ -392,7 +379,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
         </div>
       )}
 
-      {/* ── Collapsed row ── */}
+      {/* ── Expanded row ── */}
       {open && (
         <div style={{ borderTop: `1px solid ${M.borderSubtle}`, padding: '12px 14px 14px' }}>
           <div onClick={() => setOpen(false)} style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
@@ -471,14 +458,13 @@ export default function PulsePage() {
   const [btcDom, setBtcDom]                 = useState(50)
   const [marketCap, setMarketCap]           = useState<number | null>(null)
   const [priceVol, setPriceVol]             = useState<number | null>(null)
-  const [btcR7d, setBtcR7d]                 = useState<number | null>(null)   // BTC 7d return
+  const [btcR7d, setBtcR7d]                 = useState<number | null>(null)
   const [isVolatile, setIsVolatile]         = useState(false)
   const [btcIcon, setBtcIcon]               = useState<string | null>(null)
   const [ethIcon, setEthIcon]               = useState<string | null>(null)
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([])
   const { openAuth } = useAuthSheet()
 
-  // S209: User data from context — no Supabase calls on mount
   const { isAnon, isPro, regimeWindow: ctxRegimeWindow, userId, loading: userLoading } = useUser()
   const [regimeWindowState, setRegimeWindowState] = useState(30)
 
@@ -487,7 +473,6 @@ export default function PulsePage() {
     return () => clearTimeout(t)
   }, [])
 
-  // S209: re-run load when userLoading resolves (context bootstrapped)
   useEffect(() => {
     if (userLoading) return
     setRegimeWindowState(ctxRegimeWindow)
@@ -495,7 +480,6 @@ export default function PulsePage() {
       try {
         const regimeWindow = ctxRegimeWindow
 
-        // S207: Parallel fetch — public routes + auth-gated market-user for logged-in users
         const fetches: Promise<Response>[] = [
           fetch(`/api/market-context?days=${regimeWindow}&window=${regimeWindow}`),
           fetch('/api/market'),
@@ -513,7 +497,7 @@ export default function PulsePage() {
             setRegime(latest.regime || 'range')
             setConfidence(Math.round((latest.confidence || 0) * 100))
             setPriceVol(latest.vol_7d ?? null)
-            setBtcR7d(latest.r_7d ?? null)           // Wire BTC 7d return
+            setBtcR7d(latest.r_7d ?? null)
             setIsVolatile(latest.is_volatile ?? false)
 
             let days = 1
@@ -554,9 +538,7 @@ export default function PulsePage() {
           }
         }
 
-        // S207: Wire per-user data from new auth-gated endpoint (portfolio/signals for future use)
         if (marketUserRes && !isAnon && marketUserRes.ok) {
-          // Reserved for future portfolio/signals UI on Pulse — data available, not yet rendered
           await marketUserRes.json()
         }
 
@@ -595,7 +577,6 @@ export default function PulsePage() {
               isVolatile={isVolatile}
               regimeWindow={regimeWindowState}
               onWindowChange={async (val) => {
-                // Write to user_preferences — userId from context, no getUser() needed
                 if (!userId) return
                 const { createClient: cc } = await import('@/lib/supabase/client')
                 const _sb = cc()
@@ -605,9 +586,6 @@ export default function PulsePage() {
                   .eq('user_id', userId)
                   .eq('name', 'regime_display_window')
                 setRegimeWindowState(Number(val))
-                // Re-fetch market-context with new window — update full regime state.
-                // current_prices (btcChange/ethChange) are live 24h values, window-invariant.
-                // EthConfirmationCard spread always reflects live prices regardless of window.
                 const mcRes = await fetch(`/api/market-context?days=${val}&window=${val}`)
                 if (mcRes.ok) {
                   const mc = await mcRes.json()
@@ -628,7 +606,6 @@ export default function PulsePage() {
                     }
                     setPersistence(days)
                   }
-                  // current_prices are live — refresh on window switch too
                   if (mc.current_prices) {
                     const btc = mc.current_prices['BTC']
                     const eth = mc.current_prices['ETH']
@@ -689,21 +666,16 @@ export default function PulsePage() {
             </div>
           )}
 
-          {/* Coherence */}
-          <div style={anim(mounted, 6)}>
-            <CoherenceCard text={buildCoherence(regime, fearGreed, altSeason)} />
-          </div>
-
           {/* Anon CTA */}
           {isAnon && (
-            <div style={anim(mounted, 7)}>
+            <div style={anim(mounted, 6)}>
               <AnonCTA onAuth={openAuth} />
             </div>
           )}
 
           {/* Footer */}
           <div style={{
-            ...anim(mounted, 8),
+            ...anim(mounted, 7),
             textAlign: 'center', padding: '8px 0', fontSize: 10, color: M.textMuted, fontFamily: FONT_BODY,
           }}>
             Market data for educational purposes only.
