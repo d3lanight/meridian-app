@@ -1,8 +1,11 @@
 // ━━━ UserContext ━━━
+// v1.1.0 · ca-story236 · 2026-03-15
+//   - load() now returns { isPro } to allow post-load checks
+//   - onAuthStateChange fires POST /api/briefing/trigger silently on SIGNED_IN for Pro users
 // v1.0.0 · Sprint 42 — S209
-// Loads user, tier, regime_display_window once at protected layout mount.
-// All protected pages read from context — no per-page getUser() or pref fetches.
-// refresh() can be called after login or pref changes (e.g. Profile window selector).
+//   - Loads user, tier, regime_display_window once at protected layout mount.
+//   - All protected pages read from context — no per-page getUser() or pref fetches.
+//   - refresh() can be called after login or pref changes (e.g. Profile window selector).
 
 'use client'
 
@@ -65,7 +68,8 @@ const DEFAULT_STATE: UserState = {
 export function UserProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<UserState>(DEFAULT_STATE)
 
-  const load = useCallback(async () => {
+  // Returns { isPro } so callers can act on tier without reading stale closure state
+  const load = useCallback(async (): Promise<{ isPro: boolean }> => {
     setState(prev => ({ ...prev, loading: true }))
     try {
       const supabase = createClient()
@@ -73,7 +77,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       if (!user) {
         setState({ ...DEFAULT_STATE, loading: false, userId: undefined })
-        return
+        return { isPro: false }
       }
 
       // Parallel fetch: profile + both pref rows
@@ -126,8 +130,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         isAnon: false,
         loading: false,
       })
+
+      return { isPro }
     } catch {
       setState(prev => ({ ...prev, loading: false }))
+      return { isPro: false }
     }
   }, [])
 
@@ -137,19 +144,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     // Keep auth state in sync (login/logout)
     const supabase = createClient()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session?.user) {
         setState({ ...DEFAULT_STATE, loading: false, userId: undefined })
       } else {
-        load()
+        load().then(({ isPro }) => {
+          // Fire briefing trigger silently on login for Pro users only
+          // Does not fire on TOKEN_REFRESHED or other events
+          if (event === 'SIGNED_IN' && isPro) {
+            fetch('/api/briefing/trigger', { method: 'POST' }).catch(() => {})
+          }
+        })
       }
     })
     return () => subscription.unsubscribe()
   }, [load])
 
-  return (
-    <UserContext.Provider value={{ ...state, refresh: load }}>
-      {children}
-    </UserContext.Provider>
-  )
+  // Replace the context value line at the bottom of UserProvider:
+
+const refresh = useCallback(async () => { await load() }, [load])
+
+return (
+  <UserContext.Provider value={{ ...state, refresh }}>
+    {children}
+  </UserContext.Provider>
+)
 }
