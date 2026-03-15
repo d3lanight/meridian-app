@@ -38,7 +38,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, TrendingDown, Minus, Sparkles, X, ChevronLeft, Shield } from 'lucide-react'
+import { TrendingUp, AlertTriangle, Activity, Info, Sparkles, X, ChevronLeft, Shield } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { M } from '@/lib/meridian'
 import { card, anim } from '@/lib/ui-helpers'
@@ -105,10 +105,10 @@ function signalColor(severity: number): string {
   return '#2A9D8F'                        // teal — informational
 }
 
-function signalIcon(action: string) {
-  if (action === 'BUY')  return TrendingUp
-  if (action === 'SELL') return TrendingDown
-  return Minus
+function signalIcon(severity: number) {
+  if (severity >= 70) return AlertTriangle
+  if (severity >= 40) return Activity
+  return Info
 }
 
 // ── Mock sources (shown beneath overlay until SOURCES_ENABLED = true) ──────
@@ -1108,7 +1108,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {signals.slice(0, 3).map((sig, i) => {
                 const color = signalColor(sig.severity)
-                const Icon  = signalIcon(sig.action)
+                const Icon  = signalIcon(sig.severity)
                 return (
                   <div key={sig.id ?? i} style={{
                     ...card({ padding: '14px 16px' }),
