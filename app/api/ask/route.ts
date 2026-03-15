@@ -1,20 +1,20 @@
 // ━━━ Ask API ━━━
-// v2.2.0 · 2026-03-15
+// v2.3.0 · 2026-03-15
 // POST /api/ask — handles preset question taps from AgentPrompt
 // Auth: required — 401 for unauthenticated
 // Request:  { question_id: string, regime_window: number }
 // Response: { answer, question_id, generated_at, regime_window }
 //
 // Changelog:
+//   v2.3.0 — Add persistence_days via regime_persistence_days() RPC.
+//            Add active_signals (last 48h, notify=true, up to 5) for all users.
+//            Both injected into prompt context. Fixes regime_duration and
+//            signals_now questions. Enriches biggest_risk and watch_today.
 //   v2.2.0 — Context Behaviour section parsed from ca-doc-agent-config.
-//            contextBehaviourAsk injected into prompt as format block.
-//            Hardcoded FORMAT_CONSTRAINT removed — format is now config-driven.
-//            Fallback mirrors doc values so behaviour is identical on fetch failure.
+//            contextBehaviourAsk injected as format block. Hardcoded FORMAT_CONSTRAINT removed.
 //   v2.1.0 — Fix sentiment: fear_greed_value / alt_season_value (correct column names).
-//            Fix portfolio context: source switched to portfolio_exposure
-//            (was portfolio_snapshots — columns do not exist on that table).
-//   v2.0.0 — Runtime config from ca-doc-agent-config. buildPrompt config param.
-//            question registry remains in code.
+//            Fix portfolio context: source switched to portfolio_exposure.
+//   v2.0.0 — Runtime config from ca-doc-agent-config.
 //
 // Question registry:
 //   Market (free + pro): market.regime_today, market.regime_duration,
@@ -157,9 +157,13 @@ async function fetchMarketContext(supabase: Awaited<ReturnType<typeof createClie
   return data
 }
 
+async function fetchPersistenceDays(supabase: Awaited<ReturnType<typeof createClient>>): Promise<number> {
+  // v2.3.0: added — fixes regime_duration question
+  const { data } = await supabase.rpc('regime_persistence_days')
+  return (data as number) ?? 1
+}
+
 async function fetchSentiment(supabase: Awaited<ReturnType<typeof createClient>>) {
-  // v2.1.0: correct column names — fear_greed_value / alt_season_value
-  // (fear_greed_index / alt_season_index do not exist)
   const { data } = await supabase
     .from('market_sentiment')
     .select('fear_greed_value, fear_greed_label, alt_season_value, updated_at')
@@ -169,10 +173,22 @@ async function fetchSentiment(supabase: Awaited<ReturnType<typeof createClient>>
   return data
 }
 
+async function fetchActiveSignals(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  // v2.3.0: added — fixes signals_now, enriches biggest_risk and watch_today
+  // Last 48h, notify=true, up to 5
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+  const { data } = await supabase
+    .from('signals')
+    .select('signal_type, severity, summary')
+    .eq('user_id', userId)
+    .eq('notify', true)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  return data ?? []
+}
+
 async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  // v2.1.0: source switched from portfolio_snapshots to portfolio_exposure
-  // (btc_pct / eth_pct / alt_pct / stable_pct / risk_score / posture_label
-  //  do not exist on portfolio_snapshots)
   const { data: exposure } = await supabase
     .from('portfolio_exposure')
     .select('btc_weight_all, eth_weight_all, alt_weight_all, holdings_count, regime_status')
@@ -193,12 +209,20 @@ async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createC
 
 // ─── 4. Prompt Builder ───────────────────────────────────────────────────────
 
+interface Signal {
+  signal_type: string
+  severity: string
+  summary: string
+}
+
 function buildPrompt(
   config: AgentConfig,
   questionId: string,
   questionText: string,
   regime: NonNullable<Awaited<ReturnType<typeof fetchMarketContext>>>,
+  persistenceDays: number,
   sentiment: Awaited<ReturnType<typeof fetchSentiment>>,
+  activeSignals: Signal[],
   portfolio: Awaited<ReturnType<typeof fetchPortfolioContext>> | null,
   window: ValidWindow
 ): string {
@@ -215,6 +239,7 @@ function buildPrompt(
   const marketCtx = `
 Current market data (${window}d window):
 - Regime: ${regimeLabel} (confidence: ${confidencePct}%)
+- Regime duration: approximately ${persistenceDays} day${persistenceDays !== 1 ? 's' : ''}
 - Volatile modifier: ${isVolatile}
 - 7d return: ${r7d} | 30d return: ${r30d}
 - 7d volatility: ${vol7d}
@@ -222,6 +247,17 @@ Current market data (${window}d window):
 - Alt Season Index: ${altSeason}
 - Previous regime: ${regime.previous_regime ?? 'N/A'}
 `.trim()
+
+  // Active signals block — shown for all users when signals exist
+  let signalsCtx = ''
+  if (activeSignals.length > 0) {
+    const lines = activeSignals
+      .map((s) => `- [${s.severity.toUpperCase()}] ${s.signal_type}: ${s.summary}`)
+      .join('\n')
+    signalsCtx = `\nActive signals (last 48h):\n${lines}`
+  } else {
+    signalsCtx = `\nActive signals: none in last 48h`
+  }
 
   let portfolioCtx = ''
   if (portfolio?.exposure) {
@@ -244,6 +280,7 @@ User portfolio context:
 Tone: ${config.toneRules}
 
 ${marketCtx}
+${signalsCtx}
 ${portfolioCtx ? '\n' + portfolioCtx : ''}
 
 The user asked: "${questionText}"
@@ -297,16 +334,18 @@ export async function POST(request: NextRequest) {
   const window = parseWindow(regime_window)
   const questionText = ALL_QUESTIONS[question_id]
 
-  // Fetch agent config at runtime
-  const config = await fetchAgentConfig(supabase)
+  // Fetch all context in parallel
+  const [config, regime, persistenceDays, sentiment, activeSignals] = await Promise.all([
+    fetchAgentConfig(supabase),
+    fetchMarketContext(supabase, window),
+    fetchPersistenceDays(supabase),
+    fetchSentiment(supabase),
+    fetchActiveSignals(supabase, user.id),
+  ])
 
-  // Fetch market context
-  const regime = await fetchMarketContext(supabase, window)
   if (!regime) {
     return NextResponse.json({ error: 'Market data unavailable' }, { status: 503 })
   }
-
-  const sentiment = await fetchSentiment(supabase)
 
   // Portfolio context — only for pro portfolio questions
   let portfolioCtx: Awaited<ReturnType<typeof fetchPortfolioContext>> | null = null
@@ -315,7 +354,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Build prompt
-  const prompt = buildPrompt(config, question_id, questionText, regime, sentiment, portfolioCtx, window)
+  const prompt = buildPrompt(
+    config, question_id, questionText,
+    regime, persistenceDays, sentiment, activeSignals,
+    portfolioCtx, window
+  )
 
   // Call Claude
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
