@@ -1,11 +1,15 @@
 // ━━━ Ask API ━━━
-// v2.1.0 · 2026-03-15
+// v2.2.0 · 2026-03-15
 // POST /api/ask — handles preset question taps from AgentPrompt
 // Auth: required — 401 for unauthenticated
 // Request:  { question_id: string, regime_window: number }
 // Response: { answer, question_id, generated_at, regime_window }
 //
 // Changelog:
+//   v2.2.0 — Context Behaviour section parsed from ca-doc-agent-config.
+//            contextBehaviourAsk injected into prompt as format block.
+//            Hardcoded FORMAT_CONSTRAINT removed — format is now config-driven.
+//            Fallback mirrors doc values so behaviour is identical on fetch failure.
 //   v2.1.0 — Fix sentiment: fear_greed_value / alt_season_value (correct column names).
 //            Fix portfolio context: source switched to portfolio_exposure
 //            (was portfolio_snapshots — columns do not exist on that table).
@@ -55,6 +59,7 @@ interface AgentConfig {
   identity: string
   toneRules: string
   outputFormatRules: string
+  contextBehaviourAsk: string
   wordLimit: number
   model: string
   maxTokens: number
@@ -66,7 +71,9 @@ const CONFIG_FALLBACK: AgentConfig = {
   toneRules:
     'Calm and educational. Plain English. Specific to the data provided. Non-prescriptive.',
   outputFormatRules:
-    'Flowing prose only. No headings or bullet points. Do not mention "Meridian" in the response text. No price targets or percentage predictions.',
+    'Follow the formatting rules defined in the Format block below. Do not mention "Meridian" in the response text. No price targets or percentage predictions.',
+  contextBehaviourAsk:
+    'Use markdown. Structure with short paragraphs, **bold** key terms and values. Never produce a wall of text. Use line breaks to breathe.',
   wordLimit: 150,
   model: 'claude-haiku-4-5-20251001',
   maxTokens: 300,
@@ -75,6 +82,14 @@ const CONFIG_FALLBACK: AgentConfig = {
 function parseSection(markdown: string, heading: string): string {
   const re = new RegExp(`## ${heading}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i')
   const match = markdown.match(re)
+  return match ? match[1].trim() : ''
+}
+
+function parseContextBehaviour(markdown: string, context: 'ask' | 'briefing'): string {
+  const section = parseSection(markdown, 'Context Behaviour')
+  if (!section) return ''
+  const re = new RegExp(`### ${context}\\n([\\s\\S]*?)(?=\\n### |$)`, 'i')
+  const match = section.match(re)
   return match ? match[1].trim() : ''
 }
 
@@ -117,6 +132,7 @@ async function fetchAgentConfig(
       identity: parseSection(md, 'Identity') || CONFIG_FALLBACK.identity,
       toneRules: parseSection(md, 'Tone Rules') || CONFIG_FALLBACK.toneRules,
       outputFormatRules: parseSection(md, 'Output Format Rules') || CONFIG_FALLBACK.outputFormatRules,
+      contextBehaviourAsk: parseContextBehaviour(md, 'ask') || CONFIG_FALLBACK.contextBehaviourAsk,
       wordLimit: parseWordLimit(md, 'ask_response'),
       model,
       maxTokens,
@@ -223,19 +239,19 @@ User portfolio context:
 `.trim()
   }
 
-  return `IMPORTANT — Output format: Plain sentences only. Do not use markdown headings, bold text, bullet points, or any other markdown formatting. Begin your response directly with your first sentence.
-
-${config.identity}
+  return `${config.identity}
 
 Tone: ${config.toneRules}
-Format: ${config.outputFormatRules}
 
 ${marketCtx}
 ${portfolioCtx ? '\n' + portfolioCtx : ''}
 
 The user asked: "${questionText}"
 
-Answer in ${config.wordLimit} words or fewer.`
+Answer in ${config.wordLimit} words or fewer.
+
+Format:
+${config.contextBehaviourAsk}`
 }
 
 // ─── 5. Route Handler ────────────────────────────────────────────────────────
