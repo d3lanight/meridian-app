@@ -1,7 +1,11 @@
 // ━━━ Today Page ━━━
-// v5.7.0 · Sprint 46 — S228: Message feed integration
+// v5.8.0 · bug fix — eliminate message sheet flash on open
 // Purpose: Today dashboard — Ask orb nav, Chat sheet, Sources sheet, Message center.
 // Changelog:
+//   v5.8.0 — Bug fix: pre-fetch full message list on page mount alongside unread count.
+//             Bell tap opens sheet instantly — data already loaded, no skeleton flash.
+//             msgFeedData state added. fetchMessages() replaces fetchUnreadCount(),
+//             derives count from fetched rows. initialMessages passed to sheet MessageFeed.
 //   v5.7.0 — S228: ActivityBadge wired to unread count from contextual_messages.
 //             Message BottomSheet with MessageFeed (screen=today, limit=20).
 //             "Mark all read" button visible when unread > 0.
@@ -313,6 +317,19 @@ interface BriefingApiResponse {
   content?: string
 }
 
+interface ContextualMessage {
+  id: string
+  message_type: string
+  topic: string
+  icon: string
+  body: string
+  severity: 'info' | 'watch' | 'notice'
+  screens: string[]
+  read: boolean
+  read_at: string | null
+  created_at: string
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -336,15 +353,14 @@ export default function DashboardPage() {
   // ── Posture ────────────────────────────────────────────────────────────
   const [postureLabel, setPostureLabel] = useState<string | null>(null)
 
-  // ── Message center — S228 ──────────────────────────────────────────────
+  // ── Message center — S228 / v5.8.0 ────────────────────────────────────
+  // Pre-fetch full message list on mount. Bell tap opens instantly — no skeleton.
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [msgSheetOpen, setMsgSheetOpen] = useState(false)
+  const [msgFeedData,  setMsgFeedData]  = useState<ContextualMessage[] | null>(null)
 
   // ── Sources sheet ──────────────────────────────────────────────────────
   const [sourcesSheetOpen, setSourcesSheetOpen] = useState(false)
-
-  // ── Chat sheet — global in layout via AskSheet ────────────────────────────
-
 
   // ── Fetch: regime — same source + window as Pulse page ────────────────
   useEffect(() => {
@@ -436,24 +452,32 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [isAnon])
 
-  // ── Fetch: unread count — S228 ────────────────────────────────────────
+  // ── Fetch: messages — v5.8.0 ──────────────────────────────────────────
+  // Replaces the unread-count-only query. Fetches full rows so the sheet
+  // can render immediately on tap. Derives unread count from the result.
   useEffect(() => {
     if (isAnon || !userId) return
     const supabase = createClient()
-    async function fetchUnreadCount() {
+
+    async function fetchMessages() {
       try {
-        const { count } = await supabase
+        const { data } = await supabase
           .from('contextual_messages')
-          .select('id', { count: 'exact', head: true })
+          .select('*')
           .eq('user_id', userId)
-          .eq('read', false)
           .contains('screens', ['today'])
-        setUnreadCount(count ?? 0)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        const rows = (data ?? []) as ContextualMessage[]
+        setMsgFeedData(rows)
+        setUnreadCount(rows.filter(m => !m.read).length)
       } catch {
-        // silent
+        // silent — ActivityBadge stays at 0, sheet falls back to internal fetch
       }
     }
-    fetchUnreadCount()
+
+    fetchMessages()
   }, [isAnon, userId])
 
   // ── Mark all read — S228 ──────────────────────────────────────────────
@@ -466,12 +490,18 @@ export default function DashboardPage() {
       .eq('user_id', userId)
       .eq('read', false)
       .contains('screens', ['today'])
+    // Update local feed data so the sheet reflects the change immediately
+    setMsgFeedData(prev => prev ? prev.map(m => ({ ...m, read: true, read_at: new Date().toISOString() })) : prev)
     setUnreadCount(0)
   }
 
   // ── Handle single message read — S228 ─────────────────────────────────
-  function handleMessageRead(_id: string) {
+  function handleMessageRead(id: string) {
     setUnreadCount(prev => Math.max(0, prev - 1))
+    // Keep local feed data in sync so badge stays accurate without a refetch
+    setMsgFeedData(prev =>
+      prev ? prev.map(m => m.id === id ? { ...m, read: true, read_at: new Date().toISOString() } : m) : prev
+    )
   }
 
   // ── Mount animation ────────────────────────────────────────────────────
@@ -480,96 +510,6 @@ export default function DashboardPage() {
     const t = setTimeout(() => setMounted(true), 100)
     return () => clearTimeout(t)
   }, [])
-
-  // ── Fetch: regime — same source + window as Pulse page ────────────────
-  useEffect(() => {
-    if (userLoading) return
-    fetch(`/api/market-context?window=${regimeWindow}&days=${regimeWindow}`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data?.regimes?.length) return
-        const latest = data.regimes[0]
-        if (!latest) return
-        const REGIME_LABELS: Record<string, string> = {
-          bull: 'Bull Market', bear: 'Bear Market',
-          range: 'Range', volatility: 'High Volatility',
-          insufficient_data: 'Insufficient Data',
-        }
-        const r1d  = (latest.r_1d  ?? 0) * 100
-        const r7d  = (latest.r_7d  ?? 0) * 100
-        const vol  = (latest.vol_7d ?? 0) * 100
-        const regimeData: RegimeData = {
-          current:     REGIME_LABELS[latest.regime] ?? latest.regime ?? 'Unknown',
-          confidence:  Math.round((latest.confidence ?? 0) * 100),
-          persistence: 0,
-          trend:       `${r7d >= 0 ? '+' : ''}${r7d.toFixed(1)}%`,
-          dailyShift:  r1d > 3 ? 'High' : r1d > -3 ? 'Moderate' : 'Low',
-          volatility:  `${vol.toFixed(0)}%`,
-        }
-        setRegime(regimeData)
-        const rows  = data.regimes as { regime: string }[]
-        const first = rows[0]?.regime
-        let count = 0
-        for (const row of rows) {
-          if (row.regime !== first) break
-          count++
-        }
-        setRegimeDay(count)
-      })
-      .catch(() => {})
-  }, [userLoading, regimeWindow])
-
-  // ── Fetch: metrics from /api/market (window-invariant) ────────────────
-  useEffect(() => {
-    const fetches: Promise<Response>[] = [fetch('/api/market')]
-    if (!isAnon) fetches.push(fetch('/api/market-user'))
-
-    Promise.all(fetches)
-      .then(async ([mRes, muRes]) => {
-        if (mRes?.ok) {
-          const data = await mRes.json()
-          setMetrics(data.metrics ?? null)
-        }
-        if (muRes?.ok) {
-          const data = await muRes.json()
-          setSignals(data.signals ?? [])
-        }
-      })
-      .catch(() => {})
-  }, [isAnon])
-
-  // ── Fetch: briefing (auth only) ────────────────────────────────────────
-  useEffect(() => {
-    if (isAnon) { setBriefingPending(false); return }
-    fetch('/api/briefing')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: BriefingApiResponse | null) => {
-        if (!data) { setBriefingPending(false); return }
-        if (data.status === 'ready') {
-          setBriefingContent(data.content)
-          setBriefingPending(false)
-        } else {
-          setBriefingPending(true)
-        }
-      })
-      .catch(() => setBriefingPending(false))
-  }, [isAnon])
-
-  // ── Fetch: portfolio snapshot for posture label ────────────────────────
-  useEffect(() => {
-    if (isAnon) return
-    fetch('/api/portfolio-snapshot')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data) return
-        const score = data.posture_score ?? null
-        if (score === null) return
-        if      (score >= 80) setPostureLabel('Aligned')
-        else if (score >= 50) setPostureLabel('On track')
-        else                  setPostureLabel('Off target')
-      })
-      .catch(() => {})
-  }, [isAnon])
 
   // ── Derived display values ─────────────────────────────────────────────
   const name        = firstName(displayName)
@@ -1297,7 +1237,9 @@ export default function DashboardPage() {
 
 
       {/* ═══════════════════════════════════════════════════════════════════
-          MESSAGE SHEET — S228
+          MESSAGE SHEET — S228 / v5.8.0
+          initialMessages passed so feed renders immediately on open.
+          Falls back to internal fetch if msgFeedData is null (slow load edge case).
       ═══════════════════════════════════════════════════════════════════ */}
       <BottomSheet
         isOpen={msgSheetOpen}
@@ -1342,13 +1284,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Feed */}
+        {/* Feed — initialMessages bypasses internal fetch, sheet opens with no flash */}
         <div style={{ padding: '8px 20px 24px', paddingLeft: 30 }}>
           <MessageFeed
             screen="today"
             limit={20}
             showHeader={false}
             onMessageRead={handleMessageRead}
+            initialMessages={msgFeedData ?? undefined}
           />
         </div>
       </BottomSheet>

@@ -1,7 +1,10 @@
-// MessageFeed v1.2.0
-// Sprint 46 — ca-story230-mark-as-read-states
-// Updated: 2026-03-14
+// MessageFeed v1.3.0
+// Sprint — bug fix: eliminate flash on message sheet open
+// Updated: 2026-03-15
 // Changes:
+//   v1.3.0 — Add `initialMessages` prop. When provided, bypasses internal fetch entirely.
+//             Component renders immediately with pre-fetched data — no skeleton, no loading state.
+//             Existing usage without prop is unaffected (inline strips still self-fetch).
 //   v1.2.0 — S230: Mark-as-read on row tap. DB write (UPDATE contextual_messages SET read=true).
 //             On success: unread dot disappears, row opacity → 0.7, onMessageRead callback fires.
 //             No full reload — local state patch only.
@@ -94,6 +97,16 @@ export interface MessageFeedProps {
   severity?: 'info' | 'watch' | 'notice'
   /** Render null instead of the empty state — for inline strips */
   hideWhenEmpty?: boolean
+  /**
+   * Pre-fetched messages from the parent. When provided, the internal fetch
+   * is skipped entirely — no skeleton, no loading flash. The component renders
+   * immediately with this data.
+   *
+   * The parent is responsible for filtering (unreadOnly / severity) before
+   * passing data here. unreadOnly and severity props are ignored when
+   * initialMessages is set.
+   */
+  initialMessages?: ContextualMessage[]
 }
 
 // ── Component ─────────────────────────────────
@@ -106,16 +119,22 @@ export function MessageFeed({
   unreadOnly = false,
   severity,
   hideWhenEmpty = false,
+  initialMessages,
 }: MessageFeedProps) {
   const { userId, isAnon } = useUser()
-  const [messages, setMessages] = useState<ContextualMessage[]>([])
-  const [loading, setLoading]   = useState(true)
+
+  // If initialMessages provided, skip fetch — start resolved immediately
+  const [messages, setMessages] = useState<ContextualMessage[]>(initialMessages ?? [])
+  const [loading, setLoading]   = useState(initialMessages === undefined ? true : false)
   const [error, setError]       = useState(false)
 
-  // ── Fetch ──────────────────────────────────
+  // ── Fetch — only runs when initialMessages is NOT provided ────────────
 
   useEffect(() => {
+    // Skip fetch if caller provided pre-fetched data
+    if (initialMessages !== undefined) return
     if (isAnon || !userId) { setLoading(false); return }
+
     const supabase = createClient()
 
     async function fetchMessages() {
@@ -143,9 +162,18 @@ export function MessageFeed({
     }
 
     fetchMessages()
-  }, [userId, isAnon, screen, limit, unreadOnly, severity])
+  }, [userId, isAnon, screen, limit, unreadOnly, severity, initialMessages])
 
-  // ── Mark single message read — S230 ───────
+  // ── Sync if parent refreshes initialMessages ──────────────────────────
+
+  useEffect(() => {
+    if (initialMessages !== undefined) {
+      setMessages(initialMessages)
+      setLoading(false)
+    }
+  }, [initialMessages])
+
+  // ── Mark single message read — S230 ───────────────────────────────────
 
   const handleRowTap = useCallback(async (id: string) => {
     if (!userId) return
@@ -176,7 +204,7 @@ export function MessageFeed({
     onMessageRead?.(id)
   }, [userId, onMessageRead])
 
-  // ── Guards ─────────────────────────────────
+  // ── Guards ─────────────────────────────────────────────────────────────
 
   if (isAnon || !userId) return null
 
@@ -210,7 +238,7 @@ export function MessageFeed({
     )
   }
 
-  // ── Message list ───────────────────────────
+  // ── Message list ───────────────────────────────────────────────────────
 
   return (
     <div>
