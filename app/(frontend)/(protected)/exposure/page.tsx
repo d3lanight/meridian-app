@@ -26,7 +26,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, Zap, TrendingUp, Plus, BookOpen, Eye, EyeOff } from 'lucide-react'
+import { Shield, Zap, Plus, BookOpen, Eye, EyeOff } from 'lucide-react'
 import { getTargetBands } from '@/lib/risk-profiles'
 import { getRegimeConfig } from '@/lib/regime-utils'
 import type { RegimeRow } from '@/lib/regime-utils'
@@ -608,11 +608,6 @@ export default function ExposurePage() {
                       variant="warning"
                       text="Concentration detected — one or more buckets are significantly outside target bands, which amplifies exposure to regime shifts."
                       subtext="Analytical context, not a rebalancing signal."
-                    />
-                    <InsightCard
-                      icon={TrendingUp}
-                      variant="warning"
-                      text="Early regime transitions can be noisy. The model typically needs 3–5 days to confirm a shift."
                     />
                   </>
                 )}
