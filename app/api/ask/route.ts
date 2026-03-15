@@ -1,13 +1,16 @@
 // ━━━ Ask API ━━━
-// v2.0.0 · ca-story234 · 2026-03-15
+// v2.1.0 · 2026-03-15
 // POST /api/ask — handles preset question taps from AgentPrompt
 // Auth: required — 401 for unauthenticated
 // Request:  { question_id: string, regime_window: number }
 // Response: { answer, question_id, generated_at, regime_window }
 //
-// v2.0.0 — reads ca-doc-agent-config from payload_project_docs at runtime.
-//   Falls back to hardcoded values if config fetch fails (logs config=fallback).
-//   question registry remains in code (not moved to config).
+// Changelog:
+//   v2.1.0 — Fix sentiment: fear_greed_value / alt_season_value (correct column names).
+//            Fix portfolio context: source switched to portfolio_exposure
+//            (was portfolio_snapshots — columns do not exist on that table).
+//   v2.0.0 — Runtime config from ca-doc-agent-config. buildPrompt config param.
+//            question registry remains in code.
 //
 // Question registry:
 //   Market (free + pro): market.regime_today, market.regime_duration,
@@ -139,26 +142,27 @@ async function fetchMarketContext(supabase: Awaited<ReturnType<typeof createClie
 }
 
 async function fetchSentiment(supabase: Awaited<ReturnType<typeof createClient>>) {
+  // v2.1.0: correct column names — fear_greed_value / alt_season_value
+  // (fear_greed_index / alt_season_index do not exist)
   const { data } = await supabase
     .from('market_sentiment')
-    .select('fear_greed_index, fear_greed_label, alt_season_index, updated_at')
+    .select('fear_greed_value, fear_greed_label, alt_season_value, updated_at')
     .order('updated_at', { ascending: false })
     .limit(1)
     .single()
   return data
 }
 
-async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, window: ValidWindow) {
-  const { data: holdings } = await supabase
-    .from('portfolio_holdings')
-    .select('quantity, include_in_exposure, asset_mapping(symbol, name, category)')
+async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  // v2.1.0: source switched from portfolio_snapshots to portfolio_exposure
+  // (btc_pct / eth_pct / alt_pct / stable_pct / risk_score / posture_label
+  //  do not exist on portfolio_snapshots)
+  const { data: exposure } = await supabase
+    .from('portfolio_exposure')
+    .select('btc_weight_all, eth_weight_all, alt_weight_all, holdings_count, regime_status')
     .eq('user_id', userId)
-    .eq('include_in_exposure', true)
-
-  const { data: snapshot } = await supabase
-    .from('portfolio_snapshots')
-    .select('btc_pct, eth_pct, alt_pct, stable_pct, risk_score, posture_label')
-    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single()
 
   const { data: riskPref } = await supabase
@@ -168,7 +172,7 @@ async function fetchPortfolioContext(supabase: Awaited<ReturnType<typeof createC
     .eq('name', 'risk_profile')
     .maybeSingle()
 
-  return { holdings, snapshot, riskProfile: riskPref?.value ?? 'neutral' }
+  return { exposure, riskProfile: riskPref?.value ?? 'neutral' }
 }
 
 // ─── 4. Prompt Builder ───────────────────────────────────────────────────────
@@ -189,8 +193,8 @@ function buildPrompt(
   const vol7d = regime.vol_7d != null ? `${(regime.vol_7d * 100).toFixed(1)}%` : 'N/A'
   const isVolatile = regime.is_volatile ? 'Yes (volatile modifier active)' : 'No'
   const fgLabel = sentiment?.fear_greed_label ?? 'Unknown'
-  const fgIndex = sentiment?.fear_greed_index ?? 'N/A'
-  const altSeason = sentiment?.alt_season_index ?? 'N/A'
+  const fgValue = sentiment?.fear_greed_value ?? 'N/A'
+  const altSeason = sentiment?.alt_season_value ?? 'N/A'
 
   const marketCtx = `
 Current market data (${window}d window):
@@ -198,23 +202,30 @@ Current market data (${window}d window):
 - Volatile modifier: ${isVolatile}
 - 7d return: ${r7d} | 30d return: ${r30d}
 - 7d volatility: ${vol7d}
-- Fear & Greed: ${fgIndex} (${fgLabel})
+- Fear & Greed: ${fgValue} (${fgLabel})
 - Alt Season Index: ${altSeason}
 - Previous regime: ${regime.previous_regime ?? 'N/A'}
 `.trim()
 
   let portfolioCtx = ''
-  if (portfolio?.snapshot) {
-    const s = portfolio.snapshot
+  if (portfolio?.exposure) {
+    const e = portfolio.exposure
+    const btcPct = Math.round((e.btc_weight_all ?? 0) * 100)
+    const ethPct = Math.round((e.eth_weight_all ?? 0) * 100)
+    const altPct = Math.round((e.alt_weight_all ?? 0) * 100)
+    const stablePct = Math.max(0, 100 - btcPct - ethPct - altPct)
     portfolioCtx = `
 User portfolio context:
 - Risk profile: ${portfolio.riskProfile}
-- Posture score: ${s.risk_score ?? 'N/A'} (${s.posture_label ?? 'N/A'})
-- BTC: ${s.btc_pct ?? 'N/A'}% | ETH: ${s.eth_pct ?? 'N/A'}% | ALT: ${s.alt_pct ?? 'N/A'}% | STABLE: ${s.stable_pct ?? 'N/A'}%
+- Portfolio posture: ${e.regime_status ?? 'tracked'}
+- BTC: ${btcPct}% | ETH: ${ethPct}% | ALT: ${altPct}% | STABLE: ${stablePct}%
+- Holdings: ${e.holdings_count ?? 0}
 `.trim()
   }
 
-  return `${config.identity}
+  return `IMPORTANT — Output format: Plain sentences only. Do not use markdown headings, bold text, bullet points, or any other markdown formatting. Begin your response directly with your first sentence.
+
+${config.identity}
 
 Tone: ${config.toneRules}
 Format: ${config.outputFormatRules}
@@ -284,13 +295,13 @@ export async function POST(request: NextRequest) {
   // Portfolio context — only for pro portfolio questions
   let portfolioCtx: Awaited<ReturnType<typeof fetchPortfolioContext>> | null = null
   if (isPortfolioQuestion) {
-    portfolioCtx = await fetchPortfolioContext(supabase, user.id, window)
+    portfolioCtx = await fetchPortfolioContext(supabase, user.id)
   }
 
-  // Build prompt with config
+  // Build prompt
   const prompt = buildPrompt(config, question_id, questionText, regime, sentiment, portfolioCtx, window)
 
-  // Call Claude model from config
+  // Call Claude
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -308,8 +319,7 @@ export async function POST(request: NextRequest) {
   if (!anthropicRes.ok) {
     const err = await anthropicRes.text()
     console.error('[/api/ask] Anthropic error:', err)
-    return NextResponse.json({ error: 'AI unavailable' }, { status: 502 }
-    )
+    return NextResponse.json({ error: 'AI unavailable' }, { status: 502 })
   }
 
   const anthropicData = await anthropicRes.json()
