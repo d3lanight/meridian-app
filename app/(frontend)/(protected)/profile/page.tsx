@@ -122,31 +122,80 @@ function DisplayDetail({ onBack }: { onBack: () => void }) {
 
 // ── Notifications detail sub-view ────────────
 function NotificationDetail({ onBack }: { onBack: () => void }) {
-  const [posture, setPosture] = useState(true)
-  const [regime, setRegime] = useState(true)
-  const [alt, setAlt] = useState(true)
-  const [band, setBand] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [prefs, setPrefs] = useState({
+    notify_posture_mismatch:  true,
+    notify_regime_change:     true,
+    notify_alt_concentration: true,
+    notify_band_breach:       false,
+  })
+
+  const TOGGLES: { key: keyof typeof prefs; label: string; desc: string }[] = [
+    { key: 'notify_posture_mismatch',  label: 'Posture mismatch',   desc: 'When portfolio diverges from regime' },
+    { key: 'notify_regime_change',     label: 'Regime change',      desc: 'When market regime shifts' },
+    { key: 'notify_alt_concentration', label: 'ALT concentration',  desc: 'When altcoin allocation is flagged' },
+    { key: 'notify_band_breach',       label: 'Band breach',        desc: 'When weights move outside targets' },
+  ]
+
+  useEffect(() => {
+    async function fetchPrefs() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('name, value')
+        .eq('user_id', user.id)
+        .in('name', Object.keys(prefs))
+
+      if (data) {
+        const updates: Partial<typeof prefs> = {}
+        for (const row of data) {
+          if (row.name in prefs) {
+            (updates as any)[row.name] = row.value === 'true'
+          }
+        }
+        setPrefs(prev => ({ ...prev, ...updates }))
+      }
+      setLoading(false)
+    }
+    fetchPrefs()
+  }, [])
+
+  async function handleToggle(key: keyof typeof prefs, val: boolean) {
+    setPrefs(prev => ({ ...prev, [key]: val }))
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase
+      .from('user_preferences')
+      .update({ value: String(val) })
+      .eq('user_id', user.id)
+      .eq('name', key)
+  }
 
   return (
     <>
       <SubViewHeader title="Notifications" onClose={onBack} />
       <div style={{ padding: '20px', overflowY: 'auto' as const, flex: 1 }}>
-        <MenuCard>
-          {[
-            { label: 'Posture mismatch', desc: 'When portfolio diverges from regime', on: posture, set: setPosture },
-            { label: 'Regime change', desc: 'When market regime shifts', on: regime, set: setRegime },
-            { label: 'ALT concentration', desc: 'When altcoin allocation is flagged', on: alt, set: setAlt },
-            { label: 'Band breach', desc: 'When weights move outside targets', on: band, set: setBand },
-          ].map((item, i) => (
-            <div key={i} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>{item.label}</div>
-                <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>{item.desc}</div>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${M.accent}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : (
+          <MenuCard>
+            {TOGGLES.map((item) => (
+              <div key={item.key} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: M.text }}>{item.label}</div>
+                  <div style={{ fontSize: 11, color: M.textMuted, marginTop: 1 }}>{item.desc}</div>
+                </div>
+                <Toggle on={prefs[item.key]} onToggle={(v) => handleToggle(item.key, v)} />
               </div>
-              <Toggle on={item.on} onToggle={item.set} />
-            </div>
-          ))}
-        </MenuCard>
+            ))}
+          </MenuCard>
+        )}
         <SectionHeader label="Pro" />
         <MenuCard>
           <MenuRow icon={Bell} label="Custom thresholds" desc="Set your own trigger levels" pro coming />
@@ -600,7 +649,7 @@ export default function ProfilePage() {
               icon={Bell}
               label="Notifications"
               desc="Signal triggers and alerts"
-              coming
+              onClick={() => setSection('notifications')}
             />
             <MenuRow
               icon={Mail}
