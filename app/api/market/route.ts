@@ -75,8 +75,8 @@ export async function GET() {
       .limit(7),
     supabase
       .from('market_sentiment')
-      .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, total_volume_usd, market_date')
-      .order('market_date', { ascending: false })
+      .select('fear_greed_value, fear_greed_label, btc_dominance, alt_season_value, alt_season_label, total_volume_usd, market_date, created_at', )
+      .order('created_at', { ascending: false })
       .limit(1)
       .single(),
   ])

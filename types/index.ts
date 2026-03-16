@@ -53,6 +53,7 @@ export interface MarketMetrics {
   btcDominance: number;
   altSeason: number;
   totalVolume: number | null;
+  marketCap: number | null;
 }
 
 export type NavTab = 'home' | 'market' | 'exposure' | 'profile';

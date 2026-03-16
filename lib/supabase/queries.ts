@@ -132,7 +132,11 @@ export function computeMetrics(regime: any, sentiment: any): MarketMetrics {
     const btcDominance = sentiment.btc_dominance ?? fallbackBtcDominance(regime)
     const altSeason = sentiment.alt_season_value ?? fallbackAltSeason(regime)
 
-    return { fearGreed, fearGreedLabel, btcDominance, altSeason, totalVolume: sentiment.total_volume_usd ?? null }
+    // sentiment path
+    return { fearGreed, fearGreedLabel, btcDominance, altSeason, totalVolume: sentiment.total_volume_usd ?? null, marketCap: sentiment.total_market_cap_usd ?? null }
+
+    // fallback path
+    return { fearGreed, fearGreedLabel, btcDominance, altSeason, totalVolume: null, marketCap: null }
   }
 
   // ── Fallback: computed approximation (pre-S97 behavior) ──
@@ -143,6 +147,7 @@ export function computeMetrics(regime: any, sentiment: any): MarketMetrics {
       btcDominance: fallbackBtcDominance(regime),
       altSeason: fallbackAltSeason(regime),
       totalVolume: null,
+      marketCap: null,
     }
 }
 
