@@ -351,7 +351,7 @@ function MarketSignals({ totalVolume, fearGreed, altSeason, btcDom, marketCap, p
         <div style={{ flex: 1, padding: '10px 14px', borderRight: `1px solid ${M.borderSubtle}` }}>
           <div style={{ fontSize: 8, color: M.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Mkt Volume</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{formatVolume(totalVolume)}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: M.text, fontFamily: FONT_BODY }}>{formatVolume(marketCap)}</span>
             <StatusPill label={vp.label} color={vp.color} />
           </div>
         </div>
@@ -535,6 +535,7 @@ export default function PulsePage() {
             setAltSeason(m.metrics.altSeason ?? 30)
             setBtcDom(m.metrics.btcDominance ?? 50)
             setTotalVolume(m.metrics.totalVolume ?? null)
+            setMarketCap(m.metrics.marketCap ?? null)
           }
         }
 

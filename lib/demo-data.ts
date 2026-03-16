@@ -73,6 +73,7 @@ const bullScenario: Scenario = {
     btcDominance: 52.3,
     altSeason: 72,
     totalVolume: 98500000000,
+    marketCap: null,
   },
 };
 
@@ -131,6 +132,7 @@ const bearScenario: Scenario = {
     btcDominance: 58.7,
     altSeason: 28,
     totalVolume: 98500000000,
+    marketCap: null,
   },
 };
 
@@ -189,6 +191,7 @@ const sidewaysScenario: Scenario = {
     btcDominance: 54.1,
     altSeason: 48,
     totalVolume: 98500000000,
+    marketCap: null,
   },
 };
 
